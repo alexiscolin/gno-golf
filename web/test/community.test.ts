@@ -6,7 +6,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { bornBefore, communityOf, DAY_TRIES, dayHole, dayPoint, dayRows, HARD_KEY, keepLevel, keptLevel, knownOnly, knownVerdict, pageOf, playable, refused, shownOnly, sortHoles, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
+import { aliasOf, bornBefore, communityOf, DAY_TRIES, dayHole, dayPoint, dayRows, HARD_KEY, keepLevel, keptLevel, knownOnly, knownVerdict, pageOf, playable, refused, shownOnly, sortHoles, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
 import { writeHole } from "../lib/builder/gg1.ts";
 import type { DayRow, HoleRow } from "../lib/types.ts";
 import type { HoleIn } from "../lib/builder/types.ts";
@@ -215,6 +215,28 @@ void test("dayHole: the first candidate published before the day began that the 
   assert.deepEqual(dayHole([a, b, c], born([[a, null]]), v([])), { day: null, unread: true }, "when a was published not read: never skipped");
   const many = Array.from({ length: DAY_TRIES + 1 }, (_, i) => listed(`h${i}`));
   assert.deepEqual(dayHole(many, born(many.map((h) => [h, true])), v(many.map((h, i) => [h, i < DAY_TRIES ? no : ok]))), { day: null, unread: false }, "DAY_TRIES refused: none today");
+});
+
+void test("the day's hole: the same all day however many publish (more than Holes() lists), version or are taken down beside it", async () => {
+  const day = Date.UTC(2026, 9, 7), at = day, noon = day + 12 * 3600e3;
+  const addr = (i: number) => "g1" + "023456789acdefghjklmnpqrstuvwxyz"[i % 32].repeat(2) + String(i).padStart(36, "0").replace(/[1b-io]/g, "q");
+  // blocks: height 10 before the day began, 500 during it
+  const chain = { realm: "r", chainId: () => Promise.resolve("dev"), genesis: () => Promise.resolve("G"), blockTime: (h: number) => Promise.resolve(h < 100 ? at - 1 : at + 1) };
+  const pick = async (rows: readonly DayRow[], taken = new Set<string>()) => {
+    const list: DayRow[] = [], born = new Map<string, boolean | null>();
+    for await (const page of dayRows(dayChain(rows), noon, taken, 7)) list.push(...page);
+    for (const h of list) born.set(aliasOf(h), await bornBefore(chain, h, at));
+    return dayHole(list, born, new Map(list.map((h) => [h.id, { ok: true as const }]))).day?.slot;
+  };
+  const before = Array.from({ length: 30 }, (_, i) => dayRowOf(addr(i), `old${i}`, 10));
+  const first = await pick(before);
+  assert.ok(first);
+  const today = Array.from({ length: 150 }, (_, i) => dayRowOf(addr(i * 7 + 3), `new${i}`, 500));
+  assert.equal(await pick([...before, ...today]), first, "150 published during the day, anywhere in alias order: the same hole");
+  const versioned = [...before.map((h) => (h.slot === first ? { ...h, id: `${h.slot}/v2` } : h)), ...today];
+  assert.equal(await pick(versioned), first, "its own new version: still the day's");
+  const other = before.find((h) => h.slot !== first)!;
+  assert.equal(await pick([...before, ...today], new Set([other.slot!])), first, "another taken down: the same");
 });
 
 void test("bornBefore: whether a hole was first published before a time (its first version's block, as DayCandidates gives it), kept once known; 0 long before; not read: it throws", async () => {
