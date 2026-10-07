@@ -24,16 +24,16 @@ export function sizesOf(p: Piece, e?: PaletteEntry): Size[] {
   return [{ key: "width", value: g.max[0] - g.min[0], range }, { key: "depth", value: g.max[1] - g.min[1], range }];
 }
 
-/** The piece with one size set: within its entry's range, on the grid (a rail's far end moved along its way). */
-export function withSize(p: Piece, e: PaletteEntry, key: Size["key"], v: number): Piece {
+/** The piece with one size set: within its entry's range, on the grid from origin, the tee (a rail's far end moved along its way). */
+export function withSize(p: Piece, e: PaletteEntry, key: Size["key"], v: number, origin: V): Piece {
   const g = p.geometry;
-  if (g.t === "post") return setHandle(p, "r", [g.c[0] + v, g.c[1]], e);
+  if (g.t === "post") return setHandle(p, "r", [g.c[0] + v, g.c[1]], e, origin);
   if (g.t === "rail" || g.t === "bar") {
     const l = Math.hypot(g.b[0] - g.a[0], g.b[1] - g.a[1]) || 1, u: V = [(g.b[0] - g.a[0]) / l, (g.b[1] - g.a[1]) / l];
-    return setHandle(p, "b", [g.a[0] + u[0] * v, g.a[1] + u[1] * v], e);
+    return setHandle(p, "b", [g.a[0] + u[0] * v, g.a[1] + u[1] * v], e, origin);
   }
   if (g.t === "poly") return p;
-  return setHandle(p, "max", key === "width" ? [g.min[0] + v, g.max[1]] : [g.max[0], g.min[1] + v], e);
+  return setHandle(p, "max", key === "width" ? [g.min[0] + v, g.max[1]] : [g.max[0], g.min[1] + v], e, origin);
 }
 
 /** The piece with a number set (bounce, grip, grade), on its entry's steps and in range; unchanged if its entry has none. */

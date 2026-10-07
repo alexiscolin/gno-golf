@@ -9,7 +9,7 @@ import type { Issue } from "./checks";
 import type { ClockSpec, Draft, Geometry, Piece, V } from "./draft";
 import { entryParts, frame } from "./gg1";
 import { pieceName } from "./names";
-import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
+import { handlesOf, QUARTER, setHandle, snap, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
@@ -80,11 +80,12 @@ export function middleOf(p: Piece): V {
 /**
  * The armed entry's piece as the board's ghost has it: centred under the
  * pointer, placed at a point on the grid of step (so every point of it is,
- * a tunnel's way out with the rest: placePiece puts it from that point).
+ * a tunnel's way out with the rest: placePiece puts it from that point),
+ * measured from origin, the tee.
  */
-export function ghostAt(e: PaletteEntry, id: string, pointer: V, step: number): Piece {
+export function ghostAt(e: PaletteEntry, id: string, pointer: V, step: number, origin: V): Piece {
   const p = placePiece(e, id, pointer), m = middleOf(p);
-  return placePiece(e, id, snap([2 * pointer[0] - m[0], 2 * pointer[1] - m[1]], step));
+  return placePiece(e, id, snap([2 * pointer[0] - m[0], 2 * pointer[1] - m[1]], step, origin));
 }
 
 /** Where a piece is, for a sentence: its first point. */
@@ -185,18 +186,8 @@ export function movePiece(p: Piece, to: V): Piece {
   return { ...p, geometry };
 }
 
-/** v on a grid of step (half a unit, the board's default; a quarter at the finest). */
-export const snap = (v: V, step = 0.5): V => [Math.round(v[0] / step) * step + 0, Math.round(v[1] / step) * step + 0];
-
-/**
- * v on the quarter grid as the hole has it: measured from origin (the tee:
- * the grid's own, since framing shifts a whole hole, by a post's rim at
- * times; the cup when the tee itself moves).
- */
-const onQuarter = (v: V, origin: V): V => {
-  const s = snap([v[0] - origin[0], v[1] - origin[1]], QUARTER);
-  return [s[0] + origin[0], s[1] + origin[1]];
-};
+/** v on the quarter grid as the hole has it: from origin (the tee; the cup when the tee itself moves). */
+const onQuarter = (v: V, origin: V): V => snap(v, QUARTER, origin);
 
 /** How many strides a walk takes at most before its grid steps (each a whole check): a long drag stays quick. */
 const WALK_STRIDES = 32;
@@ -208,7 +199,7 @@ const WALK_STRIDES = 32;
  * checks however long the drag (a stride may step over a rail: where it lands
  * still holds).
  */
-function walk(from: V, to: V, ok: (v: V) => boolean, origin: V = [0, 0]): V {
+function walk(from: V, to: V, ok: (v: V) => boolean, origin: V): V {
   const on = (v: V) => onQuarter(v, origin), at = (f: number) => on([from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f]);
   to = on(to);
   if (ok(to)) return to;
@@ -248,8 +239,8 @@ export function clampHandle(d: Draft, id: string, key: HandleKey, to: V, o: Vali
   const p = d.pieces.find((q) => q.id === id), e = p && entryIn(p.entry, o.palette), h = p && handlesOf(p).find((x) => x.key === key);
   if (!p || !e || !h) return d;
   const before = errorsOf(d, o);
-  const last = walk(h.at, to, (v) => canPlace(d, setHandle(p, key, v, e), o, before).length === 0);
-  return replace(d, setHandle(p, key, last, e));
+  const last = walk(h.at, to, (v) => canPlace(d, setHandle(p, key, v, e, d.tee), o, before).length === 0, d.tee);
+  return replace(d, setHandle(p, key, last, e, d.tee));
 }
 
 /** A drag of the tee or the cup toward `to`: stopped at the last place where the hole has no error it did not have. */
@@ -329,12 +320,21 @@ export const roomFor = (d: Draft, p: Piece): string => {
   return why.length ? refusalOf(why[0]) : "";
 };
 
-/** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near (roomFor says when the limits are why). */
-export function placeNear(d: Draft, e: PaletteEntry, to: V, o: ValidateOptions): { draft: Draft; id: string } | null {
+/**
+ * The keyboard's drop: the entry placed at `to` or the nearest place to it
+ * the hole holds, under a fresh name. Searched with the fast checks (quick:
+ * a census for each place tried froze the board for seconds), the place
+ * found judged with the census (full) before it is kept, as a copy and a fix
+ * are; why it is refused, or null if none near (roomFor says when the limits
+ * are why).
+ */
+export function placeNear(d: Draft, e: PaletteEntry, to: V, quick: ValidateOptions, full: ValidateOptions): { draft: Draft; id: string } | { why: string } | null {
   const id = nextId(d), p = placePiece(e, id, onQuarter(to, d.tee)); // (placed on the grid: its way out too)
   if (roomFor(d, p)) return null;
-  const put = canPlace(d, p, o).length === 0 ? p : nearest(d, p, o);
-  return put ? { draft: frame({ ...d, pieces: [...d.pieces, put] }), id } : null;
+  const put = canPlace(d, p, quick).length === 0 ? p : nearest(d, p, quick);
+  if (!put) return null;
+  const why = canPlace(d, put, full);
+  return why.length ? { why: refusalOf(why[0]) } : { draft: frame({ ...d, pieces: [...d.pieces, put] }), id };
 }
 
 /** How far a copy goes to clear its piece: a post's width, a rail's or a bar's a unit aside, a zone's longest side. */

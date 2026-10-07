@@ -37,6 +37,27 @@ export const cases: [string, () => Draft, string[]][] = [
     ["E4 -: The cup cannot be reached from the tee: the tee is closed in"]],
   ["E14: that gap a ball wide: it only just fits", () => lane("garden", [rail("x", [0, 0], [12, 19])]),
     ["E14 r3: The gap at (13.5, 21) between the wall and the wall is 1 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits"]],
+  ["E4: two gaps side by side in a rail across, each narrower than the ball (0.9): neither alone shuts the way, both do", () => lane("garden", [rail("a", [15.5, 0], [15.5, 5]), rail("b", [15, 5.75], [15.5, 14.25]), rail("c", [15, 15], [15, 20])]),
+    [
+      "E4 a: The cup cannot be reached from the tee: the gap at (16.75, 6.88) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+      "E4 b: The cup cannot be reached from the tee: the gap at (16.75, 16.13) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+    ]],
+  ["E4: three such gaps side by side", () => lane("garden", [rail("a", [15.5, 0], [15.5, 4]), rail("b", [15, 4.75], [15.5, 9.5]), rail("c", [15, 10.25], [15.5, 15]), rail("d", [15, 15.75], [15, 20])]),
+    [
+      "E4 a: The cup cannot be reached from the tee: the gap at (16.75, 5.88) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+      "E4 b: The cup cannot be reached from the tee: the gap at (16.75, 11.38) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+      "E4 c: The cup cannot be reached from the tee: the gap at (16.75, 16.88) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+    ]],
+  ["E4: two rails across one after the other, each with such a gap", () => lane("garden", [rail("a", [10.5, 0], [10.5, 9.75]), rail("b", [10, 10.5], [10, 20]), rail("c", [20.5, 0], [20.5, 9.75]), rail("d", [20, 10.5], [20, 20])]),
+    [
+      "E4 a: The cup cannot be reached from the tee: the gap at (11.75, 11.63) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+      "E4 c: The cup cannot be reached from the tee: the gap at (21.75, 11.63) between the wall and the wall is 0.9 wide, narrower than the ball (1)",
+    ]],
+  ["E14: two gaps side by side a ball only just fits (1.12)", () => lane("garden", [rail("a", [15.5, 0], [15.5, 5]), rail("b", [15, 6], [15.5, 14]), rail("c", [15, 15], [15, 20])]),
+    [
+      "E14 a: The gap at (16.75, 7) between the wall and the wall is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits",
+      "E14 b: The gap at (16.75, 16) between the wall and the wall is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits",
+    ]],
   ["E5: a pond too thin to stop a fast ball (a hand-edited file)", () => lane("garden", [{ ...put("x", "*/hazard/water", [12, 2]), geometry: { t: "rect", min: [12, 2], max: [13.25, 18] } }]),
     ["L0 x: The water's side is 1.25: 1.5 to 80"]],
   ["E6: a tunnel out into the water", () => lane("garden", [put("x", "*/tunnel/cave", [8, 3], { to: [20, 10] }), put("w", "*/hazard/water", [18, 8], { size: 4 })]),

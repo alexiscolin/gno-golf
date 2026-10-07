@@ -25,9 +25,10 @@ const why = (d: unknown) => {
   return typeof r === "string" ? r : "ok";
 };
 
-void test("onGrid: multiples of a quarter, finite", () => {
-  assert.ok(onGrid(1.25) && onGrid(0) && onGrid(-3.75));
-  assert.ok(!onGrid(0.3) && !onGrid(Number.NaN) && !onGrid(Number.POSITIVE_INFINITY));
+void test("onGrid: multiples of a quarter from the tee, finite", () => {
+  assert.ok(onGrid(1.25, 0) && onGrid(0, 0) && onGrid(-3.75, 0));
+  assert.ok(!onGrid(0.3, 0) && !onGrid(Number.NaN, 0) && !onGrid(Number.POSITIVE_INFINITY, 0));
+  assert.ok(onGrid(13.95, 13.7) && onGrid(13.7 - 0.25 * 3, 13.7) && !onGrid(14, 13.7), "a hole framed by a post's rim: its own quarters");
 });
 
 void test("a whole draft reads back as it was written", () => {
@@ -45,7 +46,7 @@ void test("anything else is refused, with why", () => {
   assert.equal(why({ ...base(), title: "x".repeat(41) }), "The name is at most 40 characters.");
   assert.equal(why({ ...base(), note: "x".repeat(141) }), "The line for players is at most 140 characters.");
   assert.equal(why({ ...base(), par: 20 }), "Par is a whole number from 0 to 19.");
-  assert.equal(why({ ...base(), tee: [0.3, 5] }), "The tee is off the grid.");
+  assert.equal(why({ ...base(), tee: [0.3, 5] }), "The cup is off the grid.", "(the grid is the tee's)");
   const off = base();
   off.pieces[0] = { ...off.pieces[0], geometry: { t: "rail", a: [1.5, 1.3], b: [22.5, 1.5] } };
   assert.equal(why(off), "Piece p1 is off the grid.");

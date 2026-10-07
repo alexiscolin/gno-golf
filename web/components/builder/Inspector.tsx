@@ -115,7 +115,7 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
       <div className="insp__head">{entryName(ent)}</div>
       <div className="insp__acts">
         {/* (a round piece: off, the reason its title, as R says it) */}
-        <button type="button" className={`btn btn--ghost${notTurned(p) ? " btn--off" : ""}`} aria-disabled={notTurned(p) ? true : undefined} title={notTurned(p) || "Turn it a quarter (R)"} onClick={onTurn}>Turn<kbd>R</kbd></button>
+        <button type="button" className={`btn btn--ghost${notTurned(p, draft.tee) ? " btn--off" : ""}`} aria-disabled={notTurned(p, draft.tee) ? true : undefined} title={notTurned(p, draft.tee) || "Turn it a quarter (R)"} onClick={onTurn}>Turn<kbd>R</kbd></button>
         <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
         <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
       </div>
@@ -124,7 +124,7 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
       <details className="insp__details">
       <summary>Details</summary>
       <p className="insp__at">At {xy(at)}</p>
-      {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v))} onDone={done} />)}
+      {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v, draft.tee))} onDone={done} />)}
       {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
       {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
       {ent.scale && <Row label={ent.kind === "loop" ? "Speed" : "Grip"} value={p.params.scale ?? ent.scale.def} range={ent.scale} onChange={(v) => tryPiece(withNumber(p, ent, "scale", v))} onDone={done} />}

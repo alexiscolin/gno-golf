@@ -6,13 +6,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
-import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
-import { handlesOf, notTurned, setHandle, turnPiece } from "../lib/builder/handles.ts";
+import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, toWorld } from "../lib/builder/edit.ts";
+import { handlesOf, notTurned, setHandle, snap, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession, settle } from "../lib/builder/session.ts";
 import { centreOn, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
-import type { Draft, Piece } from "../lib/builder/draft.ts";
+import type { Draft, Piece, V } from "../lib/builder/draft.ts";
 
 const garden = await loadPalette("garden");
 const { census } = await import("../lib/builder/drawn.ts");
@@ -21,11 +21,14 @@ const entry = (id: string) => garden.find((e) => e.id === id)!;
 const put = (id: string, e: string, at: [number, number], p: Parameters<typeof placePiece>[3] = {}) => placePiece(entry(e), id, at, p);
 const errors = (d: Draft) => validate(d, ctx).issues.filter((i) => i.severity === "error");
 void build;
+/** The board's own quarters (these pieces in no framed hole: the tee's grid is the board's). */
+const O: V = [0, 0];
 
-void test("snap: to the step asked, half a unit by default, a quarter at the finest", () => {
-  assert.deepEqual(snap([3.3, 7.8]), [3.5, 8]);
-  assert.deepEqual(snap([3.3, 7.8], 0.25), [3.25, 7.75]);
-  assert.deepEqual(snap([-0.2, 0.26], 0.25), [-0.25, 0.25]);
+void test("snap: to the step asked, half a unit or a quarter, from the grid's origin (the tee)", () => {
+  assert.deepEqual(snap([3.3, 7.8], 0.5, O), [3.5, 8]);
+  assert.deepEqual(snap([3.3, 7.8], 0.25, O), [3.25, 7.75]);
+  assert.deepEqual(snap([-0.2, 0.26], 0.25, O), [-0.25, 0.25]);
+  assert.deepEqual(snap([3.3, 7.8], 0.25, [4.5, 13.7]), [3.25, 7.7], "a hole framed off the board's quarters: its own");
 });
 
 void test("handles: a post's centre and radius, a rail's or a bar's ends, a zone's corners, a tunnel's way out", () => {
@@ -38,28 +41,28 @@ void test("handles: a post's centre and radius, a rail's or a bar's ends, a zone
 
 void test("setHandle: within the entry's range and on the grid", () => {
   const rock = put("p", "*/post/rock", [5, 5]);
-  assert.equal((setHandle(rock, "r", [50, 5], entry("*/post/rock")).geometry as { r: number }).r, 4.5, "a radius stops at its entry's most");
-  assert.equal((setHandle(rock, "r", [5.1, 5], entry("*/post/rock")).geometry as { r: number }).r, 0.3, "and its least");
-  assert.deepEqual((setHandle(rock, "c", [7.3, 2.6], entry("*/post/rock")).geometry as { c: number[] }).c, [7.25, 2.5]);
+  assert.equal((setHandle(rock, "r", [50, 5], entry("*/post/rock"), O).geometry as { r: number }).r, 4.5, "a radius stops at its entry's most");
+  assert.equal((setHandle(rock, "r", [5.1, 5], entry("*/post/rock"), O).geometry as { r: number }).r, 0.3, "and its least");
+  assert.deepEqual((setHandle(rock, "c", [7.3, 2.6], entry("*/post/rock"), O).geometry as { c: number[] }).c, [7.25, 2.5]);
   const plank = put("b", "*/bar/plank", [5, 5]);
-  const long = setHandle(plank, "b", [90, 5], entry("*/bar/plank")).geometry as { a: number[]; b: number[] };
+  const long = setHandle(plank, "b", [90, 5], entry("*/bar/plank"), O).geometry as { a: number[]; b: number[] };
   assert.deepEqual(long.b, [45, 5], "a bar's length stops at 40");
-  const diag = setHandle(plank, "b", [60, 60], entry("*/bar/plank")).geometry as { a: number[]; b: number[] };
+  const diag = setHandle(plank, "b", [60, 60], entry("*/bar/plank"), O).geometry as { a: number[]; b: number[] };
   const len = Math.hypot(diag.b[0] - 5, diag.b[1] - 5);
   assert.ok(len <= 40 && len > 39.5 && diag.b.every((v) => v * 4 === Math.round(v * 4)), `${len}`);
   const pond = put("w", "*/hazard/water", [5, 5]);
-  const g = setHandle(pond, "max", [5.5, 200], entry("*/hazard/water")).geometry as { min: number[]; max: number[] };
+  const g = setHandle(pond, "max", [5.5, 200], entry("*/hazard/water"), O).geometry as { min: number[]; max: number[] };
   assert.deepEqual([g.max[0] - g.min[0], g.max[1] - g.min[1]], [1.5, 80], "each side within 1.5 to 80");
 });
 
 void test("turnPiece: a quarter turn about its middle, on the grid", () => {
   const plank = put("b", "*/bar/plank", [5, 5], { size: 4 });
-  assert.deepEqual((turnPiece(plank).geometry), { t: "bar", a: [7, 3], b: [7, 7], thick: 0.5 });
+  assert.deepEqual((turnPiece(plank, O).geometry), { t: "bar", a: [7, 3], b: [7, 7], thick: 0.5 });
   const rock = put("p", "*/post/rock", [5, 5]);
-  assert.deepEqual(turnPiece(rock).geometry, rock.geometry, "a round thing: unchanged");
+  assert.deepEqual(turnPiece(rock, O).geometry, rock.geometry, "a round thing: unchanged");
   // what R and Turn say of a piece turning leaves the same: never a silent key
-  assert.equal(notTurned(rock), "A round piece looks the same turned: nothing to turn.");
-  assert.equal(notTurned(plank), "");
+  assert.equal(notTurned(rock, O), "A round piece looks the same turned: nothing to turn.");
+  assert.equal(notTurned(plank, O), "");
 });
 
 void test("nextId, copyPiece, removePiece: a fresh name; a copy where it may go, framed; a removal (proofs kept: their key says whether they still hold)", () => {
@@ -110,12 +113,26 @@ void test("the keyboard: a piece named for a screen reader by what and where it 
   const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
   assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock at (13.5, 6.5)");
   const at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
-  const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden, census: ctx.census });
-  assert.ok(placed && placed.draft.pieces.length === d.pieces.length + 1, "placed");
+  const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden }, ctx);
+  assert.ok(placed && !("why" in placed) && placed.draft.pieces.length === d.pieces.length + 1, "placed");
   assert.deepEqual(errors(placed.draft), [], "where the hole holds");
   assert.equal(placed.id, nextId(d), "and named, to be selected");
   const big = garden.find((e) => e.id === "*/hazard/water")!;
-  assert.equal(placeNear(lane("garden", [], 8, 6), big, [4, 3], { host, palette: garden }), null, "nowhere it holds: nothing");
+  assert.equal(placeNear(lane("garden", [], 8, 6), big, [4, 3], { host, palette: garden }, ctx), null, "nowhere it holds: nothing");
+});
+
+void test("the keyboard's drop searches with the fast checks and judges only the place found with the census: no freeze where the middle is taken", async () => {
+  const { STARTERS } = await import("../lib/builder/starters.ts");
+  let drawn = 0;
+  const counted = { ...ctx, census: (...a: Parameters<typeof census>) => (drawn++, census(...a)) }, quick = { host, palette: garden };
+  for (const [world, kind] of [["garden", "dogleg"], ["garden", "signature"], ["island", "dogleg"]] as const) {
+    const d = STARTERS[world][kind], palette = await loadPalette(world), at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
+    for (const e of palette.filter((x) => x.kind === "post" || x.kind === "hazard").slice(0, 4)) {
+      drawn = 0;
+      placeNear(d, e, at, { ...quick, palette }, { ...counted, palette });
+      assert.ok(drawn <= 2, `${world} ${kind} ${e.id}: ${drawn} census checks`);
+    }
+  }
 });
 
 void test("dragCheck: a drag (or the armed ghost) is checked again only when its snapped place changes; the hole without the piece once a drag", () => {

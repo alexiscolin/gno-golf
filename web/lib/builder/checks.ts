@@ -108,14 +108,15 @@ function way(h: HoleIn, name: Namer): Issue[] {
     const shut = from.size <= reach({ ...h, tee: h.pin }, loose).size ? "the tee is closed in" : "the cup is closed off";
     return [err("E4", `The cup cannot be reached from the tee: ${shut}`, undefined, shut === "the tee is closed in" ? h.tee : h.pin)];
   }
-  const ball = 2 * h.ballR, wide = ball + PASSAGE;
-  return passages(h, wide).map(({ gap, mid, a, b }) => {
-    const between = `the gap at ${pt(mid)} between ${name(a)} and ${name(b)} is ${+gap.toFixed(2)} wide`;
-    return gap < ball
-      ? err("E4", `The cup cannot be reached from the tee: ${between}, narrower than the ball (${ball})`, a, mid, [b])
-      : err("E14", `${cap(between)}, and the way to the cup goes through it: at least ${wide}, or a ball only just fits`, a, mid, [b]);
-  });
+  // E4 the gaps no ball passes the way needs, E14 the rest the way needs a ball only just fits through
+  const ball = 2 * h.ballR, wide = ball + PASSAGE, shut = passages(h, ball), same = (p: Passage, q: Passage) => p.mid[0] === q.mid[0] && p.mid[1] === q.mid[1];
+  return [
+    ...shut.map(({ gap, mid, a, b }) => err("E4", `The cup cannot be reached from the tee: ${between(name, gap, mid, a, b)}, narrower than the ball (${ball})`, a, mid, [b])),
+    ...passages(h, wide).filter((p) => !shut.some((q) => same(p, q))).map(({ gap, mid, a, b }) =>
+      err("E14", `${cap(between(name, gap, mid, a, b))}, and the way to the cup goes through it: at least ${wide}, or a ball only just fits`, a, mid, [b])),
+  ];
 }
+const between = (name: Namer, gap: number, mid: V, a: PieceRef, b: PieceRef) => `the gap at ${pt(mid)} between ${name(a)} and ${name(b)} is ${+gap.toFixed(2)} wide`;
 
 /** The clearance the way's flood is made at: generous (a cell shut only if no ball could be anywhere in it), so it never refuses a hole a ball can play. */
 export const LOOSE = (h: HoleIn) => h.ballR - CELL * Math.SQRT1_2;
@@ -131,8 +132,10 @@ export interface Passage {
 /**
  * The gaps narrower than under between two fixed solids (walls, posts: a
  * pulse's and a timed one are not always there) that the way to the cup
- * needs: closed there, the cup is lost. E4 and E14 read them at the ball's
- * width; the difficulty meter wider. None if the cup is not reached at all.
+ * needs: closed there, alone or with the other such gaps, the cup is lost
+ * (two gaps side by side, each too narrow, are a way shut as one is). E4 and
+ * E14 read them at the ball's width; the difficulty meter wider. None if the
+ * cup is not reached at all.
  */
 export function passages(h: HoleIn, under: number): Passage[] {
   // the gaps are measured exactly, the way found by the flood
@@ -141,19 +144,27 @@ export function passages(h: HoleIn, under: number): Passage[] {
   const of: Solid[] = [], refs: PieceRef[] = [];
   for (const { item, ref } of each<WallIn>(h, "wall")) if (!item.every && ref.pulse === undefined) of.push({ kind: "wall", a: item.a, b: item.b }), refs.push(ref);
   for (const { item, ref } of each<PostIn>(h, "post")) if (ref.pulse === undefined) of.push({ kind: "post", c: item.c, r: item.r }), refs.push(ref);
-  const out: Passage[] = [];
+  // each gap closed by a post at its middle: its cells within the post's reach shut (gridOf's own rule, on the same grid)
+  const gaps: (Passage & { post: PostIn })[] = [];
   for (let i = 0; i < of.length; i++) {
     for (let j = i + 1; j < of.length; j++) {
       const [gap, mid] = gapOf(of[i], of[j]);
-      if (!(gap > 1e-9 && gap < under)) continue;
-      // one the way needs: closed there, the cup is lost. Closing it shuts the cells within its post's
-      // reach (gridOf's own rule, on the same grid): if the way the flood found passes none, it still holds
-      const shut = Math.max(gap / 2, CELL), closes = (p: V) => Math.hypot(p[0] - mid[0], p[1] - mid[1]) < shut + loose + 1e-9;
-      if (!base.path.some(closes) || reach({ ...h, posts: [...h.posts, { c: mid, r: shut }] }, loose).reached) continue;
-      out.push({ gap, mid, a: refs[i], b: refs[j] });
+      if (gap > 1e-9 && gap < under) gaps.push({ gap, mid, a: refs[i], b: refs[j], post: { c: mid, r: Math.max(gap / 2, CELL) } });
     }
   }
-  return out;
+  const lost = (closed: readonly { post: PostIn }[]) => !reach({ ...h, posts: [...h.posts, ...closed.map((g) => g.post)] }, loose).reached;
+  // one the way needs alone: closed there, the cup is lost (if the way the flood found passes none of its cells, it still holds)
+  const needed = new Set(gaps.filter((g) => base.path.some((p) => Math.hypot(p[0] - g.mid[0], p[1] - g.mid[1]) < g.post.r + loose + 1e-9) && lost([g])));
+  // and the ones the way needs together: all closed, the cup lost, each reopened in turn and kept open while the cup stays lost; those left shut are the way's
+  if (gaps.length && lost(gaps)) {
+    const shut = new Set(gaps);
+    for (const g of gaps) {
+      shut.delete(g);
+      if (!lost([...shut])) shut.add(g);
+    }
+    for (const g of shut) needed.add(g);
+  }
+  return gaps.filter((g) => needed.has(g)).map(({ gap, mid, a, b }) => ({ gap, mid, a, b }));
 }
 
 /** The gap between two solids (a wall a segment, a post a circle) and the middle of its narrowest place. */
