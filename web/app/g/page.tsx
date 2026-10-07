@@ -7,7 +7,7 @@ import Intro from "@/app/intro";
 import { SITE } from "@/lib/site";
 import { SHOP } from "@/lib/gnomes/shop";
 
-const title = "The gnomes of Gnogolf: who's on the ball?";
+const title = "The Gnogolf gnome shop: who's on the ball?";
 const description = "720 gnomes, each one of a kind: pick the exact one you play Gnogolf with. Cosmetic only, the same ball and physics; the game stays free to play.";
 const image = { url: "/og/g.jpg", type: "image/jpeg", width: 1200, height: 630, alt: title };
 export const metadata: Metadata = SHOP

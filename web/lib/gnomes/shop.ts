@@ -290,6 +290,10 @@ export function shelf<E extends Listed>(entries: readonly E[], f: Query & { view
   return { list, tiers };
 }
 /** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", or its wave. */
+/** Whether a card in the gallery shows Buy: on sale now (its wave open, unsold, the sale not closed) and not the player's. */
+export const canBuyCard = (e: Listed, s: Seen) => !s.mine.has(e.id) && onSale(e, s.c, s.sold, s.now);
+/** A wave's prices as the gallery's head says them: [tier, ugnot] in the tiers' order, a tier at 0 left out. */
+export const wavePrices = (c: Collection, w: WaveRow) => c.tiers.map((t, i) => [t.name, w.prices[i] ?? 0] as const).filter(([, p]) => p > 0);
 export function cardFact(e: Listed, s: Seen) {
   if (s.mine.has(e.id)) return "Yours";
   if (s.sold(e.id)) return "Found a player";

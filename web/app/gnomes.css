@@ -42,6 +42,11 @@
 
 /* the wave of the moment: one paper panel, its count and its green */
 .wave { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
+.shop__pitch { margin: 0 auto; max-width: 640px; text-align: center; font-size: 16px; font-weight: 700; color: var(--ink-soft); }
+.wave__prices { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin: 0; font-size: 14px; font-weight: 700; }
+.wave__prices > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+/* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
+.gcard__buy { justify-self: stretch; margin: 2px 2px 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
 .wave__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-2); font-weight: 700; }
 .wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
 .track { position: relative; height: 18px; border-radius: var(--pill); background: #cfe6d4; border: var(--edge); overflow: hidden; }

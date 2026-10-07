@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -196,6 +196,19 @@ test("shop: the promo is the wave to see, its lowest price, its Legendary and th
   assert.equal(promoWords(none, T0 + 60).line, "104 gnomes");
   // the words never press: no countdown, no "only", no "last"
   for (const p of [open]) for (const w of Object.values(promoWords(p, T0))) assert.doesNotMatch(w, /only|last|hurry|left|invest|value/i);
+});
+
+// ------------------------------------------------------------ the gallery as a shop
+test("shop: the wave's prices tier by tier, and Buy on a card on sale only", () => {
+  const c = collection();
+  assert.deepEqual(wavePrices(c, c.waves[0]), [["common", 36e6], ["rare", 72e6], ["epic", 336e6], ["legendary", 1296e6]]);
+  assert.deepEqual(wavePrices(c, { ...c.waves[0], prices: [36e6, 0, 336e6, 0] }), [["common", 36e6], ["epic", 336e6]], "a tier at 0: not said");
+  const seen = { c, sold: isSold([2]), mine: new Set([3]), now: T0 + 49 * 3600 };
+  assert.equal(canBuyCard(entries[0], seen), true);
+  assert.equal(canBuyCard(entries[1], seen), false, "found a player");
+  assert.equal(canBuyCard(entries[2], seen), false, "yours");
+  assert.equal(canBuyCard(entries[0], { ...seen, now: T0 - 60 }), false, "its wave not open yet");
+  assert.equal(canBuyCard(entries.find((e) => e.id > 104)!, seen), false, "no wave of its own yet");
 });
 
 // ------------------------------------------------------------ why not, in plain words

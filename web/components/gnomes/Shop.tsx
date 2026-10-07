@@ -15,7 +15,7 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { cardFact, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
@@ -109,8 +109,9 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     if (cat && mine.length) void know(mine.map((id) => cat.gnomes.find((g) => g.id === id)).filter((g): g is Listed => !!g).map((g) => ({ id: String(g.id), name: g.name, traits: g.traits })));
   }, [cat, mine]);
 
-  const title = theirs ? `${theirs.name || "Their"}'s gnomes` : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : "Who's on the ball?";
-  const eyebrow = theirs ? "Their gnomes" : viewing === "mine" ? "My gnomes" : "The gnomes";
+  // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
+  const title = theirs ? `${theirs.name || "Their"}'s gnomes` : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : "Gnome shop";
+  const eyebrow = theirs ? "Their gnomes" : viewing === "mine" ? "My gnomes" : "Who's on the ball?";
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
   if (region === false)
@@ -121,6 +122,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     );
   return (
     <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={eyebrow} title={title}>
+      {!theirs && viewing !== "mine" && <p className="shop__pitch">Pick the exact gnome you play as. Cosmetic only: the same ball, the same physics.</p>}
       {!theirs && viewing !== "mine" && c && c.closesAt > 0 && !closed && <Closes at={c.closesAt} now={now} />}
       {/* the wave of the moment, or the sale's end: one panel, one line of numbers */}
       {!theirs && viewing !== "mine" && row && row.at !== "none" && (
@@ -134,6 +136,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
                 <span>{row.at === "soldout" ? `All ${row.wave.size} found a player` : `${row.wave.sold} of ${row.wave.size} found a player`}</span>
               </div>
               <div className="track" aria-hidden="true"><i style={{ width: `${row.wave.size ? (100 * row.wave.sold) / row.wave.size : 0}%` }} /></div>
+              {c && <p className="wave__prices">{wavePrices(c, row.wave.row).map(([t, p]) => <span key={t}><TierChip tier={t} /> {gnot(p)} GNOT</span>)}</p>}
               {row.at === "teaser" && <p className="wave__note">Opens {utcDate(row.wave.row.start, now)}.</p>}
               {row.at === "players" && <p className="wave__note">Players first until {utcDate(row.wave.row.playersUntil, now, true)}: save one round on-chain to buy now.</p>}
               {row.at === "paused" && <p className="wave__note">Paused for a moment: the sale picks up where it stopped.</p>}
@@ -180,7 +183,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         <>
           <ul className="gshelf">
             {list.slice(0, shown).map((g) => (
-              <li key={g.id}><GnomeCard g={g} fact={cardFact(g, seen)} mine={mineSet.has(g.id)} never={closed && !sold!(g.id)} onOpen={() => onView({ ...view, open: String(g.id) })} /></li>
+              <li key={g.id}><GnomeCard g={g} fact={cardFact(g, seen)} mine={mineSet.has(g.id)} never={closed && !sold!(g.id)} buy={canBuyCard(g, seen)} onOpen={() => onView({ ...view, open: String(g.id) })} /></li>
             ))}
           </ul>
           {list.length > shown && <Button variant="secondary" className="gshelf__more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, list.length - shown)} more · {shown} of {list.length}</Button>}

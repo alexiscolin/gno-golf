@@ -36,14 +36,16 @@ export const Tile = ({ id, tier, never = false, lazy = true }: { id: number; tie
   </span>
 );
 
-/** A gnome in the grid: his tile, name and number, his tier and one fact; a button that opens his sheet. */
-export function GnomeCard({ g, fact, mine, never, onOpen }: { g: Listed; fact: string; mine: boolean; never: boolean; onOpen: () => void }) {
+/** A gnome in the grid: his tile, name and number, his tier and one fact (his price when on sale), and Buy when he
+ *  can be bought; a button that opens his sheet (where the order is reviewed: the card itself never buys). */
+export function GnomeCard({ g, fact, mine, never, buy = false, onOpen }: { g: Listed; fact: string; mine: boolean; never: boolean; buy?: boolean; onOpen: () => void }) {
   return (
     <button type="button" className={`gcard${mine ? " gcard--mine" : ""}${never ? " gcard--never" : ""}`} onClick={onOpen}
-      aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${fact}`}>
+      aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${fact}${buy ? ". Buy" : ""}`}>
       <Tile id={g.id} tier={g.tier} never={never} />
       <span className="gcard__name">{g.name}<small>#{g.id}</small></span>
       <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{fact}</span></span>
+      {buy && <span className="gcard__buy" aria-hidden="true">Buy</span>}
     </button>
   );
 }
