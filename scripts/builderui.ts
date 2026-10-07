@@ -56,7 +56,7 @@ const CONTRAST = `(sel) => {
   return { ratio: (a + 0.05) / (b + 0.05), opacity: op };
 }`;
 
-const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650]];
+const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650], [1512, 982]];
 for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
@@ -70,6 +70,11 @@ for (const [w, h] of SIZES) {
   // the three steps in the middle of the header
   const steps = (await box(c, ".stepper"))!;
   assert.ok(Math.abs((steps.l + steps.r) / 2 - w / 2) <= 2, `${at}: the steps sit at ${(steps.l + steps.r) / 2}, not ${w / 2}`);
+  // undo and redo: whole, inside the header, clear of the steps (nothing clipped, nothing under the steps)
+  const head = (await box(c, ".bhead"))!, hist = await c.js<Box[]>(`[...document.querySelectorAll(".bhead__hist")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  assert.equal(hist.length, 2, `${at}: undo and redo in the header`);
+  for (const b of hist) assert.ok(b.l >= head.l && b.r <= head.r && b.t >= head.t - 0.5 && b.b <= head.b + 0.5 && !overlap(b, steps) && b.r - b.l >= 39.5, `${at}: undo or redo cut or under the steps (${JSON.stringify(b)})`);
+  assert.equal(await c.js(`[...document.querySelectorAll(".bhead__hist")].map((e) => e.getAttribute("aria-label")).join()`), "Undo,Redo", `${at}: undo and redo named`);
   // the header's action and the dock keep their places as their words change (a slug, then none)
   await typeInto(c, ".bhead__slug", "a-name");
   await sleep(1500);

@@ -32,8 +32,9 @@
 /* the action keeps its width as its words change (Test it, Publish →); off, it stays readable: ink on paper, dashed */
 .bhead__end .btn { min-width: 136px; justify-content: center; }
 .btn.btn--off { background: var(--paper); color: var(--ink); border-style: dashed; box-shadow: none; cursor: not-allowed; }
-.bhead__end .round { width: 40px; height: 40px; border-width: 2px; font-size: 18px; font-weight: 800; }
-.bhead__end .round:disabled { opacity: .4; }
+.bhead__end .round { flex: none; width: 40px; height: 40px; border-width: 2px; font-size: 18px; font-weight: 800; }
+/* undo, redo: the arrow drawn (no font's glyph to clip); off, still read: dashed and flat, its arrow in the soft ink */
+.bhead__end .round:disabled { background: transparent; border-style: dashed; color: var(--ink-soft); box-shadow: none; transform: none; cursor: not-allowed; }
 
 /* the steps: Edit, Test, Publish; done green, the current gold, the next open or locked with its reason */
 .stepper { justify-self: center; display: flex; align-items: center; gap: var(--sp-1); margin: 0; padding: var(--sp-1); list-style: none; border: var(--edge); border-radius: var(--pill); background: var(--paper); }
