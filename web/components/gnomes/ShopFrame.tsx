@@ -13,12 +13,13 @@ import { useGnomeStage } from "@/components/Stage";
 import type { Skin } from "@/lib/scene/gnome";
 import { Button } from "@/components/ui";
 import { BlankCard } from "./parts";
+import { SHOP_TITLE } from "@/lib/gnomes/door";
 
 /** The sale's own head, as every front screen's (About.tsx FrontScreen, the rival's size): its pill, its title, one
  *  line of what it sells; its other pages' pill (a player's gnomes, the player's own: their own title). */
 export const SHOP_HEAD = {
   eyebrow: "Choose your gnome",
-  title: "Gnome shop",
+  title: SHOP_TITLE,
   page: "The gnome shop",
   pitch: "Pick the exact gnome you play as. Cosmetic only: the same ball, the same physics.",
 };

@@ -8,6 +8,9 @@
 /** The shop is on (NEXT_PUBLIC_GNOMES=1); off, the game is exactly as before it. */
 export const SHOP = process.env.NEXT_PUBLIC_GNOMES === "1";
 
+/** The shop's title (ShopFrame.tsx SHOP_HEAD's), the door's frame's too when the shop's part could not come. */
+export const SHOP_TITLE = "Gnome shop";
+
 /** The menu's shop panel's line, before the sale is read (Promo.tsx shopLine adds its lowest price). */
 export const SHOP_LINE = "Collect gnomes, play as them";
 

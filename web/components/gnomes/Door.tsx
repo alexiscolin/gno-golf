@@ -6,9 +6,13 @@
 // writes it, so a build with NEXT_PUBLIC_GNOMES off has no such chunk at all
 // and every piece here draws nothing. The pieces stand in for Game.tsx's:
 // nothing until it is in (a badge, a section, a line that arrive as they did
-// once read), then the very same.
+// once read), then the very same; the shop's screen, its corner buttons
+// meanwhile, and Try again should the part not come.
 import { useEffect, useState, type ComponentProps } from "react";
 import { chunk } from "@/lib/chunk";
+import { FrontScreen } from "@/components/About";
+import { Button } from "@/components/ui";
+import { SHOP_TITLE } from "@/lib/gnomes/door";
 import type { Chain } from "@/lib/chain";
 import type { Promo } from "@/lib/gnomes/shop";
 import type { Sale } from "@/lib/gnomes/promo";
@@ -22,17 +26,22 @@ const part = process.env.NEXT_PUBLIC_GNOMES === "1" ? chunk(() => import("./Game
 /** The shop's part of the game, fetched once (a failed fetch asked again next time); null where the shop is off. */
 export const shopPart = (): Promise<Part> | null => (part ? part.load() : null);
 
-/** The shop's part, fetched once a screen wants it (want), null until it is in (and for good where the shop is off). */
-export function useShopPart(want = true): Part | null {
+/** The shop's part, fetched once a screen wants it (want): null until it is in (and for good where the shop is off);
+ *  failed once a fetch did not come, retry asks again. */
+function usePart(want: boolean) {
   const [m, setM] = useState<Part | null>(() => part?.value() ?? null);
+  const [failed, setFailed] = useState(false), [tries, setTries] = useState(0);
   useEffect(() => {
     if (!part || m || !want) return;
     let live = true;
-    part.load().then((x) => live && setM(x), () => {});
+    setFailed(false);
+    part.load().then((x) => live && setM(x), () => live && setFailed(true));
     return () => void (live = false);
-  }, [m, want]);
-  return m;
+  }, [m, want, tries]);
+  return { m, failed, retry: () => setTries((t) => t + 1) };
 }
+/** The shop's part, fetched once a screen wants it (want), null until it is in (and for good where the shop is off). */
+export const useShopPart = (want = true): Part | null => usePart(want).m;
 
 /** The sale on this chain (lib/gnomes/promo.ts, read once a chain) as the screens show it now, by the chain's clock
  *  (whole seconds, as the gallery's): promo undefined while read, null for none; none at all without a chain. */
@@ -81,9 +90,16 @@ export const PromoLine = (p: ComponentProps<Part["PromoLine"]>) => {
   const m = useShopPart();
   return m ? <m.PromoLine {...p} /> : null;
 };
+/** The shop's screen: its corner buttons while its part downloads (the frame then draws in its place, nothing moves),
+ *  and its title with Try again should the part not come. */
 export const ShopScreen = (p: ComponentProps<Part["ShopScreen"]>) => {
-  const m = useShopPart();
-  return m ? <m.ShopScreen {...p} /> : null;
+  const { m, failed, retry } = usePart(true);
+  if (m) return <m.ShopScreen {...p} />;
+  return (
+    <FrontScreen className="front--fit shop" back="Back" onBack={p.onBack} onAbout={p.onAbout} title={failed ? SHOP_TITLE : ""}>
+      {failed && <div className="gempty" role="alert"><p>The gnome shop did not load.</p><Button variant="primary" onClick={retry}>Try again</Button></div>}
+    </FrontScreen>
+  );
 };
 export const Owned = (p: ComponentProps<Part["OwnedRow"]>) => {
   const m = useShopPart();

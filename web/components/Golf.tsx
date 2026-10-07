@@ -1374,9 +1374,9 @@ export default function Golf() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // an open dialog hears Escape first and keeps it (useDialog); with none
-      // open, a screen goes back to the one before it
+      // open, a screen goes back to the one before it (the shop: the screen it was opened from)
       if (e.key !== "Escape") return;
-      setScreen((sc) => (sc === "pick" ? cupsScreen : (BACK as Partial<Record<Screen, Screen>>)[sc] || sc));
+      setScreen((sc) => (sc === "pick" ? cupsScreen : sc === "shop" ? shopFrom.current : (BACK as Partial<Record<Screen, Screen>>)[sc] || sc));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

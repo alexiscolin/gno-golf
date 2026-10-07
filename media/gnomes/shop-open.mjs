@@ -122,4 +122,26 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   console.log(`${fits ? "PASS" : "FAIL"} the picker's collection under its tile, the aim card's width, ${Math.round(pick.tall)} px tall, the head whole at ${w}×${h}`, fits ? "" : JSON.stringify(pick));
   b.kill();
 }
+// the shop's part of the game (components/gnomes/Game.tsx) not fetched (offline, a deploy that took the old files):
+// the shop's screen still has its Back, About and Try again, and Escape leaves it; Try again with the network back
+// opens the shop (a dev build's chunk names it: the URL blocked by its name)
+{
+  const b = await launch({ width: 1280, height: 800 });
+  await b.send("Network.enable");
+  await b.send("Network.setBlockedURLs", { urls: ["*components_gnomes_Game*"] });
+  await b.send("Page.navigate", { url: APP + "/g/" });
+  for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".shop [role=alert] button")`)); i++) await sleep(500);
+  const off = await b.ev(`(() => ({ back: !!document.querySelector(".shop .screen__back"), about: !!document.querySelector(".shop .screen__about"), retry: !!document.querySelector(".shop [role=alert] button") }))()`);
+  await b.send("Network.setBlockedURLs", { urls: [] });
+  await b.js(`document.querySelector(".shop [role=alert] button")?.click(); true`);
+  for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".gshelf li .gcard")`)); i++) await sleep(500);
+  const back = !!(await b.ev(`!!document.querySelector(".gshelf li .gcard")`));
+  await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(800);
+  const left = await b.ev(`!document.querySelector(".screen.shop")`);
+  const ok = !!off && off.back && off.about && off.retry && back && left;
+  results.push({ w: 1280, ok });
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's part not fetched: Back ${off && off.back}, About ${off && off.about}, Try again ${off && off.retry}; then the shelf ${back}; Escape leaves the shop ${left}`);
+  b.kill();
+}
 process.exit(results.every((r) => r.ok) ? 0 : 1);
