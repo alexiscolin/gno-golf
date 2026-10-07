@@ -49,31 +49,43 @@ export function clock(ms: number): string {
 /** The test's par in the score card's corner, as the game's card says it ("par 3"): the rounds' once every weather is proved, else the difficulty meter's guess ("par 3?"), else nothing. */
 export const parSaid = (par: number, guess: number): string => (par ? `par ${par}` : guess ? `par ${guess}?` : "");
 
-/** A finished card's action: play the weather again (R), back to the editor (Escape), and the one going on: prove it (a quick test's), the next weather, publish. */
-export type Act = "again" | "edit" | "prove" | "next" | "publish";
+/** A finished card's action: play the weather again (R), back to the editor (Escape), and the one going on: prove it (a quick test's), publish. */
+export type Act = "again" | "edit" | "prove" | "publish";
 export interface Finished {
-  /** "Holed in 3", and what it did ("Wind proved"; "" for nothing) */
+  /** "Holed in 3"; "Every weather proved" */
   title: string;
-  sub: string;
   /** a sentence under it ("" none) */
   line: string;
+  /** the summary's rows: each weather proved, its strokes and its time in play */
+  rows?: { weather: string; strokes: string; time: string }[];
   /** the buttons, in order: the way on last, the one primary; off: why it waits */
   actions: { act: Act; text: string; key?: string; primary?: boolean; off?: string }[];
 }
+const AGAIN = { act: "again", text: "Try again", key: "R" } as const, EDIT = { act: "edit", text: "Back to edit", key: "Esc" } as const;
 
 /**
- * The card of a round holed in a test, as the game's hole-finished card:
- * a quick test's (never a proof: Prove it is the way on), or Prove's while
- * the chain replays the round, once it did not count (play it again), once
- * it proved its weather (the next one, or Publish when none is left).
+ * The card of a round holed in a test, as the game's hole-finished card: a
+ * quick test's (never a proof: Prove it is the way on), or a round of
+ * Prove's that does not count (why, and play it again). A round of Prove's
+ * that counts has none: the next weather starts on its own (provedNote),
+ * the last one ends on the summary.
  */
-export function finished(o: { quick: boolean; strokes: number; kind: string; checking?: boolean; why?: string; next?: string | null; par?: number; proveOff?: string }): Finished {
-  const title = `Holed in ${o.strokes}`, name = weatherName(o.kind);
-  const again = { act: "again", text: "Try again", key: "R" } as const, edit = { act: "edit", text: "Back to edit", key: "Esc" } as const;
-  if (o.quick) return { title, sub: "", line: "Prove it in every weather to publish it.", actions: [again, edit, { act: "prove", text: "Prove it", primary: true, ...(o.proveOff ? { off: o.proveOff } : {}) }] };
-  if (o.checking) return { title, sub: "", line: "The chain's code replays your round…", actions: [] };
-  if (o.why) return { title, sub: "", line: `That ${name.toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...again, primary: true }, edit] };
-  const sub = `${name} proved`;
-  if (o.next != null) return { title, sub, line: `Next: ${weatherName(o.next).toLowerCase()}.`, actions: [again, edit, { act: "next", text: "Next weather", primary: true }] };
-  return { title, sub, line: o.par ? `Every weather proved: par ${o.par}.` : "Every weather proved.", actions: [again, edit, { act: "publish", text: "Publish →", primary: true }] };
+export function finished(o: { quick: boolean; strokes: number; kind: string; why?: string; proveOff?: string }): Finished | null {
+  const title = `Holed in ${o.strokes}`;
+  if (o.quick) return { title, line: "Prove it in every weather to publish it.", actions: [AGAIN, EDIT, { act: "prove", text: "Prove it", primary: true, ...(o.proveOff ? { off: o.proveOff } : {}) }] };
+  if (!o.why) return null;
+  return { title, line: `That ${weatherName(o.kind).toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...AGAIN, primary: true }, EDIT] };
+}
+
+/** The HUD's brief word as a weather is proved and the next one starts on its own. */
+export const provedNote = (kind: string, next: string) => `${weatherName(kind)} proved · next: ${weatherName(next)}`;
+
+/** Prove's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
+export function summary(rows: readonly { kind: string; strokes: number; ms?: number }[], par: number): Finished {
+  return {
+    title: "Every weather proved",
+    line: par ? `Par ${par}, from your rounds.` : "",
+    rows: rows.map((r) => ({ weather: weatherName(r.kind), strokes: String(r.strokes), time: r.ms != null ? clock(r.ms) : "–" })),
+    actions: [AGAIN, EDIT, { act: "publish", text: "Publish →", primary: true }],
+  };
 }
