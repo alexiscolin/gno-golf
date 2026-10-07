@@ -244,10 +244,23 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`document.querySelector("[data-piece^='p']").focus()`);
   await sleep(600);
   const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
-  assert.equal(await c.js(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`), 0, "a piece selected: no number to type until Details is opened");
-  await c.js(`document.querySelector(".insp__details").open = true`);
+  // Details open from the first piece (the column never stands empty); folded, kept so for the visit and over another piece
+  const sliders = () => c.js<number>(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`);
+  assert.ok((await sliders()) > 0, "a piece selected: its Details open, its sliders");
+  const grid = await c.js<{ l: number[]; v: number[]; s: number[] }>(`(() => { const rows = [...document.querySelectorAll(".insp__details > .range")].filter((r) => r.querySelector("input[type=range]")); const x = (sel) => rows.map((r) => Math.round(r.querySelector(sel).getBoundingClientRect().left)); return { l: x("span"), s: x("input"), v: x("output") }; })()`);
+  for (const col of [grid.l, grid.s, grid.v]) assert.ok(col.length > 1 && col.every((x) => x === col[0]), `the Inspector's rows out of line (${JSON.stringify(grid)})`);
+  await c.js(`document.querySelector(".insp__details summary").click()`);
   await sleep(200);
-  assert.ok(await c.js<number>(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`) > 0, "Details opened: its sliders");
+  assert.equal(await sliders(), 0, "Details folded");
+  await c.js(`document.querySelectorAll("[data-piece^='p']")[1].focus()`);
+  await sleep(400);
+  assert.equal(await sliders(), 0, "Details folded: still so for another piece");
+  assert.equal(await c.js(`sessionStorage.getItem("gnogolf.builder.details")`), "shut", "the fold kept for the visit");
+  await c.js(`document.querySelector(".insp__details summary").click()`);
+  await sleep(200);
+  assert.ok((await sliders()) > 0, "Details opened again");
+  await c.js(`document.querySelector("[data-piece^='p']").focus()`);
+  await sleep(400);
   await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).focus()`);
   await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).click()`);
   await sleep(800);

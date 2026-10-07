@@ -1,5 +1,5 @@
 // What this browser remembers of the player: the camera picked this session,
-// the gnome, and the gnomes earned.
+// the Builder's Inspector folded or not, the gnome, and the gnomes earned.
 import { GNOMES } from "./scene/gnome";
 import { reducedMotion } from "./device";
 import { lowGfx } from "./engine/pace";
@@ -20,6 +20,19 @@ export function savedCam(): CamMode {
 }
 export function saveCam(m: CamMode) {
   try { sessionStorage.setItem(CAM_KEY, m); } catch {}
+}
+
+// the Builder's Inspector: its Details open until the player folds them, kept so for the visit
+const DETAILS_KEY = "gnogolf.builder.details";
+export function detailsOpen() {
+  try {
+    return sessionStorage.getItem(DETAILS_KEY) !== "shut";
+  } catch {
+    return true;
+  }
+}
+export function saveDetailsOpen(open: boolean) {
+  try { sessionStorage.setItem(DETAILS_KEY, open ? "open" : "shut"); } catch {}
 }
 
 const GNOME_KEY = "gnogolf.gnome";
