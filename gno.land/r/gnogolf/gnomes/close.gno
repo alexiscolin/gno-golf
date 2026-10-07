@@ -38,7 +38,7 @@ func SetCloseAt(cur realm, at int64) {
 		panic("gnomes: the closing date comes forward, never later than " + dateOf(closeAt))
 	}
 	closeAt = at
-	chain.Emit("CloseSet", "at", itoa(at))
+	chain.Emit("CloseAtSet", "at", itoa(at))
 }
 
 // genesisClosed reports whether the genesis sale has closed: at its date's

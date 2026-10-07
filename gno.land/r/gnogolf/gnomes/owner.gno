@@ -151,7 +151,7 @@ func SetSiteURL(cur realm, url string) {
 		panic("gnomes: a site link is https:// and up to 100 of a-z, A-Z, 0-9 and -._~/:%, ending with /")
 	}
 	siteURL = url
-	chain.Emit("SiteSet", "url", url)
+	chain.Emit("SiteURLSet", "url", url)
 }
 
 // Sweep sends the treasury whatever ugnot the realm holds: coins sent to it

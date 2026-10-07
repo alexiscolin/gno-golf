@@ -275,8 +275,12 @@ the traits is the user's call.
 Reentrancy: the only calls out are to the banker, which runs no code, and
 store's reads, which write nothing; each send comes after the state is
 written. Overflow: a Buy's sum is at most 5 times the highest price
-SetPrice takes. Not tested, and not built: `Renounce` (open); the close is a
-date in block time, so it holds whatever becomes of the owner.
+SetPrice takes. Not tested, and not built: `Renounce` (open), so no
+`OwnershipRenounced`; the close is a date in block time, so it holds
+whatever becomes of the owner. Not built either: the spec's `SetRoyaltyBps`
+and its `RoyaltySet`: the royalty is a constant (5%, config.gno). The
+setters' events are the spec's names (`CloseAtSet`, `SiteURLSet`, …),
+`z_setter_events` holding the two.
 
 ## Consequences
 
