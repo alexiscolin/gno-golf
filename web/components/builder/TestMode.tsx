@@ -20,7 +20,7 @@
 // replayed, nothing proved (its label says so, once). In play R or
 // Backspace plays again from the tee, V swaps the overview camera, Escape
 // goes back to Edit.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Dialog } from "@/components/ui";
 import Weather, { SkyIcon } from "@/components/Weather";
 import { connect, hasAdena } from "@/lib/adena";
@@ -33,7 +33,7 @@ import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/build
 import { clock, finished, holeId, holeRow, parSaid, plan, provedNote, QUICK_HOLE, quickPlan, summary, testChain, type Act } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
 import { NO_GL } from "@/lib/builder/editor";
-import { hold, stageCanvas, stageRenderer } from "@/lib/builder/stage";
+import { hold, onStage, stageCanvas, stageRenderer, stageUp } from "@/lib/builder/stage";
 import { ADENA_URL } from "@/lib/network";
 import { confetti } from "@/lib/builder/juice";
 import { weatherName } from "@/lib/builder/rules";
@@ -232,6 +232,16 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     // (one game per weather: a proof of this one moves to the next)
   }, [id, now?.kind, now?.period, canvas]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // the shared canvas's context taken away (a GPU reset): said, as the game says it; not back in 3 s, a reload offered
+  const lost = useSyncExternalStore(onStage, () => !!stageRenderer() && !stageUp());
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    setGone(false);
+    if (!lost) return;
+    const t = setTimeout(() => setGone(true), 3000);
+    return () => clearTimeout(t);
+  }, [lost]);
+
   // every weather proved: the par they suggest; proved here, by this visit's last round, a small celebration
   // (the weathers tick one by one, a little confetti, a chime; Publish pulses in the header)
   const proved = !quick && !!id && kinds.length > 0 && !left.length;
@@ -300,9 +310,10 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
           </div>
         )}
       </header>
-      {(snap?.error || note || checking || said || (proved && !now)) && (
+      {(snap?.error || lost || note || checking || said || (proved && !now)) && (
         <div className="tmode__notes">
           {snap?.error && <p className="tmode__why" role="alert">{snap.error}</p>}
+          {lost && <p className="tmode__why" role="alert">{gone ? "The 3D view did not come back. Reloading brings it back; your draft is kept." : "The browser took the 3D view away for a moment. Bringing it back…"}{gone && <Button variant="primary" onClick={() => window.location.reload()}>Reload</Button>}</p>}
           {note && <p className="tmode__note" role="status">{note}</p>}
           {checking && <p className="tmode__note" role="status">The chain&apos;s code replays your round…</p>}
           {said && <p className="tmode__done" role="status">{said}</p>}
