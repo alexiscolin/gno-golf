@@ -161,6 +161,19 @@ test("trails and holings: every kind the collection uses is made and runs to its
   assert.equal(makeHoling(GNOMES[0], new THREE.Vector3()), null);
 });
 
+test("a holing's particles not lit by themselves are a shared toon: never freed, so never linked again", async () => {
+  const { disposeCourse } = await import("../lib/scene/materials.ts");
+  const skin = catalogue.gnomes.find((e) => e.skin.holing === "feathers")!.skin;
+  const toonOf = (h: { group: THREE.Group }) => h.group.children.find((o): o is THREE.InstancedMesh => o instanceof THREE.InstancedMesh)!.material as THREE.MeshToonMaterial;
+  const a = makeHoling(skin, new THREE.Vector3())!, m = toonOf(a);
+  assert.ok(m instanceof THREE.MeshToonMaterial);
+  let freed = false;
+  m.addEventListener("dispose", () => (freed = true));
+  disposeCourse(a.group);
+  assert.ok(!freed, "kept when the burst is done");
+  assert.equal(toonOf(makeHoling(skin, new THREE.Vector3())!), m, "the next burst's own");
+});
+
 test("rewear: another gnome takes one's place, its parent, position and facing; the old one leaves", async () => {
   const { rewear } = await import("../lib/scene/gnome.ts");
   const stage = new THREE.Group(), old = makeBall(GNOMES[0]);

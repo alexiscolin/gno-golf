@@ -1,14 +1,15 @@
 // lib/gnomes/shop.ts: the gnomes' shop as the screens read it. The realm's
 // answers in the shapes r/gnogolf/gnomes writes them (read.gno, buy.gno,
-// auction.gno, equip.gno), and every state a screen shows decided from them.
+// equip.gno), and every state a screen shows decided from them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
+  makeShop, soldSet, gnot, landing, utcDate, nowRow, promoOf, promoWords, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
+import { depositFor, feeFor } from "../lib/adena.ts";
 
 const catalogue = JSON.parse(fs.readFileSync(new URL("../../data/gnomes.json", import.meta.url), "utf8")) as Catalogue;
 const entries = catalogue.gnomes;
@@ -128,11 +129,6 @@ test("shop: GNOT exact, thousands apart; typed amounts back to ugnot", () => {
   assert.equal(gnot(1_240e6), "1,240");
   assert.equal(gnot(385_000), "0.385");
   assert.equal(gnot(1), "0.000001");
-  assert.equal(parseGnot("1,302"), 1_302e6);
-  assert.equal(parseGnot(" 12.5 "), 12_500_000);
-  assert.ok(Number.isNaN(parseGnot("1.0000001")));
-  assert.ok(Number.isNaN(parseGnot("-3")));
-  assert.ok(Number.isNaN(parseGnot("")));
 });
 
 test("shop: a date is a date in UTC, today said as today; never a countdown", () => {
@@ -157,6 +153,24 @@ test("shop: the now row follows the sale's life: teaser, players first, open, so
   const closed = nowRow(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] }), isSold([]), entries, T0);
   assert.deepEqual(closed, { at: "closed", closesAt: Date.UTC(2026, 11, 14, 18) / 1000, made: 486, never: 234 });
   assert.equal(nowRow(collection({ waves: [] }), isSold([]), entries, T0).at, "none");
+});
+
+test("shop: the genesis closing closes the genesis alone: a later series' wave sells on (close.gno isClosed)", () => {
+  const later = [721, 722, 723].map((id, i) => ({ ...entries[0], id, series: "winter-2027", wave: 8, tier: i === 2 ? ("legendary" as const) : ("common" as const), home: "mountain" as const }));
+  const all = [...entries, ...later];
+  const prices = [36e6, 72e6, 336e6, 1296e6];
+  const c = collection({
+    series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }, { name: "winter-2027", first: 721, last: 723, sold: 0, closed: false }],
+    waves: [...collection().waves, { first: 721, last: 722, start: T0, playersUntil: T0, prices }, { first: 723, last: 723, start: T0 + 86400 * 30, playersUntil: T0 + 86400 * 30, prices }],
+  });
+  const now = T0 + 60, none = isSold([]);
+  assert.equal(onSale(all.find((e) => e.id === 721)!, c, none, now), true, "the later series' open wave: on sale");
+  assert.equal(onSale(entries[4], c, none, now), false, "a genesis gnome never sold: never made");
+  const row = nowRow(c, none, all, now);
+  assert.ok(row.at === "open" && row.wave.n === 2 && row.wave.size === 2, `the head shows the later series' wave, not "closed": ${row.at}`);
+  assert.deepEqual(comingLegends(all, c, now).map((e) => e.id), [723], "the later series' Legendary still to come; none of the genesis");
+  // no later wave at all: the sale is closed
+  assert.equal(nowRow({ ...c, waves: collection().waves }, none, all, now).at, "closed");
 });
 
 test("shop: a later wave is the teaser once the one before is sold out", () => {
@@ -217,10 +231,8 @@ test("shop: a player's gnomes titled by their name, else their short address, ne
 });
 
 // ------------------------------------------------------------ the gallery as a shop
-test("shop: the wave's prices tier by tier, and Buy on a card on sale only", () => {
+test("shop: Buy on a card on sale only", () => {
   const c = collection();
-  assert.deepEqual(wavePrices(c, c.waves[0]), [["common", 36e6], ["rare", 72e6], ["epic", 336e6], ["legendary", 1296e6]]);
-  assert.deepEqual(wavePrices(c, { ...c.waves[0], prices: [36e6, 0, 336e6, 0] }), [["common", 36e6], ["epic", 336e6]], "a tier at 0: not said");
   const seen = { c, sold: isSold([2]), mine: new Set([3]), now: T0 + 49 * 3600 };
   assert.equal(canBuyCard(entries[0], seen), true);
   assert.equal(canBuyCard(entries[1], seen), false, "found a player");
@@ -232,7 +244,7 @@ test("shop: the wave's prices tier by tier, and Buy on a card on sale only", () 
 // ------------------------------------------------------------ why not, in plain words
 test("shop: every refusal CanBuy gives has its words: the button's and a note", () => {
   const c = collection(), until = T0 + 48 * 3600;
-  const tansy = { tier: "epic" as const, wave: 1, home: "garden" as const };
+  const tansy = { id: 94, tier: "epic" as const, wave: 1, home: "garden" as const };
   const w = (r: CanBuy) => whyNot(r, c, tansy, T0 + 60);
   assert.equal(w(can({ ok: true })), null);
   assert.deepEqual(w(can({ reason: "paused" })), { button: "Paused for a moment", note: "The sale picks up where it stopped." });
@@ -240,6 +252,10 @@ test("shop: every refusal CanBuy gives has its words: the button's and a note", 
   assert.deepEqual(w(can({ reason: "wave-cap", window: { until, left: { common: 3, rare: 2, epic: 0 } } })), { button: "1 of 1 Epic this wave", note: "Your share until Sun 18:00 UTC. Then open to everyone." });
   assert.deepEqual(w(can({ reason: "cap", left: { common: 10, rare: 5, epic: 0 } })), { button: "2 of 2 Epics", note: "The most one wallet buys." });
   assert.deepEqual(w(can({ reason: "later" })), { button: "Opens today, 18:00 UTC", note: "From Wave 1 · Garden." });
+  // two waves to come, published in any order: the date is the gnome's own wave's
+  const two = collection({ waves: [{ first: 105, last: 208, start: T0 + 7 * 86400, playersUntil: T0 + 9 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }, { first: 1, last: 104, start: T0 + 86400, playersUntil: T0 + 3 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }] });
+  assert.equal(whyNot(can({ reason: "later" }), two, { id: 150, tier: "common", wave: 2, home: "island" }, T0)?.button, "Opens Fri 16 Oct, 18:00 UTC");
+  assert.equal(whyNot(can({ reason: "later" }), two, tansy, T0)?.button, "Opens Sat 18:00 UTC");
   assert.deepEqual(w(can({ reason: "unlisted" })), { button: "Not on sale yet", note: "From Wave 1 · Garden. A wave not open by Mon 14 Dec, 18:00 UTC never opens." });
   assert.deepEqual(w(can({ reason: "taken" })), { button: "Already found a player", note: "" });
   assert.deepEqual(w(can({ reason: "closed" })), { button: "Never made", note: "The sale closed before this gnome found a player." });
@@ -248,14 +264,27 @@ test("shop: every refusal CanBuy gives has its words: the button's and a note", 
   assert.deepEqual(w(can({ reason: "newer" as CanBuy["reason"], said: "the moon is full" })), { button: "Can't be bought now", note: "The chain says: the moon is full." });
 });
 
+// ------------------------------------------------------------ a buy sent, not confirmed
+test("shop: a buy with no hash to read, by the gnome read again: landed (the buyer's), taken (another's), or not yet", () => {
+  const me = "g1u6gljuvfjhfp6rzeud99567tmr5zncl6sa54vd", other = "g1f3chauez3mk9evmwczjwcwfy8pysfy9jn2p3m7";
+  const g = { id: "5", series: "genesis", name: "Nell", tier: "common", traits: "", owner: "", price: 36e6, sold: false, closed: false };
+  assert.equal(landing({ ...g, owner: me, sold: true }, me), "mine");
+  assert.equal(landing({ ...g, owner: other, sold: true }, me), "taken");
+  assert.equal(landing(g, me), null, "still unsold: nothing landed yet");
+  assert.equal(landing(null, me), null);
+});
+
 // ------------------------------------------------------------ the bill
 test("shop: the bill: each cost on a line, at most their sum, short by what the balance lacks", () => {
   const b = bill({ price: 333_330_000, bytes: 3849, storagePrice: 100, gas: 50e6, gasPrice: 0.001, balance: 120e6 });
   assert.deepEqual(b.lines.map(([k]) => k), ["Price", "Storage deposit", "Network fee"]);
   assert.equal(b.lines[0][1], 333_330_000);
-  assert.equal(b.lines[1][1], 423_400); // 3,849 bytes and a tenth more, at 100 ugnot
+  assert.equal(b.lines[1][1], 423_391); // 3,849 bytes at 100 ugnot, and a tenth more, rounded up
   assert.equal(b.lines[2][1], 75_000); // 50M gas at 0.001, half again
-  assert.equal(b.most, 333_330_000 + 423_400 + 75_000);
+  // the wallet's own rules, the Builder's bill's too (adena.ts): never a copy that drifts from what Adena is asked
+  assert.equal(b.lines[1][1], depositFor(3849, 100));
+  assert.equal(b.lines[2][1], feeFor(50e6, 0.001));
+  assert.equal(b.most, 333_330_000 + 423_391 + 75_000);
   assert.equal(b.short, b.most - 120e6);
   assert.equal(bill({ price: 0, bytes: 100, storagePrice: 100, gas: 1e6, gasPrice: 0.001, balance: null }).short, null);
   assert.equal(bill({ price: 0, bytes: 100, storagePrice: 100, gas: 1e6, gasPrice: 0.001, balance: 10e6 }).short, 0);
@@ -302,6 +331,8 @@ test("shop: the words of each share moment: about the game, never value", () => 
   const w = shareWords;
   assert.equal(w.bought("Tansy", 94), "I just adopted Tansy, gnome #94 of Gnogolf. Tansy rolls for me now");
   assert.equal(w.equipped("Tansy", "garden"), "My gnome for the boards: Tansy of the Garden. Race my ghost");
+  assert.equal(w.equipped("Tansy", "town"), "My gnome for the boards: Tansy of Mushroom Town. Race my ghost", "the world as the game names it");
+  assert.equal(w.equipped("Tansy", "mines"), "My gnome for the boards: Tansy of the Crystal Mines. Race my ghost");
   assert.equal(w.team(31, "The Miller"), "My Gnogolf team: 31 gnomes, The Miller up front. Race their ghosts");
   assert.equal(w.team(1, "Tansy"), "My Gnogolf team: Tansy. Race my ghost");
   for (const s of Object.values(w).map((f) => (f as (...a: string[]) => string)("X", "1")))

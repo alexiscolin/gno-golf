@@ -20,7 +20,7 @@ const OFF_GRID = /off the grid/;
 void test("ghostAt: the armed piece centred under the pointer, every point of it on the grid (a tunnel's way out too)", async () => {
   const garden = await loadPalette("garden");
   for (const id of ["*/tunnel/cave", "*/post/rock", "*/rail/", "*/hazard/water"]) {
-    const e = garden.find((x) => x.id === id)!, p = ghostAt(e, "g", [10.37, 6.13], 0.5);
+    const e = garden.find((x) => x.id === id)!, p = ghostAt(e, "g", [10.37, 6.13], 0.5, [0, 0]);
     const pts: V[] = [...(p.params.to ? [p.params.to] : [])];
     const g = p.geometry;
     pts.push(...(g.t === "rail" || g.t === "bar" ? [g.a, g.b] : g.t === "post" ? [g.c] : g.t === "poly" ? g.pts : [g.min, g.max]));
@@ -43,7 +43,7 @@ void test("Every palette entry of every Builder world drops onto a starter throu
       let placed = false, why = "";
       for (const at of along) {
         // (as the board: the ghost's checks without the census as it moves, the drop's with it)
-        const p = ghostAt(e, "g1", at, 0.5), q = canPlace(d, p, quick), is = q.length ? q : canPlace(d, p, full);
+        const p = ghostAt(e, "g1", at, 0.5, d.tee), q = canPlace(d, p, quick), is = q.length ? q : canPlace(d, p, full);
         for (const i of is) assert.doesNotMatch(plainOf(i), OFF_GRID, `${world} ${e.id} at ${at.join()}: ${plainOf(i)}`);
         if (!is.length) { placed = true; break; }
         why ||= plainOf(is[0]);

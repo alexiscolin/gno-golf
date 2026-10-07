@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { applyRig, laneBox, makeRenderer, makeScene, overviewRig, setLighting } from "@/lib/scene/camera";
-import { buildHole, finishHole } from "@/lib/scene/course";
+import { buildHole } from "@/lib/scene/course";
 import { disposeCourse } from "@/lib/scene/materials";
 import { loadWorld } from "@/lib/scene/worlds";
 import type { Hole } from "@/lib/scene/data";
@@ -57,12 +57,13 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
     if (capture) capture.current = () => (draw(), el);
     void loadWorld(state.world).then(() => {
       if (stale) return;
-      if (t.course) (t.scene.remove(t.course), disposeCourse(t.course));
-      const g = buildHole(state);
-      finishHole(g);
+      const old = t.course;
+      if (old) t.scene.remove(old);
+      const g = buildHole(state); // (finished: merged, and a world's own pass over it, once)
       t.scene.add(g);
       t.course = g;
       draw();
+      if (old) disposeCourse(old); // (once the new one is drawn: the shader programs they share kept)
     }, () => setFailed(true));
     const ro = new ResizeObserver(draw);
     ro.observe(el);

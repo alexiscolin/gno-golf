@@ -33,12 +33,13 @@ test("legal: two boxes, each its own; the button names the obligation to pay, ne
 });
 
 test("legal: the receipt carries every field (§3): seller, date in UTC and JST, item, contract, price and costs, delivery, transaction, terms, consents as ticked", () => {
-  const lines = receipt({ ...order, at: Date.UTC(2026, 9, 6, 18, 4) / 1000, hash: "3F9AC21B", realm: "gno.land/r/nym-x/gnogolf/gnomes", chainId: "gnoland-1", explorer: "https://gno.land/tx/3F9AC21B", consents: [BOX_A, BOX_B] });
+  const lines = receipt({ ...order, at: Date.UTC(2026, 9, 6, 18, 4) / 1000, hash: "3F9AC21B", realm: "gno.land/r/nym-x/gnogolf/gnomes", chainId: "gnoland-1", consents: [BOX_A, BOX_B] });
   const text = lines.join("\n");
   for (const want of [SELLER.name, "Tue 6 Oct 2026, 18:04 UTC (Wed 7 Oct, 03:04 JST)", "Tansy of the Garden, #94, Epic", "gno.land/r/nym-x/gnogolf/gnomes",
     "336 GNOT (+ network fee 0.15 GNOT, storage deposit 0.31 GNOT held by the chain)", order.address, "3F9AC21B", "gnoland-1", BOX_A, BOX_B, "No returns or refunds once final"])
     assert.ok(text.includes(want), `the receipt says ${want}`);
-  assert.ok(!receipt({ ...order, at: 0, hash: "x", realm: "r", chainId: "c", explorer: "", consents: [BOX_A] }).join("\n").includes(BOX_B), "only the boxes shown and ticked");
+  assert.ok(receipt({ ...order, at: 0, hash: "", realm: "r", chainId: "c", consents: [BOX_A] }).includes("Transaction: in your wallet's history (permanent record on c)"), "no hash (the wallet gave none): where it is");
+  assert.ok(!receipt({ ...order, at: 0, hash: "x", realm: "r", chainId: "c", consents: [BOX_A] }).join("\n").includes(BOX_B), "only the boxes shown and ticked");
 });
 
 test("legal: JST is UTC+9, said as the copy says it", () => {

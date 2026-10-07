@@ -190,12 +190,14 @@ function censusOf(s: Hole, census: Census) {
 }
 
 /** The second half of a hole's build: what stands still merged, and every
- *  chimney's smoke in one draw. */
+ *  chimney's smoke in one draw. Once: a hole finished already (its smokes
+ *  batched, null) is left as it is. */
 export function finishHole(g: Course) {
+  if (!g.userData.smokes) return;
   if (!g.userData.state.unbaked) bake(g, { board: quality.low ? g.userData.state.board : null });
   else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.ts)
   worldOf(g.userData.state).baked?.(g); // a world's own pass over the merge (the mines' light pools)
-  const puffs = smokeBatch(g.userData.smokes || []);
+  const puffs = smokeBatch(g.userData.smokes);
   g.userData.smokes = null;
   if (puffs) (g.add(puffs.mesh), g.userData.ticks.push(puffs.tick));
 }

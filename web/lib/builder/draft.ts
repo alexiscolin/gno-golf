@@ -4,6 +4,7 @@
 // that will be published. A draft read from a file or from the browser is
 // untrusted: parseDraft takes it only whole, on the grid and within its
 // limits. Its history (undo, redo) and its keeping in the browser are here.
+import { isSlug } from "../chain";
 import { FIELD, gameWorld, MAX_PAR, notABuilderWorld } from "./rules";
 
 export type V = [number, number];
@@ -74,16 +75,23 @@ export interface Draft {
 
 /** A draft's limits, beside GG1's own (gg1.ts LIMITS): what the editor holds at once. */
 export const MAX_PIECES = 224; // GG1's walls, posts and zones (160 + 32 + 32): a piece takes one at least (a test holds it)
-/** Where the browser keeps the drafts. */
+/**
+ * Where the browser keeps each draft: a key of its own (newKey), so a save
+ * writes that draft only, and two tabs never write over each other's.
+ */
+export const DRAFT_PREFIX = "gnogolf.builder.draft.";
+/** Where earlier Builders kept every draft in one list: moved to keys of their own (loadDrafts), or left as it is. */
 export const DRAFTS_KEY = "gnogolf.builder.drafts";
-/** Where a stored draft this Builder cannot read is set aside, as it was: never erased by a save. */
-export const UNREAD_KEY = "gnogolf.builder.unread";
 /** A hole's name and note at most (runes), as the realm keeps them. */
 export const MAX_TITLE = 40, MAX_NOTE = 140;
 const MAX_PULSES = 16;
 
-/** A grid value: a multiple of a quarter (Fit shifts the hole by one exactly). */
-export const onGrid = (x: number) => Number.isFinite(x) && x * 4 === Math.round(x * 4);
+/**
+ * A grid value: a multiple of a quarter from origin, the tee's (the hole's
+ * grid: framing shifts a whole hole, by a post's rim at times, off the
+ * board's quarters), to a millionth.
+ */
+export const onGrid = (x: number, origin: number) => Number.isFinite(x) && Math.abs((x - origin) * 4 - Math.round((x - origin) * 4)) < 1e-6;
 
 /** A new draft in a world: an empty board, the tee and the cup apart. */
 export const emptyDraft = (world: string): Draft => ({ v: 1, world, slug: "", title: "", par: 0, tee: [4, 6], pin: [24, 6], pieces: [], pulses: [], note: "", proofs: [] });
@@ -92,24 +100,24 @@ const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 const isInt = (x: unknown, lo: number, hi: number): x is number => Number.isInteger(x) && (x as number) >= lo && (x as number) <= hi;
 const isV = (x: unknown): x is V => Array.isArray(x) && x.length === 2 && isNum(x[0]) && isNum(x[1]);
-const gridV = (x: unknown): x is V => isV(x) && onGrid(x[0]) && onGrid(x[1]);
+const gridV = (x: unknown, tee: V): x is V => isV(x) && onGrid(x[0], tee[0]) && onGrid(x[1], tee[1]);
 
-/** A piece's shape, or why not: "shape" (unknown), "grid" (off it). */
-function geometryOf(g: unknown): "shape" | "grid" | null {
+/** A piece's shape, or why not: "shape" (unknown), "grid" (off the grid from the tee). */
+function geometryOf(g: unknown, tee: V): "shape" | "grid" | null {
   if (!isObj(g)) return "shape";
   switch (g.t) {
     case "rail":
-      return isV(g.a) && isV(g.b) ? (gridV(g.a) && gridV(g.b) ? null : "grid") : "shape";
+      return isV(g.a) && isV(g.b) ? (gridV(g.a, tee) && gridV(g.b, tee) ? null : "grid") : "shape";
     case "bar":
-      return isV(g.a) && isV(g.b) && isNum(g.thick) ? (gridV(g.a) && gridV(g.b) ? null : "grid") : "shape";
+      return isV(g.a) && isV(g.b) && isNum(g.thick) ? (gridV(g.a, tee) && gridV(g.b, tee) ? null : "grid") : "shape";
     case "post":
-      return isV(g.c) && isNum(g.r) ? (gridV(g.c) ? null : "grid") : "shape";
+      return isV(g.c) && isNum(g.r) ? (gridV(g.c, tee) ? null : "grid") : "shape";
     case "rect":
     case "round":
-      return isV(g.min) && isV(g.max) ? (gridV(g.min) && gridV(g.max) ? null : "grid") : "shape";
+      return isV(g.min) && isV(g.max) ? (gridV(g.min, tee) && gridV(g.max, tee) ? null : "grid") : "shape";
     case "poly":
       if (!Array.isArray(g.pts) || !g.pts.every(isV) || (g.outside !== undefined && typeof g.outside !== "boolean")) return "shape";
-      return g.pts.every(gridV) ? null : "grid";
+      return g.pts.every((v) => gridV(v, tee)) ? null : "grid";
   }
   return "shape";
 }
@@ -138,12 +146,12 @@ export function parseDraft(text: string): Draft | string {
   if (!isObj(d)) return "The file is not a draft.";
   if (d.v !== 1) return "This draft is from another version of the Builder.";
   if (typeof d.world !== "string" || !Object.hasOwn(FIELD, d.world)) return gameWorld(String(d.world)) ? notABuilderWorld(String(d.world)) : `No world is called ${String(d.world)}.`;
-  if (typeof d.slug !== "string" || (d.slug !== "" && !/^[a-z0-9-]{1,32}$/.test(d.slug))) return "The hole's short name is 1 to 32 lower-case letters, digits and dashes.";
+  if (typeof d.slug !== "string" || (d.slug !== "" && !isSlug(d.slug))) return "The hole's short name is 1 to 32 lower-case letters, digits and dashes.";
   if (typeof d.title !== "string" || [...d.title].length > MAX_TITLE) return `The name is at most ${MAX_TITLE} characters.`;
   if (typeof d.note !== "string" || [...d.note].length > MAX_NOTE) return `The line for players is at most ${MAX_NOTE} characters.`;
   if (!isInt(d.par, 0, MAX_PAR)) return `Par is a whole number from 0 to ${MAX_PAR}.`;
-  if (!gridV(d.tee)) return "The tee is off the grid.";
-  if (!gridV(d.pin)) return "The cup is off the grid.";
+  if (!isV(d.tee)) return "The file is not a draft.";
+  if (!gridV(d.pin, d.tee)) return "The cup is off the grid.";
   if (!Array.isArray(d.pulses) || d.pulses.length > MAX_PULSES) return `A draft has at most ${MAX_PULSES} pulses.`;
   for (const p of d.pulses) if (!isObj(p) || !isInt(p.every, 1, 1 << 20) || !isInt(p.on, 0, p.every) || !isInt(p.phase, 0, p.every)) return "A pulse's timing is not whole numbers.";
   if (!Array.isArray(d.pieces)) return "The file is not a draft.";
@@ -154,7 +162,7 @@ export function parseDraft(text: string): Draft | string {
     if (ids.has(p.id)) return `Two pieces are called ${p.id}.`;
     ids.add(p.id);
     if (typeof p.entry !== "string") return `Piece ${p.id} has no palette entry.`;
-    const g = geometryOf(p.geometry);
+    const g = geometryOf(p.geometry, d.tee);
     if (g === "shape") return `Piece ${p.id} has no shape the Builder knows.`;
     if (g === "grid") return `Piece ${p.id} is off the grid.`;
     if (!isObj(p.params)) return `Piece ${p.id} has no settings.`;
@@ -234,35 +242,82 @@ export function history(first: Draft) {
   };
 }
 
-/** The drafts kept in this browser; none if it keeps nothing (a private window) or kept another version's. */
-export function loadDrafts(): Draft[] {
+/** A draft as this browser keeps it: under its key. */
+export interface Kept {
+  key: string;
+  draft: Draft;
+}
+
+let last = 0;
+/** A new draft's key: when it was started (the drafts' order, never twice the same in a tab), then a random tail (another tab's). */
+export function newKey() {
+  last = Math.max(Date.now(), last + 1);
+  return `${DRAFT_PREFIX}${last}-${Math.random().toString(36).slice(2, 10)}`;
+}
+const started = (key: string) => Number.parseInt(key.slice(DRAFT_PREFIX.length), 10);
+
+/**
+ * The drafts kept in this browser, oldest first; none if it keeps nothing (a
+ * private window). A stored draft this Builder cannot read (edited by hand,
+ * another version's) is left out, and left as it is: no save writes its key.
+ */
+export function loadDrafts(): Kept[] {
   try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
-    const j: unknown = JSON.parse(raw || "null");
-    if (!isObj(j) || j.v !== 1 || !Array.isArray(j.drafts)) return (raw && setAside([j ?? raw]), []);
-    const read = j.drafts.map((d) => parseDraft(JSON.stringify(d)));
-    setAside(j.drafts.filter((_, i) => typeof read[i] === "string"));
-    return read.filter((d): d is Draft => typeof d !== "string");
+    const out = fromList();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const d = key?.startsWith(DRAFT_PREFIX) ? parseDraft(localStorage.getItem(key) ?? "") : "";
+      if (key && typeof d !== "string") out.push({ key, draft: d });
+    }
+    return out.sort((a, b) => started(a.key) - started(b.key) || (a.key < b.key ? -1 : 1));
   } catch {
     return [];
   }
 }
 
-/** Stored drafts (or a store) this Builder cannot read, kept aside as they were, each once. */
-function setAside(odd: unknown[]) {
-  if (!odd.length) return;
-  const was: unknown = JSON.parse(localStorage.getItem(UNREAD_KEY) || "[]");
-  const list: unknown[] = Array.isArray(was) ? (was as unknown[]) : [];
-  const seen = new Set(list.map((x) => JSON.stringify(x)));
-  localStorage.setItem(UNREAD_KEY, JSON.stringify([...list, ...odd.filter((x) => !seen.has(JSON.stringify(x)))]));
+/**
+ * An earlier Builder's list, each draft moved as it is to a key of its own
+ * (unless that key is there already: a later save of it), the list removed
+ * once every one is; the readable drafts the store refused to take, from the
+ * list. A list this Builder cannot read stays as it is.
+ */
+function fromList(): Kept[] {
+  let j: unknown;
+  try {
+    j = JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? "null");
+  } catch {
+    return [];
+  }
+  if (!isObj(j) || j.v !== 1 || !Array.isArray(j.drafts)) return [];
+  let moved = true;
+  const unmoved: Kept[] = [];
+  j.drafts.forEach((x: unknown, i) => {
+    const key = `${DRAFT_PREFIX}${i}-list`;
+    try {
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(x));
+    } catch {
+      moved = false;
+      const draft = parseDraft(JSON.stringify(x));
+      if (typeof draft !== "string") unmoved.push({ key, draft });
+    }
+  });
+  if (moved) localStorage.removeItem(DRAFTS_KEY);
+  return unmoved;
 }
 
-/** Keeps the drafts in this browser; false if it keeps nothing (the page then says so once). */
-export function saveDrafts(list: readonly Draft[]): boolean {
+/** Keeps a draft in this browser, under its key; false if it keeps nothing (the page then says so once). */
+export function saveDraft(key: string, d: Draft): boolean {
   try {
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: list }));
+    localStorage.setItem(key, JSON.stringify(d));
     return true;
   } catch {
     return false;
   }
+}
+
+/** A draft deleted from this browser. */
+export function dropDraft(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
 }

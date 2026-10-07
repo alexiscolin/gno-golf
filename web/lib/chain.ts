@@ -106,12 +106,12 @@ function refusal(log: string | undefined) {
 // Small and structural: what the page reads without looking twice. Anything
 // deeper (a skin's name, a zone's numbers) the scene already treats as data.
 
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+export type Obj = Record<string, unknown>;
+export const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isVec = (p: unknown): p is Vec2 => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]);
 const arrays = (v: Obj, ...keys: string[]) => keys.every((k) => Array.isArray(v[k]));
-const nums = (v: Obj, ...keys: string[]) => keys.every((k) => Number.isFinite(v[k]));
-const strs = (v: Obj, ...keys: string[]) => keys.every((k) => typeof v[k] === "string");
+export const nums = (v: Obj, ...keys: string[]) => keys.every((k) => Number.isFinite(v[k]));
+export const strs = (v: Obj, ...keys: string[]) => keys.every((k) => typeof v[k] === "string");
 const isMode = (m: unknown): m is Mode => m === "assisted" || m === "pro";
 const holeRow = (h: unknown) => isObj(h) && typeof h.id === "string";
 // a path is points of two finite numbers
@@ -174,6 +174,19 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // refusal — whose text is the realm's own sentence, not the VM's trace.
   const down = (e: unknown): ChainError => Object.assign(e instanceof Error ? e : new Error(String(e)), { kind: "down" as const });
   const refused = (message: string, log?: string): ChainError => Object.assign(new Error(message), { kind: "chain" as const, log });
+  // one of the node's own endpoints (/tx, /block), its JSON; down when it did not answer
+  const rpcGet = async <T>(path: string): Promise<T> => {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT);
+    try {
+      const res = await fetch(`${rpc}${path}`, { signal: c.signal });
+      if (!res.ok) throw new Error(`RPC ${res.status}`);
+      return (await res.json()) as T;
+    } catch (e) {
+      throw down(e);
+    } finally {
+      clearTimeout(t);
+    }
+  };
   interface AbciReply {
     error?: { data?: string; message?: string };
     result?: { response?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } };
@@ -271,6 +284,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // a failure is not.
   // Extras(hole, stroke), per hole version and stroke (chain.extras)
   const extrasRead = new Map<string, Promise<Extras>>();
+  // HoleData(version), by version id (its data never changes; an alias's is read each time)
+  const dataRead = new Map<string, Promise<string>>();
   const memo = <T>(fn: () => Promise<T>, ttl: number) => {
     let at = 0, p: Promise<T> | null = null;
     return (): Promise<T> => {
@@ -428,13 +443,40 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      */
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
+    /** When a block was made (ms): its header's time, as /blockchain gives it; down if the node has no such block or does not answer. */
+    blockTime: async (height: number) => {
+      const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT), at = Math.max(1, height | 0);
+      try {
+        const res = await fetch(`${rpc}/blockchain?minHeight=${at}&maxHeight=${at}`, { signal: c.signal });
+        if (!res.ok) throw new Error(`RPC ${res.status}`);
+        const r = (await res.json()) as { result?: { block_metas?: { header?: { height?: string; time?: string } }[] } };
+        const h = r.result?.block_metas?.[0]?.header, ms = Date.parse(h?.time ?? "");
+        if (h?.height !== String(at) || !Number.isFinite(ms)) throw new Error(`The node has no block ${at}.`);
+        return ms;
+      } catch (e) {
+        throw down(e);
+      } finally {
+        clearTimeout(t);
+      }
+    },
     /** A community hole's versions (an alias, "<address>/<slug>"): what the next one's id will be, and each one's sha. */
     versions: (alias: string) => qeval(`Versions(${s(alias)})`, checks.versions),
-    /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim). */
-    holeData: async (hole: string) => {
-      const hex = await qstr(REALM, `HoleData(${s(hole)})`);
-      if (!/^([0-9a-f]{2})+$/.test(hex)) throw refused("The chain's hole data is not hex.");
-      return hex;
+    /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim), the community
+     *  list judges and the meter rates. A version's read once a visit (its data never changes), a failure not kept. */
+    holeData: (hole: string) => {
+      const read = async () => {
+        const hex = await qstr(REALM, `HoleData(${s(hole)})`);
+        if (!/^([0-9a-f]{2})+$/.test(hex)) throw refused("The chain's hole data is not hex.");
+        return hex;
+      };
+      if (!/\/v\d+$/.test(hole)) return read();
+      let p = dataRead.get(hole);
+      if (!p) {
+        if (dataRead.size >= 64) dataRead.clear(); // (up to 64 KB of hex each: a long session from scratch, never unbounded)
+        p = read().catch((e: unknown) => (dataRead.delete(hole), Promise.reject(e instanceof Error ? e : new Error(String(e)))));
+        dataRead.set(hole, p);
+      }
+      return p;
     },
     /** A deployed package's file, as the node keeps it (vm/qfile). */
     file: (path: string) => query(`${rpc}/abci_query?path=%22vm/qfile%22&data=0x${hexOf(path)}`),
@@ -637,18 +679,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
         hex = /^(0x)?[0-9a-f]{64}$/i.test(hash) ? hash.replace(/^0x/i, "") : [...atob(hash)].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
       } catch {}
       if (hex.length !== 64) throw refused("Not a transaction hash.");
-      const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT);
-      let r;
-      try {
-        const res = await fetch(`${rpc}/tx?hash=0x${hex}`, { signal: c.signal });
-        if (!res.ok) throw new Error(`RPC ${res.status}`);
-        const body = (await res.json()) as { error?: unknown; result?: { tx_result?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } } };
-        r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
-      } catch (e) {
-        throw down(e);
-      } finally {
-        clearTimeout(t);
-      }
+      const body = await rpcGet<{ error?: unknown; result?: { tx_result?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } } }>(`/tx?hash=0x${hex}`);
+      const r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
       // (the realm's own sentence for the player; the VM's whole log kept on the error)
       if (r && r.Error) throw refused(refusal(r.Log) || "The transaction failed.", r.Log);
       return r ? utf8(r.Data || "") : null;
@@ -693,9 +725,13 @@ function allowedHost(h: string, extra = process.env.NEXT_PUBLIC_ALLOWED_HOSTS ||
 // a realm or package path as the chain names it, and nothing else
 const PKG = /^gno\.land\/[rp]\/[\w/.-]+$/;
 const ADDR = /^g1[0-9a-z]{38}$/;
+// a community hole's short name, as golf's validSlug takes it
+const SLUG = "[a-z0-9-]{1,32}", ONE_SLUG = new RegExp(`^${SLUG}$`);
+/** Whether s is a community hole's short name: 1 to 32 lower-case letters, digits and dashes (golf's validSlug). */
+export const isSlug = (s: unknown) => typeof s === "string" && ONE_SLUG.test(s);
 // a data hole: a course slot "garden/7" or its version "garden/7/v2", a
 // community hole "<address>/<slug>" or its version
-const DATA = /^([a-z]{1,16}\/[1-9]\d{0,2}|g1[0-9a-z]{38}\/[a-z0-9-]{1,32})(\/v[1-9]\d*)?$/;
+const DATA = new RegExp(`^([a-z]{1,16}/[1-9]\\d{0,2}|g1[0-9a-z]{38}/${SLUG})(/v[1-9]\\d*)?$`);
 /** Whether s names a hole: a realm's path, or a data hole's id or alias. */
 export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(s));
 /** A best as the realm keeps it (recordsOf). */

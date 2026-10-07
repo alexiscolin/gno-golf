@@ -86,7 +86,8 @@ export interface Shares {
   near: number;
 }
 export interface Estimate {
-  level: Level;
+  /** null: not measured (the budget ran out before any line holed it) */
+  level: Level | null;
   /** the strongest first */
   reasons: Reason[];
   /** the par the meter expects (the best line's strokes, plus one); 0 when it found no round */
@@ -299,11 +300,12 @@ function solidsOf(h: GHole): { ref: PieceRef; d: (p: V) => number }[] {
  * along it (one for each stroke, by how unforgiving it is); at least Medium
  * through a gap under 1.5 balls or past a piece that lets the ball by half
  * the time or less, at least Hard past one that does a quarter of the time or
- * less. No line found: Very hard. Thresholds tried on the starters, the
- * course and holes made hard on purpose (builder-difficulty.test.ts).
+ * less. No line found: Very hard; none found before the budget ran out
+ * (cut): not measured, null. Thresholds tried on the starters, the course
+ * and holes made hard on purpose (builder-difficulty.test.ts).
  */
-export function levelOf(m: { strokes: number | null; forgiving: readonly number[]; narrowest: number | null; rarest: number | null }): Level {
-  if (m.strokes == null) return 3;
+export function levelOf(m: { strokes: number | null; forgiving: readonly number[]; narrowest: number | null; rarest: number | null; cut?: boolean }): Level | null {
+  if (m.strokes == null) return m.cut ? null : 3;
   const lost = m.forgiving.reduce((n, f) => n + (1 - f), 0), score = lost + 0.4 * Math.max(0, m.strokes - 2);
   let level: Level = score < 1 ? 0 : score < 1.7 ? 1 : score < 2.5 ? 2 : 3;
   const floor = (l: Level) => (level = Math.max(level, l) as Level);
@@ -410,7 +412,7 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
   // what the way squeezes through and waits for
   const ball = 2 * h.ballR, gaps = passages(h, NARROW * ball).sort((x, y) => x.gap - y.gap), timed = timedOnWay(h);
   const tee = sharesOf(teeShots), strokes = line ? line.length : null, narrowest = gaps.length ? gaps[0].gap / ball : null;
-  const level = levelOf({ strokes, forgiving, narrowest, rarest: timed.length ? timed[0].open : null });
+  const level = levelOf({ strokes, forgiving, narrowest, rarest: timed.length ? timed[0].open : null, cut });
   const reasons: Reason[] = [], about = (n: Named) => (n.piece ? { piece: n.piece } : {});
   const say = (text: string, weight: number, n?: Named) => reasons.some((r) => r.text === text) || reasons.push({ text, weight, ...(n && about(n)) });
   const pairs = new Set<string>();
@@ -448,7 +450,7 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
   return {
     level,
     // an easy hole: nothing to say of it
-    reasons: level ? reasons.sort((x, y) => y.weight - x.weight) : [],
+    reasons: level !== 0 ? reasons.sort((x, y) => y.weight - x.weight) : [],
     par: strokes ? Math.min(MAX_PAR, strokes + 1) : 0,
     strokes, tee, spots, forgiving, narrowest,
     shots: Math.min(shots, budget.shots), ms: Math.round(performance.now() - t0), cut,
@@ -463,20 +465,19 @@ const parWords = (e: Pick<Estimate, "par">) => (e.par ? `par ${e.par} likely` : 
 export function meterLine(e: Estimate): { text: string; piece?: string } {
   const top = e.reasons[0];
   if (top) return { text: top.text, ...(top.piece && { piece: top.piece }) };
-  return { text: `${LEVELS[e.level]} to play${e.par ? `: ${parWords(e)}` : ""}.` };
+  return { text: e.level == null ? "Not measured: the test will tell." : `${LEVELS[e.level]} to play${e.par ? `: ${parWords(e)}` : ""}.` };
 }
 
 /** The meter's chip in full, for its tooltip and a screen reader: the level, the par it suggests until the test's rounds do, what it took. */
 export function meterTitle(e: Estimate): string {
   const par = e.par ? ` ${cap(parWords(e))}, until your test rounds set it.` : "";
-  return `Difficulty, the meter's guess: ${LEVELS[e.level]}.${par} (${e.shots.toLocaleString("en")} shots in ${e.ms} ms${e.cut ? ", cut short" : ""}.)`;
+  return `Difficulty, the meter's guess: ${e.level == null ? "not measured" : LEVELS[e.level]}.${par} (${e.shots.toLocaleString("en")} shots in ${e.ms} ms${e.cut ? ", cut short" : ""}.)`;
 }
 
 /** What the editor shows of an estimate (made in the meter's worker: the editor's own chunk carries none of the meter): the level and its word, the dock's line, the chip's words in full, the par. */
-export interface Shown extends Pick<Estimate, "par" | "path" | "heat"> {
-  level: Level;
+export interface Shown extends Pick<Estimate, "level" | "par" | "path" | "heat"> {
   word: string;
   line: { text: string; piece?: string };
   title: string;
 }
-export const shown = (e: Estimate): Shown => ({ level: e.level, word: LEVELS[e.level], line: meterLine(e), title: meterTitle(e), par: e.par, path: e.path, heat: e.heat });
+export const shown = (e: Estimate): Shown => ({ level: e.level, word: e.level == null ? "–" : LEVELS[e.level], line: meterLine(e), title: meterTitle(e), par: e.par, path: e.path, heat: e.heat });

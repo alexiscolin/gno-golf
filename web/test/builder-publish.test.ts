@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import { gnokeyCall, gnokeyOn } from "../lib/adena.ts";
 import { bill, deposit, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
 import { shaOf } from "../lib/builder/proof.ts";
 
@@ -150,6 +151,12 @@ void test("gnokeyPublish: nothing for a slug, data or realm not of their shape (
   for (const bad of [{ slug: "a b" }, { slug: "$(x)" }, { hex: "0g" }, { hex: "0" }, { realm: "gno.land/r/x;rm" }, { deposit: -1 }, { gas: 1.5 }, { author: "" }, { author: "mykey" }, { author: "g1x; rm -rf ~" }]) {
     assert.equal(gnokeyPublish({ ...ok, ...bad }), "", JSON.stringify(bad));
   }
+});
+
+void test("gnokeyPublish: adena's one gnokey call, signed by the author's address", () => {
+  const by = "g1" + "c".repeat(38), on = gnokeyOn("dev", "http://127.0.0.1:26657", by);
+  const cmd = gnokeyPublish({ realm: "gno.land/r/x/golf", slug: "a-b", hex: "00ff", note: "it's", gas: 1e8, price: 0.001, deposit: 600000, chainId: "dev", rpc: "http://127.0.0.1:26657", author: by });
+  assert.equal(cmd, gnokeyCall("gno.land/r/x/golf", "PublishMine", ["a-b", "00ff", shq("it's")], 1e8, 0.001, on, 0, 600000));
 });
 
 void test("parLine: the par explained from the rounds that proved it", () => {

@@ -153,6 +153,12 @@ void test("the budget: the meter stops at it and says so; a newer run takes over
   const d = STARTERS.garden.dogleg;
   const cut = (await estimate(host, d, { budget: { shots: 300, ms: 10_000 } }))!;
   assert.ok(cut.cut && cut.shots <= 300, said(cut));
+  // cut short before any line holed it: not measured, never "Very hard" (the community list would keep that for good)
+  assert.equal(cut.strokes, null);
+  assert.equal(cut.level, null, "not measured");
+  assert.equal(shown(cut).word, "–");
+  assert.match(meterTitle(cut), /^Difficulty, the meter's guess: not measured\./);
+  assert.equal(meterLine(cut).text, "The meter ran out of time on this hole: the test will tell.");
   let asked = 0;
   assert.equal(await estimate(host, d, { pause: () => Promise.resolve(++asked < 2) }), null, "a newer run took over");
   assert.equal(asked, 2);
@@ -163,6 +169,7 @@ void test("the level from what was measured", () => {
   const m = { strokes: 1 as number | null, forgiving: [1], narrowest: null as number | null, rarest: null as number | null };
   assert.equal(levelOf(m), 0);
   assert.equal(levelOf({ ...m, strokes: null }), 3, "no line found");
+  assert.equal(levelOf({ ...m, strokes: null, cut: true }), null, "none found before the budget ran out: not measured");
   assert.equal(levelOf({ ...m, strokes: 2, forgiving: [0.2, 1] }), 0, "a dogleg's tee shot");
   assert.equal(levelOf({ ...m, strokes: 3, forgiving: [0.5, 0.3, 1] }), 1);
   assert.equal(levelOf({ ...m, strokes: 3, forgiving: [0.2, 0.4, 0.7] }), 2);

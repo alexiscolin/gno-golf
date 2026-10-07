@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -99,6 +99,13 @@ test("isAddress accepts only a lowercase g1-bech32 address", () => {
   assert.equal(isAddress(ADDR1.toUpperCase()), false);
   assert.equal(isAddress(ADDR1.slice(0, -1)), false); // one char short
   assert.equal(isAddress(123), false);
+});
+
+test("isSlug: golf's validSlug, 1 to 32 lower-case letters, digits and dashes; the one rule every caller reads", () => {
+  for (const ok of ["a", "mole-run", "a1-", "x".repeat(32)]) assert.equal(isSlug(ok), true, ok);
+  for (const bad of ["", "x".repeat(33), "Mole", "a b", "a_b", "$(x)", "a/b", 7, null]) assert.equal(isSlug(bad), false, String(bad));
+  assert.equal(isHoleId(`${ADDR1}/${"x".repeat(32)}`), true, "a hole id's slug is the same rule");
+  assert.equal(isHoleId(`${ADDR1}/${"x".repeat(33)}`), false);
 });
 
 test("isHoleId accepts a realm path, a course slot (and its version), a community hole", () => {
@@ -480,6 +487,41 @@ test("extras: read once per hole version and stroke (the look-ahead and the next
   await chain.extras("mines/8/v3", 9);
   await chain.extras("mines/8/v3", 9);
   assert.equal(asked.length, tried + 1, "asked again once, then kept");
+});
+
+test("holeData: a version's data read once a visit (it never changes), an alias's each time, a failure asked again", async () => {
+  const chain = makeChain();
+  const asked: string[] = [];
+  let down = false;
+  setFetch((url) => {
+    asked.push(decoded(url).expr.replace(/^.*HoleData/, "HoleData"));
+    if (down) throw new Error("node down");
+    return strReply("ab01");
+  });
+  const v1 = `${ADDR1}/lane/v1`, alias = `${ADDR1}/lane`;
+  await Promise.all([chain.holeData(v1), chain.holeData(v1)]);
+  assert.equal(await chain.holeData(v1), "ab01");
+  assert.deepEqual(asked, [`HoleData("${v1}")`], "once, however many ask (the list, the meter, the load)");
+  await chain.holeData(alias);
+  await chain.holeData(alias);
+  assert.equal(asked.length, 3, "an alias names the next version once one is published: read each time");
+  down = true;
+  await assert.rejects(chain.holeData(`${ADDR1}/lane/v2`));
+  const tried = asked.length;
+  down = false;
+  await chain.holeData(`${ADDR1}/lane/v2`);
+  await chain.holeData(`${ADDR1}/lane/v2`);
+  assert.equal(asked.length, tried + 1, "a failed read is not kept: asked again once, then kept");
+});
+
+test("blockTime: a block's time (ms) from its header; a node that does not have it, or does not answer, is down", async () => {
+  const chain = makeChain();
+  setFetch((url) => (assert.match(url, /\/blockchain\?minHeight=7&maxHeight=7$/), { result: { block_metas: [{ header: { height: "7", time: "2026-10-07T06:43:54.238331Z" } }] } }));
+  assert.equal(await chain.blockTime(7), Date.parse("2026-10-07T06:43:54.238Z"));
+  setFetch(() => ({ result: { block_metas: [] } }));
+  await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
+  setFetch(() => { throw new Error("node down"); });
+  await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
 });
 
 // ------------------------------------------------------------ boards, and the mode guard

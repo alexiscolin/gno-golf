@@ -14,22 +14,23 @@
 // its path drawn, the last three faded, all played again as the hole changes;
 // the board says it is no proof. "Show the line" draws the meter's best line
 // and where its shots stopped.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { centreOn, FLAT, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
+import { centreOn, FLAT, gridLines, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
 import { BOARD } from "@/lib/builder/gg1";
 import { handlesOf, type HandleKey } from "@/lib/builder/handles";
 import { type PaletteEntry } from "@/lib/builder/palette";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, V } from "@/lib/builder/draft";
 import { makeGesture, type Env, type Target } from "@/lib/builder/gesture";
-import { stageRenderer } from "@/lib/builder/stage";
+import { onStage, stageRenderer, stageUp } from "@/lib/builder/stage";
 import type { Hole } from "@/lib/scene/data";
-import Scene from "./Scene";
+import Scene, { type Eye } from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
+import { Button, Chip } from "@/components/ui";
 import { chain, labelAt, lean, reactionAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
 import { KEYS } from "@/lib/builder/keys";
@@ -71,8 +72,9 @@ export interface BoardProps {
   ball?: Ball;
   /** how the board is looked at: turned, tilted (view.ts Look; flat by default) */
   look?: Look;
-  /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D) */
-  scene?: { state: Hole | null; of: Draft | null; paused?: boolean; keep?: boolean };
+  /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D);
+   *  eye: the player's view painted from the same scene */
+  scene?: { state: Hole | null; of: Draft | null; paused?: boolean; keep?: boolean; eye?: Eye };
 }
 
 /** The quick shots on the board: those played (the latest last; null, one the realm refused), the one being pulled, and the meter's line. */
@@ -108,8 +110,10 @@ function extent(d: Draft): [V, V] {
 
 export default function Board(props: BoardProps) {
   const { draft, quick, full, selected, armed, step, bad } = props, look = props.look ?? FLAT;
-  // in 3D where this browser has WebGL (the Builder's one context: stage.ts), else the 2D board as it was
-  const [gl] = useState(() => !!props.scene && !!stageRenderer());
+  // in 3D where this browser has WebGL (the Builder's one context: stage.ts), else the 2D board as it was;
+  // its context lost, in 2D until it is back (the scene kept, to draw again then)
+  const [in3d] = useState(() => !!props.scene && !!stageRenderer());
+  const gl = useSyncExternalStore(onStage, stageUp) && in3d;
   const waker = useRef<(() => void) | null>(null);
   const box = useRef<HTMLElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -313,13 +317,11 @@ export default function Board(props: BoardProps) {
     else if (r.moved) dropped(r.moved, false);
   }
 
-  // what the view shows: the grid's lines in sight, every unit, every fifth darker
+  // what the view shows: the grid's lines in sight, every unit from the tee, every fifth darker
   const seen = ([[0, 0], [size.w, 0], [0, size.h], [size.w, size.h]] as const).map((c) => toBoard(view, look, c));
   const x0 = Math.max(0, Math.floor(Math.min(...seen.map((c) => c[0])))), x1 = Math.min(BOARD, Math.ceil(Math.max(...seen.map((c) => c[0]))));
   const y0 = Math.max(0, Math.floor(Math.min(...seen.map((c) => c[1])))), y1 = Math.min(BOARD, Math.ceil(Math.max(...seen.map((c) => c[1]))));
-  const lines: { x?: number; y?: number; major: boolean }[] = [];
-  if (view.k >= 6) for (let x = x0; x <= x1; x++) lines.push({ x, major: x % 5 === 0 });
-  if (view.k >= 6) for (let y = y0; y <= y1; y++) lines.push({ y, major: y % 5 === 0 });
+  const lines = view.k >= 6 ? gridLines([x0, y0], [x1, y1], draft.tee) : [];
   const sel = draft.pieces.find((p) => p.id === selected), hs = 7 / view.k;
   // the tee's and the cup's hit areas, last in their groups (the selection glows their drawing): wider than it (the
   // flag and its pole with the cup), 14 px at least
@@ -335,7 +337,7 @@ export default function Board(props: BoardProps) {
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
     <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
-      {gl && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} paused={props.scene.paused} keep={props.scene.keep} />}
+      {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} eye={props.scene.eye} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
         onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>
@@ -385,17 +387,17 @@ export default function Board(props: BoardProps) {
       </svg>
       {ball && (
         <div className="board__tools">
-          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <span className="board__quick" role="status">Quick shot: not a proof</span>}
-          <button type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
+          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: not a proof</Chip>}
+          <Button size="s" type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
             title={ball.line ? "The difficulty meter's best line, and where its shots stopped (a guess, calm weather)" : "Shown once the meter has measured the hole as it is"}
-            onClick={ball.onLine}>Show the line</button>
-          <button type="button" className="board__toggle" aria-disabled={ball.tryOff ? true : undefined} title={ball.tryOff || "Play it now in calm weather, then back here: never a proof (T)"}
-            onClick={() => !ball.tryOff && ball.onTry()}>Quick test<kbd>T</kbd></button>
+            onClick={ball.onLine}>Show the line</Button>
+          <Button size="s" type="button" className="board__toggle" keycap="T" aria-disabled={ball.tryOff ? true : undefined} title={ball.tryOff || "Play it now in calm weather, then back here: never a proof (T)"}
+            onClick={() => !ball.tryOff && ball.onTry()}>Quick test</Button>
         </div>
       )}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
       {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
-      {!props.said && <p className="board__keys" aria-hidden="true">{KEYS.map((k, i) => <span key={k.key}>{i ? " · " : ""}<kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span>)}</p>}
+      {!props.said && <p className="board__keys" aria-hidden="true">{KEYS.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live || (aiming && ball?.aimed)) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">

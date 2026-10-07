@@ -16,9 +16,9 @@ import { validate, type Census } from "./pipeline";
 import { FIELD, notABuilderWorld } from "./rules";
 import { MAX_NOTE, parseDraft, type Draft } from "./draft";
 import { authorOf } from "./holes";
-import { shortAddr, type Chain } from "../chain";
+import { isSlug, shortAddr, type Chain } from "../chain";
 import type { BuilderHost } from "./wasm";
-import { loadTakedown, takenDown } from "../takedown";
+import { takedownOf, takenDown } from "../takedown";
 
 /** A file opened: its draft as it is, and why it is broken ("" if it passes every rule). */
 export interface Opened {
@@ -78,7 +78,7 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
   const r = await asDraft(hex, host, census);
   if (typeof r === "string") return r;
   const [author, slug] = id.split("/");
-  return { ...r.draft, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };
+  return { ...r.draft, slug: me && author === me && isSlug(slug) ? slug : "" };
 }
 
 /**
@@ -92,18 +92,24 @@ export function remixOf(d: Draft, id: string): Draft {
 }
 
 /**
- * A community hole's version (id) as a remix (remixOf): its data read from
- * the chain, the site's takedown list with it (one taken down never opens),
- * opened as the Builder opens any published hole (fromPublished); or why not.
+ * A published hole by its id, as the Builder opens one (fromPublished): its
+ * data read from the chain, the site's takedown list with it (one taken down
+ * never opens, the list unread nothing does); or why not, for what failed.
  */
-export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof loadTakedown>[1]): Promise<Draft | string> {
-  let d: Draft | string;
+export async function openPublished(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, me: string | null, get?: Parameters<typeof takedownOf>[1]): Promise<Draft | string> {
+  const [hex, taken] = await Promise.all([chain.holeData(id).catch(() => null), takedownOf(chain, get).catch(() => null)]);
+  if (hex === null) return "The chain has no hole there, or could not be read.";
+  if (taken === null) return "The site's list of holes taken down could not be read. Try again in a moment.";
   try {
-    const [hex, taken] = await Promise.all([chain.holeData(id), loadTakedown(chain, get)]);
-    d = await fromPublished(hex, host, id, null, census, taken);
+    return await fromPublished(hex, host, id, me, census, taken);
   } catch {
-    return "The chain has no hole there, or could not be read.";
+    return "The Builder's pieces could not load. Try again in a moment.";
   }
+}
+
+/** A community hole's version (id) as a remix (remixOf) of the hole openPublished opens; or why not. */
+export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof takedownOf>[1]): Promise<Draft | string> {
+  const d = await openPublished(chain, host, census, id, null, get);
   return typeof d === "string" ? d : remixOf(d, id);
 }
 

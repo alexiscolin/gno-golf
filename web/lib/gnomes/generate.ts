@@ -4,9 +4,8 @@
 // give the same gnomes, id for id (scripts/gnomes.ts writes them out).
 import { seeded } from "../scene/common";
 import { GNOMES } from "../scene/gnome";
-import { ACCESSORIES, ARCHETYPES, BEARDS, COLOURS, HATS, HOLINGS, HOMES, MATERIALS, PATTERNS, PIECES, TIERS, TRAILS, colour,
+import { ACCESSORIES, ARCHETYPES, BEARDS, COLOURS, HATS, HOLINGS, HOMES, MATERIALS, PATTERNS, PIECES, PROPS, TIERS, TRAILS, colour,
   type Accessory, type Archetype, type Beard, type Hat, type Home, type Pattern, type Piece } from "./vocab";
-import { PROPS } from "./props";
 import { FORMAT, PLAIN, encode, type Traits } from "./codec";
 import { deltaE } from "./colour";
 import { lookOf, skinOf, traitsOf } from "./skin";

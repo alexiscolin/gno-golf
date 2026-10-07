@@ -6,7 +6,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  BUILDER_BADGES, earnedBadges, factsOf, heldWeathers, isFresh, keepSeen, loadSeen, nextRound, readRewards, roundNow, SEEN_KEY, statsLine, statsOf, testRounds, versusLine,
+  BUILDER_BADGES, earnedBadges, factsOf, heldWeathers, isFresh, keepSeen, loadSeen, nextRound, readRewards, roundNow, savedOnMore, SEEN_KEY, statsLine, statsOf, testRounds, versusLine,
 } from "../lib/builder/rewards.ts";
 import type { Proof } from "../lib/builder/proof.ts";
 import { required } from "../lib/builder/rules.ts";
@@ -139,4 +139,16 @@ void test("readRewards: the author's holes (none taken down, nor anyone else's),
   assert.deepEqual(asked.map((a) => a.length), [12, 2]);
   assert.deepEqual(got.saved.rows.map((r) => r.id), [mine[0].id, mine[12].id]);
   assert.deepEqual([...got.saved.more], [mine[0].id, mine[12].id]);
+});
+
+void test("savedOnMore: only the holes not read yet asked (a list's next page, the day's hole), added to the rounds already read", async () => {
+  const asked: string[][] = [];
+  const chain = { savedOn: (ids: readonly string[]) => (asked.push([...ids]), Promise.resolve({ rows: ids.map((id) => saved(P1, 3, { id })), more: new Set(ids.slice(0, 1)) })) };
+  const first = await savedOnMore(chain, null, [ID]);
+  const both = await savedOnMore(chain, first, [ID, ID2]);
+  assert.deepEqual(asked, [[ID], [ID2]], "the first hole not asked again");
+  assert.deepEqual(both.saved.rows.map((r) => r.id), [ID, ID2]);
+  assert.deepEqual([...both.saved.more], [ID, ID2]);
+  assert.equal(await savedOnMore(chain, both, [ID2, ID]), both, "nothing new: nothing asked");
+  assert.equal(asked.length, 2);
 });

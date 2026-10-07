@@ -215,8 +215,18 @@ export const CUPS = ["garden", "island", "town", "mountain", "mines"] as const;
 export type Cup = (typeof CUPS)[number];
 /** The four classic cups: the grand slam's and the King's (not the mines). */
 export const CLASSIC = ["garden", "island", "town", "mountain"] as const satisfies readonly Cup[];
-/** A cup's name, as the game calls it. */
-export const CUP_NAMES: Readonly<Record<Cup, string>> = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup", mines: "Crystal Mines" };
+// The worlds as the game names them (the cups', and the volcano and the storm a gnome can come from): alone, and in
+// a sentence. Read by the cups, the Builder and the gnome shop alike: a world never goes by two names.
+const WORLDS: Readonly<Record<string, readonly [name: string, said: string]>> = {
+  garden: ["Garden", "the Garden"], island: ["Island", "the Island"], town: ["Mushroom Town", "Mushroom Town"], mountain: ["Mountain", "the Mountain"],
+  mines: ["Crystal Mines", "the Crystal Mines"], volcano: ["Volcano", "the Volcano"], storm: ["Storm", "the Storm"],
+};
+/** A world's name: "Garden", "Mushroom Town" (one the game has no name for, its id with a capital). */
+export const worldName = (w: string) => (Object.hasOwn(WORLDS, w) ? WORLDS[w][0] : cap(w));
+/** A world in a sentence: "the Garden", "Mushroom Town". */
+export const theWorld = (w: string) => (Object.hasOwn(WORLDS, w) ? WORLDS[w][1] : `the ${cap(w)}`);
+/** A cup's name, as the game calls it: its world's, "Garden Cup"; the town and the mines go by their own. */
+export const CUP_NAMES = Object.fromEntries(CUPS.map((c) => [c, c === "town" || c === "mines" ? worldName(c) : `${worldName(c)} Cup`])) as Readonly<Record<Cup, string>>;
 /** How the expert cup says what it asks (its curtain, its page, the About sheet). */
 export const HARD = "a few minutes a hole";
 /** The cup a link names ("?hole=town/3", "/h/mines-3/", an old realm's "island7"), the garden when it names none. */

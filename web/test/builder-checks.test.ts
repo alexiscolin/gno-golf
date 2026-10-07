@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { checkHole, counts, work, ROUND_STROKES, SHOT_FLOOR, STORM_FLOOR, WORK_WARN } from "../lib/builder/checks.ts";
 import { laneOf, reach } from "../lib/builder/lane.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
-import type { HoleIn, WallIn } from "../lib/builder/types.ts";
+import type { HoleIn, V, WallIn, ZoneIn } from "../lib/builder/types.ts";
 import { hexOf, host, lane } from "./builder-fixture.ts";
 
 const box = (x0: number, y0: number, x1: number, y1: number): WallIn[] =>
@@ -62,6 +62,44 @@ void test("E7: a timed piece on for part of its cycle; a pulse that comes and go
   assert.match(rules(pulse(1, 1))[0], /^E7 Pulse 1/);
 });
 
+void test("E4, E14: gaps side by side, each too narrow, shut the way as one does; beside a wide one, they do not", () => {
+  const across = (...ys: [number, number][]) => hole({ walls: [...box(0, 0, 40, 20), ...[0, ...ys.flat(), 20].flatMap((y, k, all) => (k % 2 ? [] : [{ a: [20, y], b: [20, all[k + 1]] }]))] });
+  assert.match(rules(across([5, 5.9]))[0], /^E4 .* 0\.9 wide, narrower than the ball \(1\)$/);
+  assert.equal(rules(across([5, 5.9], [14.1, 15])).filter((r) => r.startsWith("E4")).length, 2, "two");
+  assert.equal(rules(across([3, 3.9], [9.55, 10.45], [16.1, 17])).filter((r) => r.startsWith("E4")).length, 3, "three");
+  assert.equal(rules(across([5, 6.1], [13.9, 15])).filter((r) => r.startsWith("E14")).length, 2, "two a ball only just fits");
+  assert.deepEqual(rules(across([5, 5.9], [12, 15])), [], "one a ball passes well: the narrow one is not the way");
+  assert.deepEqual(rules(across([5, 6.1], [12, 15])), [], "nor one it only just fits");
+});
+
+void test("E5: a polygon's mouth by the widest circle in it, its width said when thin; quick on a wide one (each check on a drag measures it)", () => {
+  const e5 = (h: HoleIn) => checkHole(h).filter((i) => i.rule === "E5").map((i) => i.text);
+  const thin = hole({ zones: [{ kind: "hazard", min: [5, 5], max: [35, 16], poly: [[5, 5], [35, 15], [35, 16], [5, 6]] }] });
+  const [said] = e5(thin), w = Number(/is ([\d.]+) across/.exec(said ?? "")?.[1]);
+  assert.ok(Math.abs(w - 3 / Math.sqrt(10)) < 0.03, `a slanting strip a unit high is ${(3 / Math.sqrt(10)).toFixed(2)} across: ${said}`);
+  // a pond of 16 points 60 across, against the same pond as a box (its mouth at once): best of three, each hole new (its floods not kept)
+  const pond = (round: boolean) => hole({
+    w: 80, h: 80, walls: box(0, 0, 80, 80), tee: [2, 2], pin: [78, 78],
+    zones: [{ kind: "hazard", min: [10, 10], max: [70, 70], ...(round && { poly: Array.from({ length: 16 }, (_, k): [number, number] => [40 + 30 * Math.cos((k * Math.PI) / 8), 40 + 30 * Math.sin((k * Math.PI) / 8)]) }) }],
+  });
+  const best = (round: boolean) => Math.min(...[0, 1, 2].map(() => { const h = pond(round), t0 = performance.now(); checkHole(h); return performance.now() - t0; }));
+  assert.deepEqual(e5(pond(true)), []);
+  const ratio = best(true) / best(false);
+  assert.ok(ratio < 40, `the polygon's check: ${ratio.toFixed(1)} times the box's (some 10; its every point measured, some 180)`);
+});
+
+void test("E13: zones lie over one another by their shapes, not their boxes: round ones apart, two triangles making a square, meet nowhere", () => {
+  const e13 = (...zones: ZoneIn[]) => rules(hole({ zones })).filter((r) => r.startsWith("E13")).length;
+  const sand = (min: V, max: V, more: Partial<ZoneIn> = {}): ZoneIn => ({ kind: "surface", min, max, skin: "sand", ...more });
+  assert.equal(e13(sand([10, 4], [14, 8], { round: true }), sand([13.5, 7.5], [17.5, 11.5], { round: true })), 0, "two discs whose boxes meet at a corner");
+  assert.equal(e13(sand([10, 4], [14, 8], { round: true }), sand([12, 4], [16, 8], { round: true })), 1, "two that do");
+  const tri = (pts: V[]) => sand([Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1]))], [Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))], { poly: pts });
+  assert.equal(e13(tri([[10, 4], [14, 4], [10, 8]]), tri([[14, 4], [14, 8], [10, 8]])), 0, "two triangles on one diagonal");
+  assert.equal(e13(tri([[10, 4], [14, 4], [10, 8]]), tri([[10, 4], [14, 4], [10, 8]])), 1, "one on another");
+  assert.equal(e13(tri([[10, 4], [14, 4], [10, 8]]), sand([11, 5], [13, 7])), 1, "a box over a triangle");
+  assert.equal(e13(sand([10, 4], [14, 8]), sand([14, 4], [18, 8])), 0, "boxes side by side");
+});
+
 void test("E8: GG1's limits, pulses' pieces counted in", () => {
   const many = (n: number) => Array.from({ length: n }, (_, k): WallIn => ({ a: [5 + (k % 30), 2], b: [5 + (k % 30), 3] }));
   assert.deepEqual(counts(hole()).walls, [4, LIMITS.walls]);
@@ -110,7 +148,8 @@ void test("a check stays quick on a hole of many bars (the board checks on a dra
   const d = { ...lane("garden", bars, 70, 50), slug: "many" }, o = { host, palette: garden };
   // against the same lane bare, timed alike (best of five, the machine's load the same for both)
   const bare = { ...lane("garden", [], 70, 50), slug: "many" };
-  const best = (x: typeof d) => (validate(x, o), Math.min(...[0, 1, 2, 3, 4].map(() => { const t0 = performance.now(); validate(x, o); return performance.now() - t0; })));
+  // (a copy each time: validate keeps a draft's check, and the time measured is a check's)
+  const best = (x: typeof d) => (validate({ ...x }, o), Math.min(...[0, 1, 2, 3, 4].map(() => { const c = { ...x }, t0 = performance.now(); validate(c, o); return performance.now() - t0; })));
   const ratio = best(d) / best(bare);
-  assert.ok(ratio < 6, `${bars.length} bars: ${ratio.toFixed(1)} times the bare lane's check (it was some 20 before)`);
+  assert.ok(ratio < 3, `${bars.length} bars: ${ratio.toFixed(1)} times the bare lane's check (some 1.8; it was some 20 before)`);
 });

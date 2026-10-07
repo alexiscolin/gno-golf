@@ -10,16 +10,17 @@
 // hole as it is (quickshot.ts), and the meter's best line; never a proof.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
-import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, snap, whereOf, clampMove } from "@/lib/builder/edit";
-import { gauges, meterFace, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
+import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, whereOf, clampMove } from "@/lib/builder/edit";
+import { NO_GL, gauges, meterFace, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
+import { stageRenderer } from "@/lib/builder/stage";
 import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
-import { notTurned, turnPiece } from "@/lib/builder/handles";
+import { notTurned, QUARTER, snap, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
-import { dropped, toCarry, weatherName, withCarried } from "@/lib/builder/carry";
-import { FIELD, listed } from "@/lib/builder/rules";
+import { dropped, toCarry, withCarried } from "@/lib/builder/carry";
+import { FIELD, listed, weatherName } from "@/lib/builder/rules";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
@@ -35,6 +36,8 @@ import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
 import TestMode from "./TestMode";
+import PlayerView from "./PlayerView";
+import type { Eye } from "./Scene";
 import { canonicalHex as hexOf } from "@/lib/builder/proof";
 import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
@@ -114,6 +117,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
   // the last quick test's round that holed, left on the board as a dotted trail (played again as the hole changes)
   const [trail, setTrail] = useState<QuickShot[]>([]);
+  // the player's view (PlayerView.tsx), painted by the board's 3D scene
+  const [eye] = useState<Eye>(() => ({ canvas: null, paint: () => {} }));
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -216,9 +221,9 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const piece = draft.pieces.find((p) => p.id === selected) ?? null;
   const turn = () => {
     if (!piece || !full) return;
-    const same = notTurned(piece);
+    const same = notTurned(piece, draft.tee);
     if (same) return say(same);
-    const t = turnPiece(piece), why = canPlace(draft, t, full);
+    const t = turnPiece(piece, draft.tee), why = canPlace(draft, t, full);
     if (why.length) return say(refusalOf(why[0]));
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });
   };
@@ -233,21 +238,22 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   };
   const nudge = (d: V) => {
     if (!piece || !quick || !full) return;
-    const w = whereOf(piece.geometry), to = clampMove(draft, piece.id, snap([w[0] + d[0], w[1] + d[1]], 0.25), quick);
+    const w = whereOf(piece.geometry), to = clampMove(draft, piece.id, snap([w[0] + d[0], w[1] + d[1]], QUARTER, draft.tee), quick);
     tryEdit({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? movePiece(piece, to) : p)) }, "");
   };
   const fix = (i: Issue) => quick && tryEdit(fixOf(i, draft, quick), "No free place near it: move it by hand.");
   // the keyboard: the tee or the cup moved as a drag lets it go; the armed piece dropped between them, then selected
   const moveEnd = (which: "tee" | "pin", d: V) => {
     if (!quick || !full) return;
-    const r = dropEnd(draft, which, snap([draft[which][0] + d[0], draft[which][1] + d[1]], 0.25), quick, full);
+    const r = dropEnd(draft, which, snap([draft[which][0] + d[0], draft[which][1] + d[1]], QUARTER, draft.tee), quick, full);
     if ("why" in r) return r.why && say(r.why);
     set(r);
   };
   const dropArmed = () => {
-    if (!armed || !full) return;
-    const at: V = [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], r = placeNear(draft, armed, at, full);
+    if (!armed || !quick || !full) return;
+    const at: V = [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], r = placeNear(draft, armed, at, quick, full);
     if (!r) return say(roomFor(draft, placePiece(armed, "", at)) || "No free place for it between the tee and the cup.");
+    if ("why" in r) return say(r.why);
     set(r.draft);
     setArmed(null);
     setSelected(r.id);
@@ -260,7 +266,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if ("refused" in r) return say(`The ${w} has no ${r.refused.join(", ")}.`);
       if ("why" in r) return say(`Not in the ${w}: ${r.why}`);
       set(r);
-    });
+    }, () => say(`The ${w}'s pieces could not load: try again.`)); // (offline, a deploy mid-flight: the hole stays where it is)
   };
 
   // the keys: always the editor's, never a field's
@@ -268,7 +274,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     const key = (e: KeyboardEvent) => {
       if (trying) return; // (a quick test's keys are its own)
       const t = e.target as HTMLElement;
-      if (t.closest("input, select, textarea, [contenteditable]")) return;
+      if (t.closest("input, select, textarea, [contenteditable], dialog")) return; // (a dialog's keys are its own)
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === "Alt") return setFine(true);
       // Space: held, a drag pans (a button keeps its Space unless the pointer is on the board)
@@ -309,12 +315,13 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = v ? atFault(v, kept.pieces.map((p) => p.id)) : new Set<string>(); // (both of an overlap, each piece an error meets)
-  const testOff = carrying === kept ? "Checking…" : testGate(kept, checked);
+  const gl = !!stageRenderer();
+  const testOff = carrying === kept ? "Checking…" : testGate(kept, checked, gl);
   const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
   // a quick test: the hole as kept with no error (no name nor address needed)
-  const tryOff = !checked || checked.of !== kept ? "Checking…" : errors.length ? testOff : "";
+  const tryOff = !gl ? NO_GL : !checked || checked.of !== kept ? "Checking…" : errors.length ? testOff : "";
   function tryIt() {
     const hex = !tryOff && hexOf(kept, host);
     if (hex) (setArmed(null), setAim(null), setTrying({ of: kept, hex }));
@@ -323,7 +330,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
-        steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
+        steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? (gl ? "Fix the errors first" : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
         action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Prove it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={meterFace(clean, est, kept)}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
@@ -336,7 +343,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
             {toast && <p className="btoast" role="status">{toast}</p>}
             {opened && errors.length > 0 && <p className="bbroken" role="status">{opened}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep" }}
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep", eye }}
               // (the first run's hints first: the board's tools come once they are gone)
               ball={hints ? undefined : {
                 played: landed, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
@@ -348,6 +355,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           </div>
           <aside className="col" aria-label="The selected piece">
             <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={playing} onPlay={() => setPlaying((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
+            {gl && <PlayerView eye={eye} />}
           </aside>
         </>
       ) : (
@@ -355,11 +363,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       )}
       {trying && (
         <div className={`tbench tbench--quick tint--${draft.world}`}>
-          <div className="qbar">
-            <b>Quick test</b><span>Calm weather · not a proof</span>
-            <button type="button" className="btn btn--ghost" onClick={() => setTrying(null)}>Back to edit<kbd>Esc</kbd></button>
-          </div>
-          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onRound={(r) => setTrail(roundOf(host, trying.of, r))} onLeave={() => setTrying(null)} />
+          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onRound={(r) => setTrail(roundOf(host, trying.of, r))} onLeave={() => setTrying(null)}
+            proveOff={trying.of === kept ? testOff : "Checking…"} onProve={() => (setTrying(null), onTest(trying.of))} />
         </div>
       )}
       {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}

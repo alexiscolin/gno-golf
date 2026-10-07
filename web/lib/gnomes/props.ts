@@ -1,6 +1,7 @@
 // An Epic's own thing, as data: a few simple shapes, inked like the rest of
-// him (scene/gnome-props.ts builds them). A new one is a new last entry: its
-// name is its code (PROPS), so the order is the encoding's.
+// him (scene/gnome-props.ts builds them). A new one is a new last entry here
+// and in vocab.ts PROPS, its code (the encoding's order; a test holds the two
+// together), which the codec reads without these shapes.
 //
 // Where a part stands: "body" is the gnome's own space (his body a sphere of
 // 0.55 at the origin, his face toward +z, eyes at y 0.08); "hat" the hat's
@@ -451,6 +452,3 @@ export const PROP_DESIGNS: Readonly<Record<string, PropDesign>> = {
   "fairy-ring": { legend: true },
   "frost-cap": { legend: true },
 };
-
-/** The props, by code (0: none): PROP_DESIGNS' order, so a new one goes last. */
-export const PROPS: readonly string[] = ["", ...Object.keys(PROP_DESIGNS)];

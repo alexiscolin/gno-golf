@@ -997,7 +997,8 @@ playable and listed.
   from the landing handle, which stays on that axis's side; its mouth is at
   least 1.5 deep along that axis (`Max − Min` on it); its landing is in the
   lane, clear of walls, outside hazards; its speed at most 3.5. Plain air
-  needs its own drawing (wind streaks) the same way.
+  needs its own drawing (wind streaks) the same way. (Air a world draws
+  itself is in: the Mountain's gust, its snow cannon, timed only.)
 - Editing the field constants (friction, bounce, substeps, shelter, ball and
   cup radius).
 - A static page and link card per community hole. They would need a build

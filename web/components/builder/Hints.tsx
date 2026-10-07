@@ -8,11 +8,12 @@
 // each palette tile's picture, its name and what it does (tiles.ts).
 import { useEffect, useRef } from "react";
 import { pictureOf, tilesOf } from "@/lib/builder/tiles";
-import { worldName } from "@/lib/builder/rules";
+import { cap, theWorld } from "@/lib/builder/rules";
 import type { PaletteEntry } from "@/lib/builder/palette";
 import { KEYS } from "@/lib/builder/keys";
 import { entryName } from "@/lib/builder/names";
 import { MOD } from "./Inspector";
+import { Button } from "@/components/ui";
 
 const HINTS = [
   ["palette", "Drag a piece onto the board"],
@@ -29,15 +30,15 @@ export default function Hints({ onDone, glossary = null }: {
   useEffect(() => got.current?.focus(), []);
   const tiles = glossary ? (({ first, more }) => [...first, ...more.flatMap((g) => g.tiles)])(tilesOf(glossary.palette)) : [];
   const hints = (inPanel: boolean) => HINTS.map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
-  const ok = <button ref={got} type="button" className="btn btn--gold bhint__ok" onClick={onDone}>Got it</button>;
+  const ok = <Button ref={got} variant="gold" type="button" className="bhint__ok" onClick={onDone}>Got it</Button>;
   // the first run: each hint by its place; the "?": one panel in the middle, the hints, then the pieces
   if (!glossary) return <div className="bhints" role="note" aria-label="Three hints" onKeyDown={(e) => e.key === "Escape" && onDone()}>{hints(false)}<div className="bhints__centre">{ok}</div></div>;
   return (
     <div className="bhints" role="note" aria-label="How it works, and the pieces" onKeyDown={(e) => e.key === "Escape" && onDone()}>
       <div className="bhints__centre bhints__centre--help">
-        <section className="bgloss" aria-label={`How it works, and the ${worldName(glossary.world)}'s pieces`}>
+        <section className="bgloss" aria-label={`How it works, and ${theWorld(glossary.world)}'s pieces`}>
           <div className="bgloss__hints">{hints(true)}</div>
-          <h2>The {worldName(glossary.world)}&apos;s pieces</h2>
+          <h2>{cap(theWorld(glossary.world))}&apos;s pieces</h2>
           <ul>
             {tiles.map((t) => (
               <li key={t.key} className="bgloss__piece" title={t.looks.length > 1 ? t.looks.map(entryName).join(", ") : undefined}>

@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { added, drawn, loadWorld, worldOf } from "./scene-harness.ts";
-import { BINDINGS, HAND_ONLY, WORLD_NAMES, commonOf, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
+import { BINDINGS, HAND_ONLY, HOME, WORLD_NAMES, commonOf, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD, MAX_BOUNCE, WEATHER, kicks } from "../lib/builder/rules.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { writeDraft } from "../lib/builder/gg1.ts";
@@ -28,7 +28,9 @@ void test("the builder's worlds are the scene's classic four (no Crystal Mines);
   for (const [w, es] of palettes) {
     const kinds = new Set(es.map((e) => e.kind));
     for (const k of ["rail", "bar", "post", "surface", "slope", "tunnel", "hazard"] as const) assert.ok(kinds.has(k), `${w}: no ${k}`);
-    assert.ok(!kinds.has("loop") && !kinds.has("air"), `${w}: no loop, no moving air (the plan's v1)`);
+    // moving air where a world draws it (the mountain's snow cannon); no loop (the island's castle tube is an assembly)
+    assert.equal(kinds.has("air"), w === "mountain", `${w}: moving air only where it is drawn`);
+    assert.ok(!kinds.has("loop"), `${w}: no loop`);
     assert.equal(new Set(es.map((e) => e.id)).size, es.length, `${w}: an id twice`);
     for (const e of es) assert.equal(entry(e.id, es), e);
   }
@@ -72,6 +74,38 @@ void test("every drawing the scene declares for the Builder's worlds is bound or
     }
   }
   assert.ok(Object.hasOwn(HAND_ONLY, "bar/tram"));
+});
+
+void test("every shared drawing has a home: every world's, some worlds', or the shore's; a world's course pieces are its own; the shore's pieces only by the sea", () => {
+  const shared = new Set(Object.entries(sharedSkins()).flatMap(([kind, list]) => list.map((s) => `${kind}/${s}`)).filter((k) => !Object.hasOwn(HAND_ONLY, k)));
+  assert.deepEqual(new Set(Object.keys(HOME)), shared, "a home for every shared drawing the palette offers, and for no other");
+  for (const [k, home] of Object.entries(HOME)) if (typeof home !== "string") for (const w of home) assert.ok(Object.hasOwn(FIELD, w), `${k}: ${w} is no Builder world`);
+  // what the game's own holes of a world place is that world's own, never borrowed
+  const course = fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" "));
+  const borrowed: string[] = [];
+  for (const [slot, , , hex] of course) {
+    const g = host.decode(hex), es = palettes.get(g.world);
+    if (!es) continue;
+    const zones = [g, ...g.pulses].flatMap((l) => l.zones.map((z) => [z.kind === "slope" && z.air ? "air" : z.kind, z.skin]));
+    const pieces = [g, ...g.pulses].flatMap((l) => [...l.posts.map((p) => ["post", p.skin]), ...l.walls.flatMap((w) => [["rail", w.skin], ["bar", w.skin]]), ...zones]);
+    for (const [kind, skin] of pieces) for (const e of es) if (e.kind === kind && e.skin === skin && e.borrowed) borrowed.push(`${slot} ${e.id}`);
+  }
+  assert.deepEqual([...new Set(borrowed)], []);
+  // the shore's (a palm, a crab, the waves) look wrong away from the sea: only a world with one offers them
+  for (const [w, es] of palettes) {
+    const shore = es.filter((e) => e.world === "*" && HOME[`${e.kind}/${e.skin}`] === "sea").map((e) => e.id);
+    if (w === "island") assert.ok(shore.includes("*/post/sandcastle") && shore.includes("*/surface/wetsand"), w);
+    else assert.deepEqual(shore, [], `${w}: no sea, none of the shore's pieces`);
+  }
+  // each world's own, as the game dresses it
+  const own = (w: string) => palettes.get(w)!.filter((e) => !e.borrowed).map((e) => e.skin);
+  const lent = (w: string) => palettes.get(w)!.filter((e) => e.borrowed).map((e) => e.skin);
+  for (const s of ["hedge", "flowerbed", "molehill", "sunflower", "scarecrow", "moon bridge", "wheelbarrow"]) assert.ok(own("garden").includes(s), `garden: ${s}`);
+  for (const s of ["palm", "wetsand", "lagoon", "rowing boat", "sandcastle", "shipwreck"]) assert.ok(own("island").includes(s), `island: ${s}`);
+  for (const s of ["brick", "herringbone", "stall", "lamp", "fountain", "canal"]) assert.ok(own("town").includes(s), `town: ${s}`);
+  for (const s of ["boulder", "snowdrift", "ice", "pine", "crevasse"]) assert.ok(own("mountain").includes(s), `mountain: ${s}`);
+  assert.ok(lent("mountain").includes("scarecrow") && lent("garden").includes("lamp") && lent("island").includes("hedge"), "another world's pieces, borrowed");
+  for (const s of ["", "bumper", "sand", "water"]) for (const w of palettes.keys()) assert.ok(own(w).includes(s), `${w}: "${s}" every world's`);
 });
 
 void test("every binding is inside GG1's bounds and the plan's: a bounce above 1 exactly where the skin kicks; mouths 1.5 across; ice a surface; no weather", () => {
@@ -161,4 +195,16 @@ void test("the five common pieces first, named plainly, in every Builder world: 
     for (const c of common) assert.ok(p.includes(c.entry), `${world} ${c.name}: one of its own entries`);
     assert.deepEqual(common.map((c) => c.entry.kind), ["rail", "post", "surface", "hazard", "slope"], world);
   }
+});
+
+void test("the moving pieces are judged like any other: a blowhole out onto a rock, the serac's ice on the cup, a gust over a hill, refused", async () => {
+  const { validate } = await import("../lib/builder/pipeline.ts");
+  const { census } = await import("../lib/builder/drawn.ts");
+  const said = (w: string, pieces: Parameters<typeof lane>[1]) => validate(lane(w, pieces), { host, palette: palettes.get(w)!, census }).issues.filter((i) => i.severity === "error").map((i) => `${i.rule} ${i.piece}: ${i.text}`);
+  const put = (w: string, id: string, at: [number, number], p: Parameters<typeof placePiece>[3] = {}) => placePiece(entry(id, palettes.get(w)!)!, id.split("/").at(-1)!, at, p);
+  // each placed alone in the lane: it passes
+  for (const [w, id] of [["island", "island/tunnel/blowhole"], ["mountain", "mountain/hazard/serac"], ["mountain", "mountain/air/gust"]] as const) assert.deepEqual(said(w, [put(w, id, [12, 4], { size: 4, to: [20, 15] })]), [], id);
+  assert.deepEqual(said("island", [put("island", "island/tunnel/blowhole", [8, 8], { to: [20, 10] }), put("island", "*/post/rock", [20, 10])]), ["E6 blowhole: The blowhole comes out at (21.5, 11.5), on a wall or a post"]);
+  assert.deepEqual(said("mountain", [put("mountain", "mountain/hazard/serac", [25, 8], { size: 3 })]), ["E3 serac: The cup touches the serac at (28.5, 11.5)"]);
+  assert.deepEqual(said("mountain", [put("mountain", "mountain/air/gust", [10, 6], { size: 6 }), put("mountain", "mountain/slope/kicker", [12, 8], { size: 4 })]), ["E13 gust: The snow cannon lies over the kicker at (11.5, 7.5)"]);
 });

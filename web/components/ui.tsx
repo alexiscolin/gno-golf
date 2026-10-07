@@ -4,24 +4,42 @@
 // game is one of these, so they all hover, press, focus and disable alike.
 // Their look is in globals.css under "shared controls".
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 import { vsPar } from "@/lib/card";
 import { vsParWords } from "@/components/common";
 
 /**
  * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
- * front's call to action: a duel's Race), "chip" (a HUD card that is a button).
+ * front's call to action: a duel's Race), "chain" (the one action that goes
+ * to the chain: Adena's blue), "chip" (a HUD card that is a button), "icon"
+ * (round, an icon or a sign in it: as wide as it is high). size: "l" (a
+ * screen's, the default), "m" (a toolbar's), "s" (a small one beside what it
+ * acts on): one height each, whatever is inside, so a row of one size lines
+ * up. keycap: its key, in a cap after the words (never taller than the button).
+ * A link that looks like a button takes buttonClass.
  */
-const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", gold: "btn--gold", chip: "btn--chip" };
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: keyof typeof VARIANTS;
+const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", gold: "btn--gold", chain: "btn--save", chip: "btn--chip", icon: "btn--ghost btn--icon" };
+const SIZES = { l: "", m: "btn--m", s: "btn--s" };
+export type ButtonLook = { variant?: keyof typeof VARIANTS; size?: keyof typeof SIZES };
+export const buttonClass = ({ variant = "secondary", size = "l" }: ButtonLook, className = "") => ["btn", VARIANTS[variant], SIZES[size], className].filter(Boolean).join(" ");
+interface ButtonProps extends ComponentProps<"button">, ButtonLook {
+  keycap?: ReactNode;
 }
-export function Button({ variant = "secondary", className = "", children, ...props }: ButtonProps) {
-  const v = VARIANTS[variant] || "btn--ghost";
+export function Button({ variant, size, keycap, className = "", children, ...props }: ButtonProps) {
   return (
-    <button className={`btn ${v} ${className}`.trim()} {...props}>
+    <button className={buttonClass({ variant, size }, className)} {...props}>
       {children}
+      {keycap != null && <kbd className="btn__key">{keycap}</kbd>}
     </button>
+  );
+}
+
+/** What only shows in a row of buttons (the Builder's difficulty meter): their height and edge, flat (it is not pressed). size as Button's. */
+export function Chip({ size = "l", className = "", children, ...props }: HTMLAttributes<HTMLSpanElement> & { size?: ButtonLook["size"] }) {
+  return (
+    <span className={["chip", size === "l" ? "" : `chip--${size}`, className].filter(Boolean).join(" ")} {...props}>
+      {children}
+    </span>
   );
 }
 

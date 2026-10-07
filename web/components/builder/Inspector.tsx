@@ -8,7 +8,7 @@
 // holds, and the reason is said once (settings.ts; edit.ts canPlace).
 import { entryName } from "@/lib/builder/names";
 import { useEffect, useRef, useState } from "react";
-import { Segmented } from "@/components/ui";
+import { Button, Segmented } from "@/components/ui";
 import { settle } from "@/lib/builder/session";
 import { canPlace, newErrors, errorsOf, whereOf } from "@/lib/builder/edit";
 import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
@@ -17,6 +17,7 @@ import { MS_PER_STEP } from "@/lib/engine/replay";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
 import { refusalOf } from "@/lib/builder/explain";
+import { detailsOpen, saveDetailsOpen } from "@/lib/prefs";
 import { notTurned } from "@/lib/builder/handles";
 import { xy } from "@/lib/builder/rules";
 
@@ -51,7 +52,7 @@ function Cycle({ t, unit, playing, onPlay }: { t: Pulse; unit: string; playing: 
   const now = (step + t.phase) % t.every < t.on;
   return (
     <div className="cycle__row">
-      {unit === "substeps" && <button type="button" className="round round--s" aria-pressed={playing} aria-label={playing ? "Pause its blinking" : "Play its blinking"} title={playing ? "Pause (on the board too)" : "Play (on the board too)"} onClick={onPlay}>{playing ? "❚❚" : "▶"}</button>}
+      {unit === "substeps" && <Button variant="icon" size="s" type="button" aria-pressed={playing} aria-label={playing ? "Pause its blinking" : "Play its blinking"} title={playing ? "Pause (on the board too)" : "Play (on the board too)"} onClick={onPlay}>{playing ? "❚❚" : "▶"}</Button>}
       <div className="cycle" aria-label={`There on ${t.on} of every ${t.every} ${unit}${unit === "substeps" ? `: ${now ? "there" : "open"} now` : ""}`}>
         {Array.from({ length: cells }, (_, i) => <i key={i} className={`${(Math.floor((i * t.every) / cells) + t.phase) % t.every < t.on ? "on" : ""}${unit === "substeps" && Math.floor((step * cells) / t.every) === i ? " now" : ""}`} />)}
       </div>
@@ -80,6 +81,8 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
   onCopy: () => void;
   onDelete: () => void;
 }) {
+  // Details open unless the player folded them this visit (prefs.ts)
+  const [open] = useState(detailsOpen);
   if (!piece) return <p className="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>;
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
@@ -115,16 +118,16 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
       <div className="insp__head">{entryName(ent)}</div>
       <div className="insp__acts">
         {/* (a round piece: off, the reason its title, as R says it) */}
-        <button type="button" className={`btn btn--ghost${notTurned(p) ? " btn--off" : ""}`} aria-disabled={notTurned(p) ? true : undefined} title={notTurned(p) || "Turn it a quarter (R)"} onClick={onTurn}>Turn<kbd>R</kbd></button>
-        <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
-        <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
+        <Button size="s" type="button" keycap="R" aria-disabled={notTurned(p, draft.tee) ? true : undefined} title={notTurned(p, draft.tee) || "Turn it a quarter (R)"} onClick={onTurn}>Turn</Button>
+        <Button size="s" type="button" keycap={`${MOD}D`} onClick={onCopy}>Copy</Button>
+        <Button size="s" type="button" keycap="⌫" onClick={onDelete}>Delete</Button>
       </div>
       <p className="insp__hint">Drag it to move it, its handles to size and turn it.</p>
-      {/* the numbers, for whoever asks for them (the GUI spec's B1: none to type unless Details is opened) */}
-      <details className="insp__details">
+      {/* the numbers, open (else the column stands empty), folded away for the visit by whoever would rather not see them */}
+      <details className="insp__details" open={open} onToggle={(e) => saveDetailsOpen(e.currentTarget.open)}>
       <summary>Details</summary>
       <p className="insp__at">At {xy(at)}</p>
-      {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v))} onDone={done} />)}
+      {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v, draft.tee))} onDone={done} />)}
       {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
       {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
       {ent.scale && <Row label={ent.kind === "loop" ? "Speed" : "Grip"} value={p.params.scale ?? ent.scale.def} range={ent.scale} onChange={(v) => tryPiece(withNumber(p, ent, "scale", v))} onDone={done} />}

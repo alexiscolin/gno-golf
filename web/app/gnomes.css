@@ -13,12 +13,12 @@
 .shop, .gsheet { font-variant-numeric: tabular-nums; }
 
 /* a tier's chip: its shape and its name, on its colour */
-.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; background: var(--tier-common); }
+.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; --tier-bg: var(--tier-common); background: var(--tier-bg); }
 .tier svg { width: 14px; height: 14px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
-.tier--rare { background: var(--tier-rare); }
-.tier--epic { background: var(--tier-epic); }
-.tier--legendary { background: var(--gold-grad); }
-.tier--earned { background: var(--green-light); }
+.tier--rare { --tier-bg: var(--tier-rare); }
+.tier--epic { --tier-bg: var(--tier-epic); }
+.tier--legendary { --tier-bg: var(--gold-grad); }
+.tier--earned { --tier-bg: var(--green-light); }
 
 /* a gnome's tile: his thumbnail on his tier's stage, framed in his tier's rim */
 .gtile { position: relative; display: block; aspect-ratio: 1; border-radius: 18px; border: var(--edge-bold); background: #f6ead2; overflow: hidden; }
@@ -31,10 +31,16 @@
 .gtile--never img { filter: grayscale(1) brightness(1.15) opacity(.3); }
 .gtile--never { border-style: dashed; border-color: rgba(var(--ink-rgb), .35); background: rgba(var(--ink-rgb), .04); }
 
-/* the gallery: its width the cups', its pieces on one column */
-.shop .worlds__in { width: min(1160px, calc(100vw - 48px)); display: grid; gap: var(--sp-4); justify-items: stretch; }
+/* the gallery: its width the cups', within the screen's room (never 100vw: a sideways scroll), its pieces on one
+   column; a front screen's head (the rival's: title.css .front--fit) but the screen scrolling from its top, the
+   head in the corner buttons' row, the gutters slim (the banner's room at the end, as the cups') */
+.screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { justify-content: flex-start; padding: 0 24px 48px; }
+body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
+@media (max-width: 600px) { .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { padding-inline: 16px; } } /* (the page's frame closer: globals.css) */
+.shop .worlds__in { width: min(1160px, 100%); display: grid; gap: var(--sp-4); justify-items: stretch; }
 .shop .front__head { justify-self: center; }
-@media (max-width: 600px) { .shop .worlds__in { width: calc(100vw - 32px); } }
+/* a player's page's Race: centred at its own width, as every call to action of the game (the column stretches the rest) */
+.shop .worlds__in > .btn--cta { justify-self: center; }
 
 /* the sale's end: a date to know, flat, never a countdown */
 .closes { justify-self: center; display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 5px 14px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink-soft); text-align: center; }
@@ -43,76 +49,72 @@
 /* the shop's slots (ShopFrame): the same height before and after their figures are read */
 .closes-slot { min-height: 34px; display: grid; justify-items: center; align-items: center; }
 .gcard__buy.gcard__buy--skel { background: rgba(var(--ink-rgb), .08); border-color: transparent; box-shadow: none; }
-.shop__pitch { margin: 0 auto; max-width: 640px; text-align: center; font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--ink-soft); }
+.shop__pitch { margin: var(--sp-2) auto 0; max-width: 640px; text-align: center; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); } /* (small words in ink: the soft ink is under 4.5:1 on a front's ground) */
 /* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
 .gcard__buy { justify-self: stretch; margin: 2px 2px 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
 .wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
 
-/* the shop's head, slim: its title at a sheet title's size (globals.css .sheet h2), level with the corner buttons,
-   its one line under it; then the sale's line and the toolbar, the gnomes above the fold */
-.screen.worlds.shop { padding-top: 0; }
-/* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf; the head's own lines a step apart */
-.shop .worlds__in { padding-top: 38px; gap: var(--sp-4); }
-.shop .front__head { display: grid; justify-items: center; gap: var(--sp-2); margin: 0; }
-@media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } } /* (the line clear of the corner buttons) */
-/* the shopkeeper peeking beside the title, out of the flow (the head no taller), clear of the corner buttons */
-.shop .front__head { position: relative; }
-.shopkeeper { position: absolute; top: -30px; left: calc(50% + 92px); width: 68px; height: 68px; pointer-events: none; } /* (his feet on the title's line, clear of its last letter) */
+/* the shop's head: the game's front head (its pill, its title at the rival's size, its line), level with the corner
+   buttons; then the sale's line and the toolbar, the gnomes above the fold */
+/* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf */
+.shop .worlds__in { padding-top: 34px; gap: var(--sp-4); }
+.shop .front__head { margin: 0; }
+/* a phone: the title alone (title.css), between the corner buttons, a line clear of them */
+@media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } .shop .worlds__title { margin-inline: 56px; } }
+/* the shopkeeper past the title's last letter, his feet on its line, out of the flow (the head no taller): never over it */
+.shop .worlds__title { position: relative; }
+.shopkeeper { position: absolute; left: calc(100% + 10px); bottom: -4px; width: 76px; height: 76px; pointer-events: none; }
 .shopkeeper .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* a phone: no room beside the title between the corner buttons, and none over it without crowding it: he stays on the menu's panel */
 @media (max-width: 700px) { .shopkeeper { display: none; } }
-.shop .worlds__title { margin: 0 56px; font-size: 30px; line-height: 1.15; --ink-w: 4px; --ink-drop: 2px; }
 
-/* the sale in one line: a little fairway from the tee to the flag, the ball at the share that found a player, the
-   wave's Legendary at the flag in gold, the wave's words, its state's chip; one row, two on a phone (fixed heights:
-   the slot while it is read is the same room) */
-.wline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; align-content: center; gap: 4px var(--sp-3); height: 40px; margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+/* the sale in one line, a block of its own (a section's room above and below it): a fairway from the tee to the
+   flag, the ball at the share that found a player, the wave's Legendary at the flag in gold, the wave's words, its
+   state's chip; one row, two on a phone (fixed heights: the slot while it is read is the same room) */
+.wline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; align-content: center; gap: 6px var(--sp-4); height: 72px; margin: var(--sp-4) 0; font-size: 18px; font-weight: 800; color: var(--ink); }
 .wline__words { white-space: nowrap; }
-.wline__who { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.wline__who { font-size: 16px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .wline__who b { color: var(--ink); font-weight: 800; }
-.wline__legend { flex: none; width: 36px; height: 36px; margin-left: -6px; border: var(--edge); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
+.wline__legend { flex: none; width: 60px; height: 60px; margin-left: -6px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 3px var(--gold); }
 .wline__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
-.wline__chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 8px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
-.wline__chip svg { width: 15px; height: 15px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
-.fw { position: relative; flex: none; width: 260px; height: 32px; }
-.fw__lane { position: absolute; left: 0; right: 0; top: 6px; height: 20px; border: var(--edge); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 12px, #a3e6bf 12px 24px); }
-.fw__tee { position: absolute; left: 6px; top: 11px; width: 4px; height: 10px; border-radius: 2px; background: var(--paper); border: 1.5px solid var(--ink); }
-.fw__flag { position: absolute; right: 2px; top: -7px; width: 16px; height: 32px; overflow: visible; } /* (its cup on the lane, its flag over it) */
+.wline__chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px 4px 10px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.wline__chip svg { width: 17px; height: 17px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
+.fw { position: relative; flex: none; width: 380px; height: 46px; }
+.fw__lane { position: absolute; left: 0; right: 0; top: 9px; height: 30px; border: var(--edge-bold); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 16px, #a3e6bf 16px 32px); }
+.fw__tee { position: absolute; left: 9px; top: 17px; width: 5px; height: 14px; border-radius: 2px; background: var(--paper); border: 2px solid var(--ink); }
+.fw__flag { position: absolute; right: 4px; top: -10px; width: 22px; height: 44px; overflow: visible; } /* (its cup on the lane, its flag over it) */
 .fw__cup { fill: var(--ink); }
-.fw__ball { position: absolute; top: 9px; left: calc(10px + var(--at) * (100% - 38px)); width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
-.fw__ball::after { content: ""; position: absolute; left: 2px; top: 3px; width: 3px; height: 3px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
-@keyframes fw-roll { from { left: 10px; transform: rotate(-600deg); } }
+.fw__ball { position: absolute; top: 13px; left: calc(16px + var(--at) * (100% - 64px)); width: 22px; height: 22px; border: 2.5px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
+.fw__ball::after { content: ""; position: absolute; left: 4px; top: 5px; width: 4px; height: 4px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
+@keyframes fw-roll { from { left: 16px; transform: rotate(-600deg); } }
 @media (prefers-reduced-motion: reduce) { .fw__ball { animation: none; } }
 /* a phone: the fairway, the Legendary and the words on one row; the chip (or the Legendary's words) on the next */
 @media (max-width: 700px) {
-  .wline { height: 64px; gap: 4px var(--sp-2); font-size: 13px; }
-  .fw { flex: 1 1 60px; min-width: 60px; max-width: 200px; }
+  .wline { height: 88px; margin: var(--sp-2) 0; gap: 6px var(--sp-3); font-size: 16px; }
+  .fw { flex: 1 1 100px; min-width: 100px; max-width: 220px; }
   .wline__words { order: 3; }
-  .wline__legend { order: 2; width: 30px; height: 30px; }
-  .wline__who, .wline__chip { order: 4; flex-basis: 100%; justify-content: center; text-align: center; }
+  .wline__legend { order: 2; width: 48px; height: 48px; }
+  .wline__who, .wline__chip { order: 4; flex-basis: 100%; justify-content: center; text-align: center; font-size: 15px; }
   .wline__chip { flex-basis: auto; }
   .wline--chip .wline__who { display: none; }
 }
-@media (min-width: 701px) and (max-width: 1000px) { .fw { width: 140px; } .wline--chip .wline__who { display: none; } }
+@media (min-width: 701px) and (max-width: 1000px) { .fw { width: 220px; } .wline--chip .wline__who { display: none; } }
 
 /* one toolbar: which gnomes · the tiers (their prices once) · the search · the look · more filters; one row wide, two
    narrower (each row's height fixed: the slot while it is read is the same room) */
 .gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto auto; grid-template-areas: "views tiers . search look more"; grid-template-rows: 48px; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .gbar__views { grid-area: views; } .gbar__tiers { grid-area: tiers; } .gbar > .gbar__icon:not(.gbar__more), .gsearch { grid-area: search; } .gbar > .seg--look { grid-area: look; } .gbar__more { grid-area: more; }
-.gbar .seg { box-shadow: none; }
 /* every control the same height, on one line: the toolbar's rhythm */
-.gbar .seg button { min-height: 36px; } /* (in the segment's 2 px edge: 40 all told) */
-.gbar__views button { padding: 6px 14px; font-size: 14px; white-space: nowrap; }
+.gbar .seg button { min-height: 36px; font-size: 13px; } /* (in the segment's 2 px edge: 40 all told; the words of one size, on one baseline) */
+.gbar__views button { padding: 6px 14px; white-space: nowrap; }
 .gbar__tiers { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tierbtn__unit { font-size: 11px; }
-.tierbtn { height: 40px; padding: 0 10px 0 7px; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .04em; cursor: pointer; transition: transform var(--t-press), box-shadow var(--t-press); }
+/* a tier's chip as the shelf's filter (Button, a toolbar's): pressed, ringed, on its own colour */
+.tierbtn { gap: 5px; padding: 0 10px 0 7px; font-size: 13px; font-weight: 800; letter-spacing: .04em; }
 .tierbtn__price { margin-left: 2px; font-size: 13px; letter-spacing: 0; text-transform: none; }
-.tierbtn:hover { transform: translateY(-1px); }
-.tierbtn[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.tierbtn[aria-pressed="true"] { background: var(--tier-bg); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
 .gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
-.tierbtn:focus-visible, .gbar__icon:focus-visible, .gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
-.gbar__icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); cursor: pointer; }
-.gbar__icon:hover, .gbar__icon[aria-expanded="true"], .gbar__icon--on { background: var(--mint); }
+.gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .gbar__icon svg, .gsearch svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
 .gbar__more svg circle { fill: var(--paper); }
 .gsearch { display: flex; align-items: center; gap: 6px; width: 260px; height: 40px; padding: 0 4px 0 12px; border: var(--edge); border-radius: 14px; background: var(--white); }
@@ -132,7 +134,7 @@
 @media (max-width: 700px) {
   .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views search look" "tiers tiers tiers"; grid-template-rows: 48px 44px; column-gap: var(--sp-2); }
   .gbar:has(.gsearch) { grid-template-areas: "views . look" "tiers tiers tiers" "search search search"; grid-template-rows: 48px 44px 44px; }
-  .gbar__views { display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; font-size: 13px; }
+  .gbar__views { display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; }
   .gbar__tiers { justify-content: flex-start; gap: 5px; }
   .tierbtn__name, .tierbtn__unit { display: none; }
   .tierbtn { padding: 0 9px 0 6px; }
@@ -154,8 +156,10 @@
 @media (max-width: 600px) { .gshelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); } }
 .gcard { display: grid; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-2) var(--sp-2) 10px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
 .gcard:hover { transform: translateY(-3px); }
-.gcard__name { margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gcard__name small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+/* the name cut short when it is long, never his number: the gnome's identity in the shop */
+.gcard__name { display: flex; align-items: baseline; min-width: 0; margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; }
+.gcard__name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gcard__name small { flex: none; margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .gcard__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin: 0 2px; min-height: 26px; }
 .gcard__fact { min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard--mine { background: var(--ink); color: var(--paper); }
@@ -182,6 +186,9 @@
 /* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
 .gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-3); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
 html:has(.gsheet) { overflow: hidden; }
+/* the shop's sheets open inside its screen (its stacking context, under the network banner, a later sibling): the
+   banner goes while one is open, as the corner buttons do (globals.css), never a chip over the sheet's Buy */
+body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet > * { margin: 0 !important; }
 .gsheet__head { display: grid; justify-items: center; gap: var(--sp-2); text-align: center; }
 .gsheet__head .gtile { width: min(220px, 60vw); }

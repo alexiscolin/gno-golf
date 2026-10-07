@@ -9,7 +9,7 @@ import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
 import { periodFor } from "./proof";
-import { required } from "./rules";
+import { required, weatherName } from "./rules";
 import { calmPeriod } from "./quickshot";
 import type { BuilderHost } from "./wasm";
 
@@ -44,4 +44,36 @@ export const quickPlan = (host: Pick<BuilderHost, "setperiod" | "find">, id: str
 export function clock(ms: number): string {
   const t = Math.floor(ms / 100), s = Math.floor(t / 10);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}.${t % 10}`;
+}
+
+/** The test's par in the score card's corner, as the game's card says it ("par 3"): the rounds' once every weather is proved, else the difficulty meter's guess ("par 3?"), else nothing. */
+export const parSaid = (par: number, guess: number): string => (par ? `par ${par}` : guess ? `par ${guess}?` : "");
+
+/** A finished card's action: play the weather again (R), back to the editor (Escape), and the one going on: prove it (a quick test's), the next weather, publish. */
+export type Act = "again" | "edit" | "prove" | "next" | "publish";
+export interface Finished {
+  /** "Holed in 3", and what it did ("Wind proved"; "" for nothing) */
+  title: string;
+  sub: string;
+  /** a sentence under it ("" none) */
+  line: string;
+  /** the buttons, in order: the way on last, the one primary; off: why it waits */
+  actions: { act: Act; text: string; key?: string; primary?: boolean; off?: string }[];
+}
+
+/**
+ * The card of a round holed in a test, as the game's hole-finished card:
+ * a quick test's (never a proof: Prove it is the way on), or Prove's while
+ * the chain replays the round, once it did not count (play it again), once
+ * it proved its weather (the next one, or Publish when none is left).
+ */
+export function finished(o: { quick: boolean; strokes: number; kind: string; checking?: boolean; why?: string; next?: string | null; par?: number; proveOff?: string }): Finished {
+  const title = `Holed in ${o.strokes}`, name = weatherName(o.kind);
+  const again = { act: "again", text: "Try again", key: "R" } as const, edit = { act: "edit", text: "Back to edit", key: "Esc" } as const;
+  if (o.quick) return { title, sub: "", line: "Prove it in every weather to publish it.", actions: [again, edit, { act: "prove", text: "Prove it", primary: true, ...(o.proveOff ? { off: o.proveOff } : {}) }] };
+  if (o.checking) return { title, sub: "", line: "The chain's code replays your round…", actions: [] };
+  if (o.why) return { title, sub: "", line: `That ${name.toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...again, primary: true }, edit] };
+  const sub = `${name} proved`;
+  if (o.next != null) return { title, sub, line: `Next: ${weatherName(o.next).toLowerCase()}.`, actions: [again, edit, { act: "next", text: "Next weather", primary: true }] };
+  return { title, sub, line: o.par ? `Every weather proved: par ${o.par}.` : "Every weather proved.", actions: [again, edit, { act: "publish", text: "Publish →", primary: true }] };
 }

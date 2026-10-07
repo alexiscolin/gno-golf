@@ -71,13 +71,22 @@
 # sanctions. The list is geo.ts's BLOCKED, the same on both rules (the tests
 # hold them to it): CN, CU, IR, KP, SY, RU, BY. /geo.json, read once when the
 # shop would open, says shut there; a gnome's page is the "not available"
-# page. The free game plays everywhere. Best effort: a VPN gets round it.
+# page. Everyone else's /geo.json is the open answer (the rule after them:
+# the first rule that matches applies); the file itself says shut, so a host
+# without these rules never opens the shop. The free game plays everywhere.
+# Best effort: a VPN gets round it.
 [[redirects]]
   from = "/geo.json"
   to = "/geo-blocked.json"
   status = 200
   force = true
   conditions = {Country = ["CN", "CU", "IR", "KP", "SY", "RU", "BY"]}
+
+[[redirects]]
+  from = "/geo.json"
+  to = "/geo-open.json"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/g/*"

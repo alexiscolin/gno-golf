@@ -3,7 +3,7 @@
 // its history; its persistence.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DRAFTS_KEY, MAX_PIECES, UNREAD_KEY, emptyDraft, exportDraft, history, loadDrafts, onGrid, parseDraft, saveDrafts, type Draft } from "../lib/builder/draft.ts";
+import { DRAFTS_KEY, MAX_PIECES, dropDraft, emptyDraft, exportDraft, history, loadDrafts, newKey, onGrid, parseDraft, saveDraft, type Draft } from "../lib/builder/draft.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
 
 const base = (): Draft => ({
@@ -25,9 +25,10 @@ const why = (d: unknown) => {
   return typeof r === "string" ? r : "ok";
 };
 
-void test("onGrid: multiples of a quarter, finite", () => {
-  assert.ok(onGrid(1.25) && onGrid(0) && onGrid(-3.75));
-  assert.ok(!onGrid(0.3) && !onGrid(Number.NaN) && !onGrid(Number.POSITIVE_INFINITY));
+void test("onGrid: multiples of a quarter from the tee, finite", () => {
+  assert.ok(onGrid(1.25, 0) && onGrid(0, 0) && onGrid(-3.75, 0));
+  assert.ok(!onGrid(0.3, 0) && !onGrid(Number.NaN, 0) && !onGrid(Number.POSITIVE_INFINITY, 0));
+  assert.ok(onGrid(13.95, 13.7) && onGrid(13.7 - 0.25 * 3, 13.7) && !onGrid(14, 13.7), "a hole framed by a post's rim: its own quarters");
 });
 
 void test("a whole draft reads back as it was written", () => {
@@ -45,7 +46,7 @@ void test("anything else is refused, with why", () => {
   assert.equal(why({ ...base(), title: "x".repeat(41) }), "The name is at most 40 characters.");
   assert.equal(why({ ...base(), note: "x".repeat(141) }), "The line for players is at most 140 characters.");
   assert.equal(why({ ...base(), par: 20 }), "Par is a whole number from 0 to 19.");
-  assert.equal(why({ ...base(), tee: [0.3, 5] }), "The tee is off the grid.");
+  assert.equal(why({ ...base(), tee: [0.3, 5] }), "The cup is off the grid.", "(the grid is the tee's)");
   const off = base();
   off.pieces[0] = { ...off.pieces[0], geometry: { t: "rail", a: [1.5, 1.3], b: [22.5, 1.5] } };
   assert.equal(why(off), "Piece p1 is off the grid.");
@@ -108,36 +109,88 @@ void test("a draft holds as many pieces as the palette lets an author place: one
   assert.equal(MAX_PIECES, LIMITS.walls + LIMITS.posts + LIMITS.zones);
 });
 
-void test("persistence: a stored draft this Builder cannot read is set aside, never erased by the next save", () => {
-  localStorage.clear();
-  const odd = { ...base(), pieces: "not a list" };
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: [base(), odd] }));
-  assert.deepEqual(loadDrafts(), [base()]);
-  saveDrafts([base(), emptyDraft("island")]);
-  assert.deepEqual(JSON.parse(localStorage.getItem(UNREAD_KEY)!), [odd], "kept aside, as it was");
-  loadDrafts();
-  assert.equal((JSON.parse(localStorage.getItem(UNREAD_KEY)!) as unknown[]).length, 1, "set aside once, not again at each load");
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 9, drafts: [base()] }));
-  assert.deepEqual(loadDrafts(), []);
-  assert.equal((JSON.parse(localStorage.getItem(UNREAD_KEY)!) as unknown[]).length, 2, "another version's store, whole");
-});
+const drafts = () => loadDrafts().map((k) => k.draft);
 
-void test("persistence: saved and loaded as written; a store that throws, or another version's, gives none", () => {
+void test("persistence: saved and loaded as written, oldest first; a store that throws gives none", () => {
   localStorage.clear();
-  saveDrafts([base(), emptyDraft("island")]);
-  assert.deepEqual(loadDrafts(), [base(), emptyDraft("island")]);
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 9, drafts: [base()] }));
-  assert.deepEqual(loadDrafts(), []);
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: [base(), { nope: 1 }] }));
-  assert.deepEqual(loadDrafts(), [base()], "a broken draft is left out, the rest kept");
+  saveDraft(newKey(), base());
+  saveDraft(newKey(), emptyDraft("island"));
+  assert.deepEqual(drafts(), [base(), emptyDraft("island")]);
   const get = localStorage.getItem.bind(localStorage);
   localStorage.getItem = () => {
     throw new Error("private window");
   };
   try {
     assert.deepEqual(loadDrafts(), []);
-    assert.doesNotThrow(() => saveDrafts([base()]));
+    assert.doesNotThrow(() => saveDraft(newKey(), base()));
   } finally {
     localStorage.getItem = get;
   }
+});
+
+void test("persistence: two tabs on one browser never write over each other's drafts", () => {
+  localStorage.clear();
+  const [k1, k2] = [newKey(), newKey()];
+  saveDraft(k1, base());
+  saveDraft(k2, emptyDraft("island"));
+  const a = loadDrafts(), b = loadDrafts(); // each tab reads the drafts once, as it opens
+  const added = newKey();
+  assert.ok(saveDraft(added, { ...emptyDraft("garden"), title: "New in A" }), "tab A starts a hole");
+  assert.ok(saveDraft(b[0].key, { ...b[0].draft, title: "Moved in B" }), "tab B, which never saw it, edits another");
+  dropDraft(b[1].key);
+  assert.deepEqual(drafts().map((d) => d.title), ["Moved in B", "New in A"], "A's new hole kept, B's edit kept, B's delete done");
+  assert.ok(saveDraft(a[0].key, { ...a[0].draft, title: "Then in A" }));
+  assert.deepEqual(drafts().map((d) => d.title), ["Then in A", "New in A"], "the same draft saved twice: the last save is that draft's, the others untouched");
+});
+
+void test("persistence: a stored draft this Builder cannot read is left out and left as it is, never erased by a save", () => {
+  localStorage.clear();
+  const odd = newKey();
+  localStorage.setItem(odd, JSON.stringify({ ...base(), pieces: "not a list" }));
+  const was = localStorage.getItem(odd);
+  saveDraft(newKey(), base());
+  assert.deepEqual(drafts(), [base()]);
+  saveDraft(loadDrafts()[0].key, emptyDraft("island"));
+  assert.equal(localStorage.getItem(odd), was);
+});
+
+void test("persistence: an earlier Builder's list moves to a key per draft; one it cannot read is kept as it was", () => {
+  localStorage.clear();
+  const odd = { ...base(), pieces: "not a list" };
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: [base(), odd, emptyDraft("island")] }));
+  assert.deepEqual(drafts(), [base(), emptyDraft("island")]);
+  assert.equal(localStorage.getItem(DRAFTS_KEY), null, "moved, so no save of a list writes over another tab's draft");
+  const stored = Array.from({ length: localStorage.length }, (_, i) => localStorage.getItem(localStorage.key(i)!));
+  assert.ok(stored.includes(JSON.stringify(odd)), "the unread draft, as it was");
+  saveDraft(newKey(), base());
+  assert.equal(loadDrafts().length, 3, "moved once, not again");
+});
+
+void test("persistence: a corrupt list, or another version's, stays as it is: the next save does not erase it", () => {
+  for (const raw of ['{"v":1,"drafts":[{"v":1,"wor', JSON.stringify({ v: 9, drafts: [base()] })]) {
+    localStorage.clear();
+    localStorage.setItem(DRAFTS_KEY, raw);
+    assert.deepEqual(loadDrafts(), []);
+    saveDraft(newKey(), emptyDraft("garden"));
+    loadDrafts();
+    assert.equal(localStorage.getItem(DRAFTS_KEY), raw);
+  }
+});
+
+void test("persistence: a store that refuses a write (quota) still gives every readable draft, and loses none of them", () => {
+  localStorage.clear();
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: [base(), { ...base(), pieces: "not a list" }, emptyDraft("island")] }));
+  const set = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+  try {
+    assert.deepEqual(drafts(), [base(), emptyDraft("island")], "read from the list, though it could not be moved");
+    assert.equal(saveDraft(newKey(), base()), false, "the page then says it keeps nothing");
+  } finally {
+    localStorage.setItem = set;
+  }
+  assert.notEqual(localStorage.getItem(DRAFTS_KEY), null, "the list kept until every draft is moved");
+  assert.deepEqual(drafts(), [base(), emptyDraft("island")]);
+  assert.equal(localStorage.getItem(DRAFTS_KEY), null);
 });

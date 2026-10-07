@@ -167,7 +167,7 @@ void test("E4 on an edit: closing the tee in or the cup off is refused, dragged 
   const d = lane("garden", []), r1 = pieceIn(d, "r1"), closes = { tee: "This closes the tee in: no way to the cup.", cup: "This closes the cup off: no way from the tee." };
   // the top rail's end dragged down to the bottom rail: its far end closes the tee in, its near end the cup off
   for (const [key, to, why] of [["b", [13.5, 21.5], closes.tee], ["a", [19.5, 21.5], closes.cup]] as const) {
-    const there = setHandle(r1, key, to, entryIn(r1.entry, garden)!);
+    const there = setHandle(r1, key, to, entryIn(r1.entry, garden)!, d.tee);
     // while dragged: the ghost red, in an edit's words
     const live = dragCheck(d, ctx).piece(there);
     assert.equal(refusalOf(live[0]), why, `r1.${key} while dragged`);

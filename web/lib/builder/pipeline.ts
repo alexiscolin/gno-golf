@@ -15,7 +15,7 @@ import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { cap, FIELD, pt } from "./rules";
 import { builderLimits } from "./limits";
-import type { Draft, Piece, V } from "./draft";
+import { onGrid, type Draft, type Piece, type V } from "./draft";
 import type { BuilderHost, Cost } from "./wasm";
 import type { GHole } from "./types";
 import type { Drawn, PieceRef } from "../scene/census";
@@ -58,7 +58,7 @@ const SHAPES = { rail: "a rail", bar: "a bar", post: "a post", rect: "a box", ro
 /** L0: each piece's entry is its world's, within its ranges and clocks. */
 function ranges(d: Draft, palette: readonly PaletteEntry[]): Issue[] {
   const out: Issue[] = [];
-  const q = (x: number) => Math.abs(x * 4 - Math.round(x * 4)) < 1e-6, grid = (v: V) => q(v[0] - d.tee[0]) && q(v[1] - d.tee[1]);
+  const grid = (v: V) => onGrid(v[0], d.tee[0]) && onGrid(v[1], d.tee[1]);
   const range = (p: Piece, what: string, v: number, r?: Range) => r && !(v >= r.min - 1e-9 && v <= r.max + 1e-9) && out.push(err("L0", `${cap(pieceName(p))}'s ${what} is ${+v.toFixed(2)}: ${r.min} to ${r.max}`, p));
   for (const p of d.pieces) {
     const e = entryIn(p.entry, palette);
@@ -180,9 +180,21 @@ function drawnAs(d: Draft, refs: Map<string, PieceRef[]>, palette: readonly Pale
  * Every check the builder makes of a draft, errors first; a layer runs only
  * once the ones before it pass. The draft is judged framed (gg1.ts frame:
  * as the editor keeps it), so a piece moved past the hole's low edge is
- * judged where the hole will put it.
+ * judged where the hole will put it. A draft (never changed once made: an
+ * edit makes a new one) is checked once for each options: an edit's own
+ * check is the next edit's "before", the editor's check of it as kept the
+ * same, so an edit pays one census, not three.
  */
 export function validate(draft: Draft, o: ValidateOptions): Validated {
+  const kept = checked.get(o)?.get(draft);
+  if (kept) return kept;
+  const v = validated(draft, o);
+  checked.set(o, (checked.get(o) ?? new WeakMap<Draft, Validated>()).set(draft, v));
+  return v;
+}
+const checked = new WeakMap<ValidateOptions, WeakMap<Draft, Validated>>();
+
+function validated(draft: Draft, o: ValidateOptions): Validated {
   const { host, palette } = o, d = frame(draft);
   const l0 = ranges(d, palette);
   const { hex, bars: barLines, refs } = writeDraft(d, FIELD[d.world]);

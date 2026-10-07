@@ -15,13 +15,13 @@ const entry = (id: string) => garden.find((e) => e.id === id)!;
 void test("sizesOf, withSize: a post's radius, a bar's length along its way, a zone's two sides; kept in range", () => {
   const rock = placePiece(entry("*/post/rock"), "p", [5, 5]);
   assert.deepEqual(sizesOf(rock).map((s) => [s.key, s.value]), [["r", 0.8]]);
-  assert.equal((withSize(rock, entry("*/post/rock"), "r", 9).geometry as { r: number }).r, 4.5);
+  assert.equal((withSize(rock, entry("*/post/rock"), "r", 9, [0, 0]).geometry as { r: number }).r, 4.5);
   const plank = placePiece(entry("*/bar/plank"), "b", [5, 5]);
   assert.deepEqual(sizesOf(plank).map((s) => [s.key, s.value]), [["length", 3]]);
-  assert.deepEqual((withSize(plank, entry("*/bar/plank"), "length", 6.1).geometry as { b: number[] }).b, [11, 5], "on the grid");
+  assert.deepEqual((withSize(plank, entry("*/bar/plank"), "length", 6.1, [0, 0]).geometry as { b: number[] }).b, [11, 5], "on the grid");
   const pond = placePiece(entry("*/hazard/water"), "w", [5, 5]);
   assert.deepEqual(sizesOf(pond).map((s) => s.key), ["width", "depth"]);
-  assert.deepEqual((withSize(pond, entry("*/hazard/water"), "depth", 0.2).geometry as { max: number[] }).max, [11, 6.5], "a side at its least");
+  assert.deepEqual((withSize(pond, entry("*/hazard/water"), "depth", 0.2, [0, 0]).geometry as { max: number[] }).max, [11, 6.5], "a side at its least");
 });
 
 void test("withNumber: bounce, grip and grade on their entry's steps and in range", () => {

@@ -10,11 +10,9 @@ import { makeLocalChain } from "./localchain";
 import { replay, type Proof } from "./proof";
 import { holeRow } from "./testmode";
 import type { Draft } from "./draft";
-import { cap } from "./rules";
+import { weatherName } from "./rules";
 import type { BuilderHost } from "./wasm";
 
-/** A weather's name in a sentence ("" is clear). */
-export const weatherName = (kind: string) => (kind ? cap(kind) : "Clear");
 
 /**
  * The rounds to replay for the hole as it is now (key): for each of the

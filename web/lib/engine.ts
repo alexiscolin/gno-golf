@@ -31,7 +31,7 @@ import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
-import { loadTakedown, takenDown } from "./takedown";
+import { NO_TAKEN, takedownOf, takenDown } from "./takedown";
 import { communityOf, NOT_BUILDER, playable, refused } from "./community";
 import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -65,6 +65,9 @@ export interface GameOptions {
    *  the page loads them only when its link asks for them */
   promo?: typeof Promo;
   probes?: typeof Probes;
+  /** the renderer already on canvas, lent for the game (the Builder's test mode lends the board's, lib/builder/stage.ts):
+   *  handed back on destroy as it was, never disposed; else the game makes its own */
+  renderer?: THREE.WebGLRenderer;
   /** ?camlog: the camera logs every frame (for the probes' camLog) */
   log?: boolean;
   onChange?: (snap: Snapshot) => void;
@@ -85,15 +88,14 @@ const HUD = { top: 108, bottom: 136, side: 14 };
 // the community's holes listed with the cups (off until the builder is out)
 const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
-const NO_TAKEN: ReadonlySet<string> = new Set(); // the takedown list when none could be read
 
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
 
-export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
+export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, renderer: lent, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
   const chain = given ?? makeChain({ rpc, web });
 
-  const renderer = makeRenderer(canvas);
+  const renderer = lent ?? makeRenderer(canvas), lentDpr = renderer.getPixelRatio();
   const scene = makeScene();
   // a storm's lightning: the scene lights up, the page flashes (silently)
   const causes = makeCauses(scene);
@@ -123,10 +125,18 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
   // a collection gnome's trail behind him while he rolls (lib/gnomes; GNOMES' have none)
   let trail: GnomeTrail | null = null, trailUntil = 0;
   const trailAt = new THREE.Vector3();
+  // set aside, never drawn, compiled with the hole (warm): a burst of confetti and the player's own holing,
+  // kept so their shaders are linked with the hole's, not on the winning putt
+  const aside = new THREE.Group(), confettiWarm = makeConfetti([0, 0]);
+  aside.add(confettiWarm.group);
+  let holingWarm: Holed | null = null;
   const dressTrail = (id: string) => {
     if (trail) (scene.remove(trail.group), disposeCourse(trail.group));
     trail = makeTrail(gnomeById(id));
     if (trail) scene.add(trail.group);
+    if (holingWarm) (aside.remove(holingWarm.group), disposeCourse(holingWarm.group));
+    holingWarm = makeHoling(gnomeById(id), new THREE.Vector3());
+    if (holingWarm) aside.add(holingWarm.group);
   };
   dressTrail(gnomeId);
   // a burst done or replaced: out of the scene, its GPU memory freed
@@ -152,10 +162,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     scene.add((confetti = mine = h).group);
     sound("pop");
   };
-  // a burst kept hidden, so its shader compiles with the hole's (warm), not on the winning putt
-  const confettiWarm = makeConfetti([0, 0]);
-  confettiWarm.group.visible = false;
-  scene.add(confettiWarm.group);
   let blinkAt = 0, blinkUntil = 0;
   // small moods of the gnome: a hop of joy when he holes out, a head shake
   // when he comes out of the water. Cosmetic, timed on the page clock.
@@ -723,11 +729,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     if (g.started) closeIn = setTimeout(intro, OVERVIEW_MS);
   }
 
-  // Every shader the hole can need, compiled now: the scene as it is, and the
-  // see-through variant of what a canopy fade turns transparent (fog and the
-  // lightning's light never change the programs: see weather.ts)
-  // (the see-through ones are only started: they are ready long before a fade
-  // needs them). Resolves once the ones drawn now are linked.
+  /** What is set aside (the confetti, the player's holing) compiled, lit as the hole is. */
+  const warmAside = () => renderer.compile(aside, camera, scene);
+  // Every shader the hole can need, compiled now: the scene as it is, what is
+  // set aside, and the see-through variant of what a canopy fade turns
+  // transparent (fog and the lightning's light never change the programs: see
+  // weather.ts) (the see-through ones are only started: they are ready long
+  // before a fade needs them). Resolves once the ones drawn now are linked.
   function warm() {
     const fades: THREE.Material[] = [];
     scene.traverse((o) => {
@@ -739,6 +747,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       renderer.compile(scene, camera);
       for (const m of fades) (m.transparent = false), (m.needsUpdate = true);
     }
+    warmAside();
     // (a context without parallel compiling resolves at once: the old way;
     // and a driver that never says a program is ready is waited 2 s at most)
     let t: ReturnType<typeof setTimeout> | undefined;
@@ -1438,9 +1447,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
   }
 
   /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
-  let takenOnce: Promise<ReadonlySet<string>> | null = null;
-  const takedown = () =>
-    (takenOnce ||= loadTakedown(chain).catch(() => ((takenOnce = null), NO_TAKEN)));
+  const takedown = () => takedownOf(chain).catch(() => NO_TAKEN);
 
   // a link to a community hole the Builder's rules do not pass lands on the cups, and says so (load refuses it too)
   const unchecked = () => start(null).then((to) => (to === null ? "unchecked" : to));
@@ -1624,7 +1631,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       disposeCourse(ball);
       ball = makeBall(gnomeById((gnomeId = id)));
       dressTrail(id);
-      if (g.s) headlamp(ball, g.s.world === "mines");
+      if (g.s) (headlamp(ball, g.s.world === "mines"), warmAside()); // (his holing's shaders now, not at the putt)
       scene.add(ball);
       if (g.s) placeBall();
     },
@@ -1692,10 +1699,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       dropAim(); // and any preview on its way
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
-      for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group, trail && trail.group]) if (o) disposeCourse(o);
+      for (const o of [ball, aim, band, confetti && confetti.group, aside, trail && trail.group]) if (o) disposeCourse(o);
       rival.dispose();
-      renderer.dispose();
-      releaseShared();
+      // a lent renderer keeps what it holds for the shared looks (its next game, or the board, draws them again),
+      // handed back at its own pixel ratio and its GL state reset; the game's own is disposed, and the looks let go of it
+      if (lent) (renderer.setPixelRatio(lentDpr), renderer.resetState());
+      else (renderer.dispose(), releaseShared());
       pip.remove();
     },
   };

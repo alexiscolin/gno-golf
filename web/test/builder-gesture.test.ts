@@ -15,7 +15,10 @@ import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { canonicalHex, proofKey } from "../lib/builder/proof.ts";
 import { FLAT, TILT, toBoard, toPlane, toScreen, fromPlane, matrixOf, relook, type Look, type View } from "../lib/builder/view.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import type { Draft, V } from "../lib/builder/draft.ts";
+import { parseDraft, type Draft, type V } from "../lib/builder/draft.ts";
+import { placePiece } from "../lib/builder/edit.ts";
+import { QUARTER } from "../lib/builder/handles.ts";
+import { validate } from "../lib/builder/pipeline.ts";
 
 const { census } = await import("../lib/builder/drawn.ts");
 const LOOKS: Look[] = [FLAT, { turns: 1, tilt: 0 }, { turns: 2, tilt: TILT }, { turns: 3, tilt: TILT }];
@@ -102,6 +105,32 @@ void test("the same pointer edits on the 2D board and on the 3D one, flat, turne
     assert.equal(new Set(flat).size > 5, true, `${world}: the edits change the hole`);
     for (const look of LOOKS) assert.deepEqual(await play(world, look, true), flat, `${world}, in 3D: turned ${look.turns}, tilted ${look.tilt.toFixed(2)}`);
   }
+});
+
+void test("a post whose rim sets the frame (the hole shifted off the board's quarters): the grid the hole's own, the tee's, for every edit", async () => {
+  const palette = await loadPalette("island"), o = { host, palette }, full = { ...o, census }, entry = (id: string) => palette.find((e) => e.id === id)!;
+  const castle = placePiece(entry("*/post/sandcastle"), "s", [15, 0]); // (the island's sandcastle, r 2.2, may sit on a rail: the hole's low edge its rim)
+  const ed = editor({ ...lane("island", [castle]), slug: "rim" }), env = () => ({ draft: ed.s.now(), quick: o, full, armed: ed.armed(), selected: ed.sel(), step: 0.5 });
+  assert.notEqual(ed.s.now().tee[1] % QUARTER, 0, "framed by the rim: the tee off the board's quarters");
+  const drag = (target: Target, from: V, to: V) => (ed.g.down(env(), from, target), ed.g.move(env(), to), ed.g.up(env(), to));
+  ed.arm(entry("*/post/rock"));
+  ed.g.down(env(), [15, 10.1], null);
+  assert.equal(ed.g.move(env(), [15, 10.1])?.ghost?.why, "", "the ghost green where the hole holds");
+  const placed = ed.g.up(env(), [15, 10.1]), id = ed.sel()!;
+  assert.deepEqual(placed, { placed: id });
+  const rock = () => ed.s.kept().pieces.find((p) => p.id === id)!.geometry as { c: V; r: number };
+  assert.deepEqual(drag({ t: "handle", key: "c" }, rock().c, [rock().c[0] + 2.1, rock().c[1] + 1.1]), {}, "its centre dragged by its handle");
+  ed.arm(entry("*/rail/"));
+  ed.g.down(env(), [22, 6], null), ed.g.up(env(), [22, 6]);
+  const rail = () => ed.s.kept().pieces.find((p) => p.id === ed.sel())!.geometry as { a: V; b: V };
+  const b = rail().b;
+  assert.deepEqual(drag({ t: "handle", key: "b" }, b, [b[0] + 1.1, b[1] + 2.1]), {}, "a rail's end dragged");
+  assert.notDeepEqual(rail().b, b);
+  const tee = ed.s.kept().tee;
+  assert.deepEqual(drag({ t: "end", which: "tee" }, tee, [tee[0] + 1.1, tee[1] + 0.6]), {}, "the tee moved");
+  assert.notDeepEqual(ed.s.kept().tee, tee);
+  assert.deepEqual(validate(ed.s.kept(), full).issues.filter((i) => i.severity === "error"), []);
+  assert.equal(typeof parseDraft(JSON.stringify(ed.s.kept())), "object", "and the draft opens again as kept");
 });
 
 void test("the 3D board's camera shows the ground where the lens puts it: the overlay on its pieces, the pointer on the ground it is over", () => {

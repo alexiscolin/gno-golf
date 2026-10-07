@@ -13,7 +13,8 @@
 // holeHolds, publishSteps).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopied } from "@/components/common";
-import { Button } from "@/components/ui";
+import { Button, buttonClass } from "@/components/ui";
+import Share from "@/components/Share";
 import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
@@ -30,7 +31,7 @@ import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost, Cost } from "@/lib/builder/wasm";
 import type { Hole } from "@/lib/scene/data";
 import Preview from "./Preview";
-import { cardLines, holeLinkOf, saveFile as download, shareCard } from "./share";
+import { cardLines, holeShare, saveFile as download, shareCard } from "./share";
 import { MAX_NOTE, MAX_TITLE as MAX_NAME } from "@/lib/builder/draft";
 import { worldName } from "@/lib/builder/rules";
 
@@ -140,8 +141,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   }, [hex, alias, host]);
 
   if (sent === "done") {
-    const link = holeLinkOf(id), lines = cardLines({ name, world: draft.world, par: draft.par, author });
-    const share = () => (navigator.share ? navigator.share({ title: name, text: `${name}, a mini-golf hole on gno.land`, url: link }).catch(() => {}) : copy(link));
+    const lines = cardLines({ name, world: draft.world, par: draft.par, author });
     const card = () => {
       const c = capture.current?.();
       if (c) void shareCard(c, lines).then((blob) => blob && download(blob, `${draft.slug}.png`));
@@ -155,8 +155,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
         <section className="pub__doneform">
           <h2>{name} is on gno.land!</h2>
           <p>Play it for real: your best becomes the ghost your friends race.</p>
-          <a className="btn btn--gold" href={playLink(holeRow(id, draft))}>Play it for real</a>
-          <Button onClick={() => void share()}>{copied ? "Link copied" : "Share it"}</Button>
+          <a className={buttonClass({ variant: "gold" })} href={playLink(holeRow(id, draft))}>Play it for real</a>
+          <Share {...holeShare(name, id)} label="Share it" />
           <button type="button" className="linkish" onClick={card}>Save its card</button>
         </section>
       </main>
@@ -213,7 +213,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           {step.at === "newer" || step.at === "hole" ? <Button variant="gold" className="btn--wide" onClick={onRetest}>{step.at === "hole" && !/^The rounds/.test(step.why) ? "Back to Edit" : "Test again (free)"}</Button>
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
-                : hasAdena() ? <button type="button" className="btn btn--save btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${b.total.toFixed(2)} GNOT`}</button>
+                : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${b.total.toFixed(2)} GNOT`}</Button>
                   : <p className="pub__note">Adena is not in this browser: publish with gnokey above.</p>}
         </div>
       </section>

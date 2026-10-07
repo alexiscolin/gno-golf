@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node --experimental-strip-types
 // The Builder's starter holes (web/lib/builder/starters.ts): three a world,
-// made of its palette's pieces (a straight lane, a dogleg, the world's own
-// signature piece), each checked by the whole pipeline, and a holing round
+// made of its own pieces, none borrowed from another world (a straight
+// lane, a dogleg, the world's own signature piece), each checked by the whole pipeline, and a holing round
 // of each in every weather the world asks for (web/test/builder-starters.json,
 // found here by search through builder.wasm, replayed into a proof). Run it
 // again after a change to the palette, the checks or the physics; the unit
@@ -15,7 +15,7 @@ import type { PaletteEntry } from "../web/lib/builder/palette.ts";
 
 const { host } = await import("../web/test/builder-fixture.ts");
 await import("../web/test/scene-harness.ts");
-const { loadPalette } = await import("../web/lib/builder/palette.ts");
+const { HOME, loadPalette } = await import("../web/lib/builder/palette.ts");
 const { placePiece } = await import("../web/lib/builder/edit.ts");
 const { frame } = await import("../web/lib/builder/gg1.ts");
 const { emptyDraft } = await import("../web/lib/builder/draft.ts");
@@ -33,15 +33,15 @@ const rail = (id: string, a: V, b: V): Piece => ({ id, entry: "*/rail/", geometr
 const ring = (pts: V[]) => pts.map((p, i) => rail(`r${i + 1}`, p, pts[(i + 1) % pts.length]));
 
 function starters(world: string, palette: readonly PaletteEntry[]): Record<string, Draft> {
-  const own = (kind: string) => palette.filter((e) => e.kind === kind && e.world === world);
-  const posts = [...own("post"), ...palette.filter((e) => e.kind === "post" && e.world === "*" && e.skin)];
-  const [post, post2 = post] = posts;
+  // the world's own pieces: its module's drawings, then the shared ones at home there and only some worlds' (palette.ts HOME), none borrowed
+  const own = (kind: string) => [...palette.filter((e) => e.kind === kind && e.world === world), ...palette.filter((e) => e.kind === kind && e.world === "*" && typeof HOME[`${kind}/${e.skin}`] === "object" && !e.borrowed)];
+  const [post, post2 = post] = own("post");
   const straight = frame({ ...emptyDraft(world), title: "Straight", par: 2, tee: [3, 6], pin: [29, 6],
     pieces: [...ring([[0, 0], [32, 0], [32, 12], [0, 12]]), placePiece(post, "p1", [13, 3.5]), placePiece(post2, "p2", [19, 8.5])] });
   const dogleg = frame({ ...emptyDraft(world), title: "Dogleg", par: 3, tee: [3, 5], pin: [25, 22],
     pieces: [...ring([[0, 0], [30, 0], [30, 26], [20, 26], [20, 10], [0, 10]]), placePiece(post, "p1", [27, 5])] });
-  // the world's signature: its first own hill, ground or hazard across the middle, else a post of its own
-  const zone = [...own("slope"), ...own("surface"), ...own("hazard")][0];
+  // the world's signature: its first own hill, ground or hazard across the middle (its module's first), else a post of its own
+  const zones = [...own("slope"), ...own("surface"), ...own("hazard")], zone = zones.find((e) => e.world === world) ?? zones[0];
   const sig = zone ? placePiece(zone, "p1", [14, 4], { size: zone.kind === "hazard" ? 3 : 5 }) : placePiece(own("post")[0] ?? post, "p1", [17, 7]);
   const [, kind, skin] = sig.entry.split("/");
   const signature = frame({ ...emptyDraft(world), title: `The ${skin || kind}`, par: 3, tee: [3, 7], pin: [31, 7], pieces: [...ring([[0, 0], [34, 0], [34, 14], [0, 14]]), sig] });

@@ -3,10 +3,14 @@
 // Builder on (NEXT_PUBLIC_BUILDER=1): at the widths a computer opens it at
 // (900 px, its floor, to a wide screen, and a short laptop window), the
 // window never scrolls sideways, the checks' dock holds its verdict and
-// gauges, the three steps sit in the middle of the header, the header's
-// action and the dock keep their places as their words change, what a step
-// says when it is off is readable, and the note of a browser that keeps
+// gauges (two lines when all is well, the gauges of one width and in line;
+// a problem opens it, its piece a click away, and fixed it folds back), the
+// three steps sit in the middle of the header, the header's action and the
+// dock keep their places as their words change, what a step says when it is
+// off is readable, and the note of a browser that keeps
 // nothing covers no control; undo and redo stand whole in the header; the
+// palette opens on all its groups, folds as left for the visit and scrolls
+// in itself; the
 // start screen (a player back) never scrolls sideways, keeps clear of the
 // corner's Back and shows its starters above the fold. Exits non-zero on the first failure.
 //
@@ -27,6 +31,10 @@ const cdp = (await import("../media/lib/cdp.mjs")) as {
   APP: string;
 };
 const { launch, sleep, APP } = cdp;
+const { misaligned, footprint } = (await import("../media/lib/rows.mjs")) as {
+  misaligned: (rows: { name: string; box: string; words?: string; by?: string }[]) => string;
+  footprint: (sel: string) => string;
+};
 type Box = { l: number; t: number; r: number; b: number };
 
 /** The page at /build/, a new hole opened (a starter), in a window w × h; before: a script run ahead of the page's own. */
@@ -63,12 +71,30 @@ for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
   assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
-  // the dock: its line and, its limits opened, every gauge inside it
-  await c.js(`document.querySelector(".checks__limits").open = true`);
-  await sleep(200);
+  // the keys line: each key with its words on one line, and a line starts with a key, never a separator
+  const legend = await c.js<{ broken: string[]; led: string[] }>(`(() => {
+    const spans = [...document.querySelectorAll(".board__keys > span")], rects = spans.map((s) => s.getClientRects());
+    const lineStart = (i) => i === 0 || rects[i][0].top > rects[i - 1][rects[i - 1].length - 1].top + 2;
+    return { broken: spans.filter((_, i) => rects[i].length > 1).map((s) => s.textContent), led: spans.filter((s, i) => lineStart(i) && !s.textContent.trim().startsWith(s.querySelector("kbd").textContent)).map((s) => s.textContent) };
+  })()`);
+  assert.deepEqual(legend, { broken: [], led: [] }, `${at}: the keys line breaks inside an entry, or a line starts with a separator`);
+  // the dock: its line and every gauge inside it, the gauges open (no disclosure), one width each, side by side on one top
   const dock = (await box(c, ".checks"))!;
-  const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__line > *, .checks .gauge")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__line > *, .checks .gauge, .checks__chain")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
   for (const b of inside.filter((x) => x.r > x.l)) assert.ok(b.r <= dock.r + 0.5 && b.l >= dock.l - 0.5, `${at}: the dock spills (${JSON.stringify(b)} out of ${JSON.stringify(dock)})`);
+  const dials = await c.js<(Box & { label: Box; value: Box })[]>(`[...document.querySelectorAll(".checks .gauge")].map((e) => { const b = (x) => { const r = x.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; }; return { ...b(e), label: b(e.querySelector("span")), value: b(e.querySelector("em")) }; })`);
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".checks .gauge span")].map((e) => e.textContent)`), ["Pieces", "Moving", "Room for shots", "Size"], `${at}: the player's gauges, the chain's counts far off`);
+  assert.equal(await c.js(`!!document.querySelector(".checks details")`), false, `${at}: the gauges behind a disclosure`);
+  for (const g of dials) {
+    assert.ok(Math.abs(g.r - g.l - (dials[0].r - dials[0].l)) < 0.5, `${at}: the gauges of different widths (${dials.map((x) => Math.round(x.r - x.l)).join()})`);
+    if (w >= 1280) assert.ok(Math.abs(g.t - dials[0].t) < 0.5 && Math.abs(g.label.b - g.value.b) < 0.5 && Math.abs(g.value.r - g.r) < 0.5, `${at}: a gauge's label, value or row out of line (${JSON.stringify(g)})`);
+  }
+  // all well, two lines: the next step and the meter's guess on one, the gauges on the other; the rest of the height the board's
+  if (w >= 1280) {
+    const line = (await box(c, ".checks__line"))!;
+    assert.ok(line.b - line.t <= 26, `${at}: the dock's first line wraps (${line.b - line.t} px)`);
+    assert.ok(dock.b - dock.t <= 72, `${at}: the dock takes ${dock.b - dock.t} px of the board's height (98 before)`);
+  }
   // the three steps in the middle of the header
   const steps = (await box(c, ".stepper"))!;
   assert.ok(Math.abs((steps.l + steps.r) / 2 - w / 2) <= 2, `${at}: the steps sit at ${(steps.l + steps.r) / 2}, not ${w / 2}`);
@@ -80,17 +106,69 @@ for (const [w, h] of SIZES) {
   // the header's action and the dock keep their places as their words change (a slug, then none)
   await typeInto(c, ".bhead__slug", "a-name");
   await sleep(1500);
-  const named = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks__limits summary"))! };
+  const named = { undo: (await box(c, ".bhead__hist"))!, gauge: (await box(c, ".checks .gauge"))! };
   await typeInto(c, ".bhead__slug", "");
   await sleep(1500);
-  const unnamed = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks__limits summary"))! };
+  const unnamed = { undo: (await box(c, ".bhead__hist"))!, gauge: (await box(c, ".checks .gauge"))! };
   assert.ok(Math.abs(named.undo.l - unnamed.undo.l) < 1, `${at}: Undo moves as the action's words change (${named.undo.l} → ${unnamed.undo.l})`);
   assert.ok(Math.abs(named.gauge.l - unnamed.gauge.l) < 1, `${at}: the limits move as the verdict changes (${named.gauge.l} → ${unnamed.gauge.l})`);
   // the action off, its reason readable (no faded text)
   const off = await c.js<{ ratio: number; opacity: number } | null>(`(${CONTRAST})(".bhead__end .btn[aria-disabled=true]")`);
   assert.ok(off, `${at}: the action is not off with no name`);
   assert.ok(off.opacity === 1 && off.ratio >= 4.5, `${at}: the action's reason, off, reads at ${off.ratio.toFixed(2)}:1, opacity ${off.opacity}`);
+  // the palette: "More pieces" open at first (every group in sight), "From other worlds" folded; it scrolls in itself, never the window
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more true", "others false"], `${at}: the palette's folds at first`);
+  const pal = await c.js<{ over: string; sh: number; ch: number }>(`(() => { const p = document.querySelector(".palette"); return { over: getComputedStyle(p).overflowY, sh: p.scrollHeight, ch: p.clientHeight }; })()`);
+  assert.ok(pal.over === "auto" && (pal.sh <= pal.ch || (await c.js(`document.documentElement.scrollHeight <= innerHeight`))), `${at}: the palette spills onto the page (${JSON.stringify(pal)})`);
   console.log(`${at}: ok`);
+  c.kill();
+}
+
+// the buttons in a row as tall as one another, on one top and their words on one baseline (Button's sizes): the
+// header's (Back, the steps, the meter, ?, undo, redo, the action), the board's, the Inspector's; off, a button keeps
+// the box it has on (undo, before and after an edit); the header's address shows its short name whole, and the
+// palette's "More pieces" lie on the column's grid
+for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
+  const c = await editor(w, h);
+  const at = `buttons ${w}×${h}`;
+  await c.js(`document.querySelector("[data-piece]").focus()`);
+  await sleep(600);
+  const rows = [
+    { name: "the header", box: ".bhead__start > .btn, .bhead .stepper, .bhead__end .btn, .bhead__end .chip", words: ".bhead .step span, .bhead__end .chip > span, .bhead__act" },
+    { name: "the board's", box: ".board__tools > *" },
+    { name: "the Inspector's", box: ".insp__acts .btn" },
+  ];
+  assert.deepEqual(await c.js<string[]>(misaligned(rows)), [], `${at}: out of line`);
+  const head = await c.js<{ l: number; r: number }[]>(`[...document.querySelectorAll(".bhead__start > *, .bhead .stepper, .bhead__end > *")].filter((e) => e.getBoundingClientRect().width).map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right }; })`);
+  for (const [i, b] of head.slice(1).entries()) assert.ok(b.l >= head[i].r - 0.5, `${at}: the header's parts overlap (${JSON.stringify(head)})`);
+  // the hole's address: its short name whole (the world's name gives way first)
+  const slug = await c.js<{ cut: number; out: number }>(`(() => { const e = document.querySelector(".bhead__slug"), r = e.getBoundingClientRect(), box = e.parentElement.getBoundingClientRect(); return { cut: e.scrollWidth - e.clientWidth, out: r.right - box.right }; })()`);
+  assert.ok(slug.cut <= 1 && slug.out <= 0.5, `${at}: the address cuts the short name (${JSON.stringify(slug)})`);
+  const off = await c.js<object>(footprint(".bhead__hist"));
+  assert.equal(await c.js(`document.querySelector(".bhead__hist").disabled`), true, `${at}: undo off before any edit`);
+  await typeInto(c, ".bhead__hole input", "Moved nothing");
+  await sleep(600);
+  assert.equal(await c.js(`document.querySelector(".bhead__hist").disabled`), false, `${at}: undo on after an edit`);
+  assert.deepEqual(await c.js<object>(footprint(".bhead__hist")), off, `${at}: undo's box changes as it comes on`);
+  const grid = await c.js<{ col: number; tiles: { l: number; w: number }[] }>(`(() => { const r = document.querySelector(".ptiles--first").getBoundingClientRect(); return { col: r.width, tiles: [...document.querySelectorAll('.palette [data-fold="more"] .ptile')].map((t) => ({ l: t.getBoundingClientRect().left - r.left, w: t.getBoundingClientRect().width })) }; })()`);
+  for (const t of grid.tiles) assert.ok(Math.abs(t.w - grid.col) < 1 || (Math.abs(t.l) < 1 || Math.abs(t.l + t.w - grid.col) < 1) && t.w < grid.col / 2, `${at}: a "More pieces" tile off the column's grid (${JSON.stringify(t)} in ${grid.col})`);
+  const alone = await c.js<number>(`[...document.querySelectorAll('.palette [data-fold="more"] .ptiles')].filter((g) => { const t = [...g.children].map((x) => x.getBoundingClientRect()); return t.some((a) => a.width < g.getBoundingClientRect().width / 2 && !t.some((b) => b !== a && Math.abs(b.top - a.top) < 1)); }).length`);
+  assert.equal(alone, 0, `${at}: a "More pieces" tile half the column's width, alone on its row`);
+  console.log(`${at}: ok`);
+  c.kill();
+}
+
+// the palette's folds kept as left for the visit: "More pieces" folded, the page loaded again, still folded
+{
+  const c = await editor(1440, 900);
+  await c.js(`document.querySelector('.palette [data-fold="more"] summary').click()`);
+  await sleep(300);
+  await c.send("Page.reload");
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette [data-fold], .bholes__starts button")`)); k++) await sleep(500);
+  await c.js(`document.querySelector(".palette") || document.querySelector(".bholes__starts button").click()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette [data-fold]")`)); k++) await sleep(500);
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more false", "others false"], "the palette's folds not kept for the visit");
+  console.log("the palette's folds kept: ok");
   c.kill();
 }
 
@@ -114,6 +192,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const steps = (await box(c, ".bholes__steps"))!, bar = (await box(c, ".bholes__bar"))!, pad = await c.js<number>(`parseFloat(getComputedStyle(document.querySelector(".bholes__sign")).paddingLeft)`);
   assert.ok(steps.t - sign.t >= pad && sign.b - steps.b >= pad && sign.r - steps.r >= pad, `${at}: the steps touch the sign's edges (${JSON.stringify({ sign, steps, pad })})`);
   assert.ok(bar.t - sign.b >= 32, `${at}: the world tabs sit right under the sign (${bar.t - sign.b}px)`);
+  // its head the game's (a front screen's pill and outlined title)
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".bholes__sign .front__head > *")].map((e) => e.tagName + " " + e.className + " " + e.textContent)`), ["SPAN eyebrow The Builder", "H1 worlds__title Hard hats on!"], `${at}: the head is not a front screen's`);
   // the starters as templates, the blank lane as one of the cards, as big, under its own label, its own picture
   assert.deepEqual(await c.js<string[]>(`[...document.querySelectorAll(".bholes__group")].map((e) => e.textContent)`), ["Start from a template", "Or start blank"], `${at}: the start's groups`);
   const blank = cards[3], first = cards[0];
@@ -154,8 +234,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`document.querySelector(".bhead [aria-label^='How it works']").click()`);
   await sleep(500);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "?: the three hints");
-  const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length`);
-  assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the palette");
+  // (the world's own: another world's, under From other worlds, are theirs)
+  const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length - document.querySelectorAll('.palette [data-fold="others"] [data-tile]').length`);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the world's own");
   assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".bgloss__piece")].every((e) => e.querySelector("img") && e.querySelector("b").textContent && e.querySelector("small").textContent)`), "each: its picture, its name, what it does");
   const g = (await box(c, ".bgloss"))!;
   assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);
@@ -191,11 +272,35 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("keeps nothing: ok");
   c.kill();
 }
+// a problem (a draft kept with a piece doubled where it stands): the dock opens on it, a click on it selects the piece; fixed, it folds back
+{
+  const c = await editor(1440, 900);
+  await c.js(`(() => { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("gnogolf.builder.draft.")) { const d = JSON.parse(localStorage.getItem(k)); const p = d.pieces.find((q) => q.geometry.t === "post") || d.pieces.at(-1); d.pieces.push({ ...p, id: p.id + "x" }); localStorage.setItem(k, JSON.stringify(d)); } } })()`);
+  await c.send("Page.reload");
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`[...document.querySelectorAll(".bholes button")].some((b) => b.textContent.trim() === "Open")`)); k++) await sleep(300);
+  await c.js(`[...document.querySelectorAll(".bholes button")].find((b) => b.textContent.trim() === "Open").click()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".issue button.issue__why")`)); k++) await sleep(300);
+  const well = (await box(c, ".checks"))!, row = await c.js<string>(`document.querySelector(".issue button.issue__why").textContent`);
+  assert.match(row, /overlaps/, "a problem: its plain reason in the dock");
+  assert.ok(well.b - well.t > 72, "a problem: the dock opened on it");
+  await c.js(`document.querySelector(".issue button.issue__why").click()`);
+  await sleep(500);
+  const picked = await c.js<string>(`document.querySelector(".board__piece--on")?.getAttribute("data-piece") ?? ""`);
+  assert.ok(picked, "a click on the problem: its piece selected");
+  await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).click()`);
+  for (let k = 0; k < 30 && (await c.ev<boolean>(`!!document.querySelector(".issue")`)); k++) await sleep(300);
+  const fixed = (await box(c, ".checks"))!;
+  assert.equal(await c.js(`document.querySelectorAll(".issue").length`), 0, "fixed: nothing left to fix");
+  assert.ok(fixed.b - fixed.t <= 72, `fixed: the dock folds back (${fixed.b - fixed.t} px)`);
+  console.log("a problem in the dock: ok");
+  c.kill();
+}
+
 // a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
 {
   const c = await editor(1280, 800);
   // the straight starter (its two posts, p1 and p2; its rails are r1 to r4): from the drafts screen
-  await c.js(`document.querySelector(".bhead .round--icon").click()`);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bholes__starts button").click()`);
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece^='p']")`)); k++) await sleep(300);
@@ -207,10 +312,23 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`document.querySelector("[data-piece^='p']").focus()`);
   await sleep(600);
   const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
-  assert.equal(await c.js(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`), 0, "a piece selected: no number to type until Details is opened");
-  await c.js(`document.querySelector(".insp__details").open = true`);
+  // Details open from the first piece (the column never stands empty); folded, kept so for the visit and over another piece
+  const sliders = () => c.js<number>(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`);
+  assert.ok((await sliders()) > 0, "a piece selected: its Details open, its sliders");
+  const grid = await c.js<{ l: number[]; v: number[]; s: number[] }>(`(() => { const rows = [...document.querySelectorAll(".insp__details > .range")].filter((r) => r.querySelector("input[type=range]")); const x = (sel) => rows.map((r) => Math.round(r.querySelector(sel).getBoundingClientRect().left)); return { l: x("span"), s: x("input"), v: x("output") }; })()`);
+  for (const col of [grid.l, grid.s, grid.v]) assert.ok(col.length > 1 && col.every((x) => x === col[0]), `the Inspector's rows out of line (${JSON.stringify(grid)})`);
+  await c.js(`document.querySelector(".insp__details summary").click()`);
   await sleep(200);
-  assert.ok(await c.js<number>(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`) > 0, "Details opened: its sliders");
+  assert.equal(await sliders(), 0, "Details folded");
+  await c.js(`document.querySelectorAll("[data-piece^='p']")[1].focus()`);
+  await sleep(400);
+  assert.equal(await sliders(), 0, "Details folded: still so for another piece");
+  assert.equal(await c.js(`sessionStorage.getItem("gnogolf.builder.details")`), "shut", "the fold kept for the visit");
+  await c.js(`document.querySelector(".insp__details summary").click()`);
+  await sleep(200);
+  assert.ok((await sliders()) > 0, "Details opened again");
+  await c.js(`document.querySelector("[data-piece^='p']").focus()`);
+  await sleep(400);
   await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).focus()`);
   await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).click()`);
   await sleep(800);
@@ -255,7 +373,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
     assert.notDeepEqual(await at(sel), was, `${what}: moved`);
     assert.deepEqual(await onScreen(sel === "[data-end='tee'] circle" ? "[data-end='pin'] circle" : "[data-end='tee'] circle"), other, `${what}: the board not panned`);
   }
-  await c.js(`document.querySelector(".bhead .round--icon").click()`); // back to the drafts
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`); // back to the drafts
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(300);
   const drafts = await c.js<number>(`document.querySelectorAll(".bholes__list li").length`);
   await c.js(`[...document.querySelectorAll(".bholes__list button")].find((b) => /Delete/.test(b.textContent)).click()`);
@@ -267,6 +385,31 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelectorAll(".bholes__list li").length`), drafts, "and keeps the draft");
   assert.match(await c.js<string>(`document.activeElement?.textContent || ""`), /Delete/, "the focus back on the row's Delete");
   console.log("delete: ok");
+  c.kill();
+}
+// two tabs on one browser (the second a frame of the same origin: one storage, its events): a hole one starts and
+// an edit the other makes, on a list it read before, are both kept; the drafts screen shows what the other kept
+{
+  const c = await editor(1280, 800); // tab A, on the dogleg
+  const inB = (expr: string) => c.js(`(() => { const document = window.frames[0].document; return ${expr}; })()`);
+  await c.js(`(() => { const f = document.createElement("iframe"); f.src = "/build/"; f.style.cssText = "position:fixed;inset:0;width:1100px;height:780px;z-index:99"; document.body.append(f); })()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!window.frames[0]?.document.querySelector(".bholes__list button")`)); k++) await sleep(500);
+  await inB(`[...document.querySelectorAll(".bholes__list button")].find((b) => b.textContent === "Open").click()`); // tab B, on the dogleg too
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!window.frames[0].document.querySelector(".checks .gauge")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bholes__starts button").click()`); // A starts a hole
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".checks .gauge")`)); k++) await sleep(300);
+  await inB(`(() => { const el = document.querySelector("[aria-label=\\"The hole's name\\"]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "Named in B"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  await sleep(1500);
+  await inB(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!window.frames[0].document.querySelector(".bholes__list")`)); k++) await sleep(300);
+  assert.equal(await inB(`document.querySelectorAll(".bholes__list li").length`), 2, "tab B back on its drafts: A's new hole there");
+  await c.send("Page.reload");
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(500);
+  assert.equal(await c.js(`document.querySelectorAll(".bholes__list li").length`), 2, "the hole A started, kept through B's save");
+  assert.match(await c.js<string>(`document.querySelector(".bholes__list").textContent`), /Named in B/, "B's edit kept");
+  console.log("two tabs: ok");
   c.kill();
 }
 // the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
@@ -323,9 +466,19 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
   const at = await tee();
   await key("t", "KeyT");
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
-  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__notes").textContent`), /not a proof/, "said to be no proof");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__score")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__score") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__label").textContent`), /Quick test not a proof$/, "its label: a quick test, no proof");
+  assert.equal(await c.js<number>(`document.querySelector(".tbench--quick").textContent.split("not a proof").length - 1`), 1, "no proof, said once");
+  // the game's HUD: its cards in one row along the top, in the window, none over another; Try again at the bottom
+  const cards = await c.js<Box[]>(`[...document.querySelectorAll(".tbench--quick .hud--top > *")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  const wide = await c.js<number>("innerWidth");
+  assert.ok(cards.length >= 4, `the HUD's cards: ${cards.length}`);
+  for (const [i, b] of cards.entries()) {
+    assert.ok(b.l >= 0 && b.r <= wide && b.t >= 0 && Math.abs(b.t - cards[0].t) < 1, `a HUD card out of its row or the window (${JSON.stringify(b)})`);
+    for (const o of cards.slice(i + 1)) assert.ok(!overlap(b, o), `two HUD cards over each other (${JSON.stringify(b)}, ${JSON.stringify(o)})`);
+  }
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .hud--bottom").textContent`), /^Try againR$/, "Try again (R) at the bottom");
   await key("Escape", "Escape");
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".tbench--quick")`)); k++) await sleep(300);
   const after = await tee();

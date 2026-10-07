@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { builderOn, onComputer, PHONE_QUERY } from "../lib/builder/route.ts";
-import { authorOf, cupsLink, listHoles, playLink } from "../lib/builder/holes.ts";
+import { AUTHOR_KEY, authorOf, cupsLink, holeByline, knownAuthor, listHoles, playLink } from "../lib/builder/holes.ts";
+import { GNOKEY_ADDR_KEY } from "../lib/adena.ts";
 import type { HoleRow } from "../lib/types.ts";
 
 const WEB = new URL("../", import.meta.url).pathname;
@@ -92,4 +93,20 @@ void test("the phone lists only the community holes this browser already passed 
   const src = fs.readFileSync(path.join(WEB, "components/builder/PhoneBuilder.tsx"), "utf8");
   assert.match(src, /knownOnly\(/, "its community list: the known verdicts only");
   assert.doesNotMatch(src, /verdictOf\(/, "never a judging");
+});
+
+void test("holeByline: a community hole's line under its name, the same on the game's list, the phone's and the share card", () => {
+  assert.equal(holeByline({ author: "g1" + "a".repeat(38), world: "island", par: 4 }), "by g1aaaaaa…aaaa · Island · par 4");
+});
+
+void test("knownAuthor: the address the Builder last used, else the one the save flow's gnokey panel keeps (one key, both read it)", () => {
+  const A = "g1" + "a".repeat(38), B = "g1" + "b".repeat(38);
+  localStorage.clear();
+  assert.equal(knownAuthor(), null);
+  localStorage.setItem(GNOKEY_ADDR_KEY, B);
+  assert.equal(knownAuthor(), B);
+  localStorage.setItem(AUTHOR_KEY, A);
+  assert.equal(knownAuthor(), A);
+  localStorage.setItem(AUTHOR_KEY, "not an address");
+  assert.equal(knownAuthor(), B);
 });

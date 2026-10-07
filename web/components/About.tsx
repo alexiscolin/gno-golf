@@ -88,9 +88,10 @@ interface FrontScreenProps {
   back: string;
   onBack: () => void;
   onAbout: () => void;
-  /** the line over the title (none: the title alone, as the shop's) */
+  /** the line over the title (none: the title alone) */
   eyebrow?: string;
-  title: string;
+  /** the title's words (and what stands by them, out of the flow: the shop's keeper) */
+  title: ReactNode;
   dare?: ReactNode;
   corner?: ReactNode;
   children?: ReactNode;
@@ -102,13 +103,21 @@ export function FrontScreen({ className, tint = "garden", inner = "", back, onBa
       <AboutButton onClick={onAbout} />
       {corner}
       <div className={`worlds__in ${inner}`.trim()}>
-        <div className="front__head">
-          {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-          <h2 className="worlds__title">{title}</h2>
-          {dare}
-        </div>
+        <FrontHead eyebrow={eyebrow} title={title} dare={dare} />
         {children}
       </div>
+    </div>
+  );
+}
+
+/** A front screen's head: the pill, the outlined title, what stands under them (dare); h1 on a page of its own (the Builder's). */
+export function FrontHead({ eyebrow, title, dare, h1 = false }: { eyebrow?: string; title: ReactNode; dare?: ReactNode; h1?: boolean }) {
+  const H = h1 ? "h1" : "h2";
+  return (
+    <div className="front__head">
+      {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+      <H className="worlds__title">{title}</H>
+      {dare}
     </div>
   );
 }

@@ -29,6 +29,6 @@ void test("one home each for the Builder's own words and numbers: a point, a lis
   assert.deepEqual(builder(/\$\{\+\w+\[0\]\.toFixed\(2\)\}, \$\{\+\w+\[1\]\.toFixed\(2\)\}/), [path.join("lib", "builder", "rules.ts")], "a board point written by hand");
   assert.deepEqual(builder(/slice\(0, -1\)\.join\(", "\)/), [path.join("lib", "builder", "rules.ts")], "a list joined by hand");
   assert.deepEqual(builder(/\[0\]\.toUpperCase\(\)/), [], "a capital by hand (rules.ts cap)");
-  assert.deepEqual(builder(/"Clear"/), [path.join("lib", "builder", "carry.ts")], "a weather named twice (carry.ts weatherName)");
+  assert.deepEqual(builder(/"Clear"/), [path.join("lib", "builder", "rules.ts")], "a weather named twice (rules.ts weatherName)");
   assert.deepEqual(builder(/MARGIN = 1\.5/), [path.join("lib", "builder", "gg1.ts")], "Fit's margin said twice");
 });

@@ -19,7 +19,7 @@ import { shareWords, type Worn } from "@/lib/gnomes/shop";
 import { thumb } from "./parts";
 import Collector from "./Rank";
 
-interface Props {
+export interface OwnedProps {
   chain: Chain;
   me: string;
   /** their gnomes, best first (GnomesOf's rows) */
@@ -35,7 +35,7 @@ interface Props {
   name: (skinId: string) => string;
 }
 
-export default function Owned({ chain, me, held, worn, playing, onPick, region, onWorn, name }: Props) {
+export default function Owned({ chain, me, held, worn, playing, onPick, region, onWorn, name }: OwnedProps) {
   const [busy, setBusy] = useState<"" | "sign" | "done">("");
   const [shown, setShown] = useState<{ id: string; name: string; home: string } | null>(null); // the one just shown to everyone: share him
   const [error, setError] = useState("");

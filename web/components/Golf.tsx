@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
@@ -55,6 +54,7 @@ import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/
 import { collectorsOf } from "@/lib/gnomes/collection";
 import Collector from "@/components/gnomes/Rank";
 import type { ShopProps, ShopView } from "@/components/gnomes/Shop";
+import type { OwnedProps } from "@/components/gnomes/Owned";
 
 // The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
 // player's gnomes, each a chunk of its own, fetched only when shown; off, none of it is ever loaded.
@@ -75,7 +75,19 @@ function Shop(props: ShopProps) {
   const closing = closingSlot(knownSale(props.chain)?.c ?? null);
   return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} keeper={props.keeper} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
 }
-const Owned = dynamic(() => import("@/components/gnomes/Owned"), { ssr: false });
+// the picker's row of the player's gnomes, the same way: nothing while it downloads or if it could not come (the
+// collection's door stays), asked again the next time the picker shows it
+const ownedChunk = chunk(() => import("@/components/gnomes/Owned"));
+function Owned(props: OwnedProps) {
+  const [Row, setLoaded] = useState(() => ownedChunk.value()?.default);
+  useEffect(() => {
+    if (Row) return;
+    let live = true;
+    ownedChunk.load().then((m) => live && setLoaded(() => m.default), () => {});
+    return () => void (live = false);
+  }, [Row]);
+  return Row ? <Row {...props} /> : null;
+}
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog where the hooks answer
@@ -779,7 +791,7 @@ export default function Golf() {
         unidle = () => cancelIdleCallback(id);
       }
     } else
-      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe() : undefined])
+      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe().catch(() => undefined) /* (not fetched: drawn plain) */ : undefined])
         .then(([promo, probes]) => !cancelled && make(promo, probes))
         .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
 
@@ -1015,7 +1027,7 @@ export default function Golf() {
 
   // The collection (SHOP): what the player holds and wears for everyone, read once an account is
   // here; the gnome played is their pick while it is theirs, else the one they wear (wear.ts playing).
-  const [region, setRegion] = useState<boolean | null>(null); // (null: not read yet)
+  const [region, setRegion] = useState<boolean | null>(null); // (null: not read yet, or could not be: asked again on the next screen)
   // the shop's every door (the menu's card, the picker's section, the finish card's line, the cups' link): one gate
   const shopOn = shopShown(SHOP, region);
   const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string; home: string }[]>([]);
@@ -1024,10 +1036,15 @@ export default function Golf() {
   const shopFrom = useRef<Screen>("worlds"); // the screen the shop's Back returns to
   const gnomeNow = useRef(gnome);
   gnomeNow.current = gnome;
-  useEffect(() => void (SHOP && shopInRegion().then(setRegion)), []);
-  // the sale as the menu, the picker and the finish card show it (read once a visit, where the shop is offered)
-  const { promo, now: promoNow } = usePromo(shopOn ? (game.current && game.current.chain) || null : null);
-  const shopSkin = useShopSkin(shopOn ? (game.current && game.current.chain) || null : null, promo);
+  useEffect(() => void (SHOP && region === null && shopInRegion().then(setRegion)), [screen]); // eslint-disable-line react-hooks/exhaustive-deps -- (asked while unanswered)
+  // the sale as the menu, the picker, the shop and the finish card show it: read once a visit, where the shop is
+  // offered, from the first screen that shows it on (never the title's: the catalogue and the wardrobe wait for it)
+  const saleHere = shopOn && (screen === "modes" || screen === "worlds" || screen === "pick" || screen === "shop" || (playing && holedNow));
+  const [saleShown, setSaleShown] = useState(false);
+  useEffect(() => void (saleHere && setSaleShown(true)), [saleHere]);
+  const saleChain = shopOn && (saleHere || saleShown) ? (game.current && game.current.chain) || null : null;
+  const { promo, now: promoNow } = usePromo(saleChain);
+  const shopSkin = useShopSkin(saleChain, promo);
   // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
   useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopChunk.prefetch()), [shopOn, screen]);
   const readWorn = () => {
@@ -1038,9 +1055,10 @@ export default function Golf() {
       collectorsOf(c).know(me, { total: rows.length, rows }); // (their collector rank, every page counted: ADR-011)
       const listed = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g])) : new Map<string, { name: string; home: string }>();
       const mine = rows.map((r) => ({ ...r, name: listed.get(r.id)?.name || `Gnome ${r.id}`, home: listed.get(r.id)?.home || "" }));
-      const skins = await know(w ? [...mine, w] : mine);
+      const skins = await know(w ? [...mine, w] : mine).catch(() => null);
       setHeld(mine);
       setWorn(w);
+      if (!skins) return; // (the wardrobe not fetched: their gnomes listed, the gnome played as it is until the next read)
       // the gnome played: theirs while it is theirs, else the one everyone sees, else the browser's own
       const want = playingOf({ pick: pickOf(me), held: new Set(skins.map((k) => k.id)), worn: w, saved: savedGnome(), free: (id) => GNOMES.some((g) => g.id === id) && unlockedRef.current(id) });
       if (want !== gnomeNow.current) (setGnome(want), game.current && game.current.setGnome(want));
@@ -1999,7 +2017,7 @@ export default function Golf() {
                 </Button>
               )}
               {canSave && !phoneOnly && (
-                <Button variant="secondary" className={(pushSave ? "btn--save" : "") + (rankAt ? " btn--save-rank" : "")} disabled={busy(record) || !nameReady} onClick={() => (track("save_clicked", { from: "card", blocked: block }), void recordIt())}>
+                <Button variant={pushSave ? "chain" : "secondary"} className={rankAt ? "btn--save-rank" : ""} disabled={busy(record) || !nameReady} onClick={() => (track("save_clicked", { from: "card", blocked: block }), void recordIt())}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" && record.of !== undefined ? `Adena: part ${record.part} of ${record.of}…` : saveLabel(record)}
                   {rankAt > 0 && !busy(record) && (
@@ -2319,7 +2337,7 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
             {(rec?.at === "refused" || rec?.at === "unsure") && <small className="pending__err" role="alert">{rec.error}</small>}
           </span>
           {!(rec?.at === "refused" && rec.final) && (
-            <Button variant="secondary" className="btn--save" disabled={busy(rec)} onClick={onSave}>
+            <Button variant="chain" disabled={busy(rec)} onClick={onSave}>
               {saveLabel(rec)}
             </Button>
           )}
@@ -2487,7 +2505,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
           ) : now === 2 ? (
             <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
-            <Button variant="secondary" className="btn--wide btn--save" disabled={!nameOk} onClick={() => (track("save_clicked", { from: "sheet", blocked: null }), onSave())}>Save on-chain</Button>
+            <Button variant="chain" className="btn--wide" disabled={!nameOk} onClick={() => (track("save_clicked", { from: "sheet", blocked: null }), onSave())}>Save on-chain</Button>
           ) : (
             <Button variant={now === -1 || now === 4 ? "primary" : "secondary"} className="btn--wide" onClick={onClose}>
               {now === -1 ? "All set: play" : now === 4 ? "Play a hole, then save it" : "Later: keep playing"}

@@ -9,17 +9,16 @@
 // a file or a published hole opened. A new player never lands here first: the
 // first run opens the Garden's dogleg (templates.ts firstRun).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BackButton } from "@/components/About";
+import { BackButton, FrontHead } from "@/components/About";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
 import { Emblem } from "@/components/Worlds";
-import { Button, Sheet } from "@/components/ui";
+import { Button, buttonClass, Sheet } from "@/components/ui";
 import { gnomeById } from "@/lib/scene";
 import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
-import { draftFile, fromFile, fromPublished, type Opened } from "@/lib/builder/importing";
+import { draftFile, fromFile, openPublished, type Opened } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
-import { loadTakedown } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
 import { endpoints, playLink } from "@/lib/builder/holes";
@@ -81,14 +80,10 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     if (f.size > MAX_FILE) return setWhy("That file is too big to be a draft.");
     void f.text().then((t) => fromFile(t, host, census)).then(take, () => setWhy("That file could not be read."));
   };
-  const openPublished = (id = hole.trim()) => {
+  const openHole = (id = hole.trim()) => {
     if (!isHoleId(id)) return setWhy("A hole's address is like g1…/its-name, or g1…/its-name/v2.");
     setBusy(true);
-    // the site's takedown list too: a hole taken down never opens (the list unread, nothing does)
-    void Promise.all([chain.holeData(id), loadTakedown(chain)])
-      .then(([hex, taken]) => fromPublished(hex, host, id, author, census, taken), () => "The chain has no hole there, or could not be read.")
-      .then(take)
-      .finally(() => setBusy(false));
+    void openPublished(chain, host, census, id, author).then(take).finally(() => setBusy(false));
   };
   return (
     <div className={`screen worlds front bholes tint--${world}`}>
@@ -151,7 +146,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                       {h && got && author && !statsOf(h, got.saved, author).mine && <SaveTestRound chain={chain} proofs={d.proofs} id={h.id} world={d.world} author={author} onSaved={reload} />}
                     </span>
                     <span className="bholes__acts">
-                      <Button className="btn--s" onClick={() => onOpen(i)}>Open</Button>
+                      <Button size="s" onClick={() => onOpen(i)}>Open</Button>
                       {h && <a className="linkish" href={playLink(h, keep)}>Play</a>}
                       <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
                       <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
@@ -171,8 +166,8 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                       {live(h)}
                     </span>
                     <span className="bholes__acts">
-                      <a className="btn btn--ghost btn--s" href={playLink(h, keep)}>Play</a>
-                      <button type="button" className="linkish" disabled={busy} onClick={() => openPublished(h.id)}>Open its next version</button>
+                      <a className={buttonClass({ size: "s" })} href={playLink(h, keep)}>Play</a>
+                      <button type="button" className="linkish" disabled={busy} onClick={() => openHole(h.id)}>Open its next version</button>
                     </span>
                   </li>
                 );
@@ -200,7 +195,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
             <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => (openFile(e.target.files?.[0]), (e.target.value = ""))} />
             <span className="bholes__hole">
               <input value={hole} placeholder="g1…/its-name" aria-label="A published hole's address" spellCheck={false} autoCapitalize="off" onChange={(e) => setHole(e.target.value)} />
-              <Button disabled={!hole.trim() || busy} onClick={() => openPublished()}>{busy ? "Reading…" : "Open"}</Button>
+              <Button disabled={!hole.trim() || busy} onClick={() => openHole()}>{busy ? "Reading…" : "Open"}</Button>
             </span>
           </div>
         </details>
@@ -241,8 +236,7 @@ function Workshop() {
     <header className="bholes__sign" onPointerEnter={() => setHot(true)} onPointerLeave={() => setHot(false)}>
       <span ref={stage} className="bholes__gnome"><Emblem id="build" /></span>
       <div className="bholes__say">
-        <span className="eyebrow">The Builder</span>
-        <h1 className="worlds__title">Hard hats on!</h1>
+        <FrontHead eyebrow="The Builder" title="Hard hats on!" h1 />
         <p>Build your own hole. Test it. Put your name on it.</p>
       </div>
       <ol className="bholes__steps" aria-label="How it goes">

@@ -22,7 +22,7 @@ import "./lib/scene/gnome-dress";
 import { hatTop } from "./lib/scene/gnome-kit";
 import { makeTrail } from "./lib/scene/gnome-fx";
 import { makeShowcase } from "./lib/scene/gnome-showcase";
-import { PROP_DESIGNS, PROPS } from "./lib/gnomes/props";
+import { PROP_DESIGNS } from "./lib/gnomes/props";
 import * as VOCAB from "./lib/gnomes/vocab";
 import { TIER_LOOK } from "./lib/gnomes/catalogue";
 import { encode, PLAIN } from "./lib/gnomes/codec";
@@ -51,7 +51,7 @@ window.texture = (id) => textures.get(id);
 window.gnomes = GNOMES;
 window.props = Object.fromEntries(Object.entries(PROP_DESIGNS).map(([k, v]) => [k, "legend" in v ? "legend" : v.at]));
 window.hatTop = (skin) => hatTop(skin);
-window.vocab = { DARK: VOCAB.COLOURS.map(([, v]) => darkBody(v)), ...Object.fromEntries(Object.entries(VOCAB).filter(([, v]) => Array.isArray(v))), PROPS, TIER_LOOK };
+window.vocab = { DARK: VOCAB.COLOURS.map(([, v]) => darkBody(v)), ...Object.fromEntries(Object.entries(VOCAB).filter(([, v]) => Array.isArray(v))), TIER_LOOK };
 // the earned nine as every field of their look (their stripes a pattern), by kind
 // the gnome some traits draw, every other field plain (lib/gnomes/skin.ts: the client's own reading)
 window.skinOf = (t) => skinOf({ ...PLAIN, accessories: [], ...t }, { id: "portrait", name: "", line: "" });
