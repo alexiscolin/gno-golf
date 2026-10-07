@@ -13,7 +13,7 @@
 // a hole not yet judged is not shown. A hole whose data, or the rules, cannot
 // be read right now has no verdict at all (verdictOf throws, nothing kept):
 // it is said not to load, with Try again, never to break the rules.
-import type { Chain } from "./chain";
+import { isVersion, type Chain } from "./chain";
 import { authorOf } from "./builder/holes";
 import { bytesOf, sha256 } from "./sha";
 import { fnv1a } from "./sky";
@@ -51,7 +51,7 @@ const builder: JudgeDeps = {
 
 const keyOf = async (hex: string) => `${VERDICT_KEY}|${VERDICT_RULES}|${await sha256(bytesOf(hex))}`;
 /** A version's key ("<alias>/v<n>": its data never changes), on its chain's realm; null for an alias (it names the next version once one is published). */
-const idKeyOf = async (chain: Judging, id: string) => (/\/v\d+$/.test(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await whichOf(chain)}|${id}` : null);
+const idKeyOf = async (chain: Judging, id: string) => (isVersion(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await whichOf(chain)}|${id}` : null);
 const kept = (key: string): Verdict | null => {
   try {
     const v = localStorage.getItem(key);

@@ -480,7 +480,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
         if (!/^([0-9a-f]{2})+$/.test(hex)) throw refused("The chain's hole data is not hex.");
         return hex;
       };
-      if (!/\/v\d+$/.test(hole)) return read();
+      if (!isVersion(hole)) return read();
       let p = dataRead.get(hole);
       if (!p) {
         if (dataRead.size >= 64) dataRead.clear(); // (up to 64 KB of hex each: a long session from scratch, never unbounded)
@@ -745,6 +745,10 @@ export const isSlug = (s: unknown) => typeof s === "string" && ONE_SLUG.test(s);
 const DATA = new RegExp(`^([a-z]{1,16}/[1-9]\\d{0,2}|g1[0-9a-z]{38}/${SLUG})(/v[1-9]\\d*)?$`);
 /** Whether s names a hole: a realm's path, or a data hole's id or alias. */
 export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(s));
+// a data hole's version: its alias, then "/v<n>" (a community hole's slug may itself be "v3": that is an alias)
+const VERSION_ID = new RegExp(`^([a-z]{1,16}/[1-9]\\d{0,2}|g1[0-9a-z]{38}/${SLUG})/v[1-9]\\d*$`);
+/** Whether s is a data hole's version ("garden/7/v2", "<address>/<slug>/v3"): its data never changes, unlike an alias's. */
+export const isVersion = (s: unknown) => VERSION_ID.test(String(s));
 /** A best as the realm keeps it (recordsOf). */
 /** The most holes holesOf reads of an author's (their newest), and savedOn of holes at once, and of rounds a hole and mode. */
 const MAX_OWN = 24, MAX_SAVED_HOLES = 12, MAX_SAVED = 100;

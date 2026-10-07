@@ -120,6 +120,8 @@ void test("remixId and remixLink: a community hole's version to remix, from the 
   assert.equal(remixLink(`${B}/mole-run/v2`), `/build/?remix=${encodeURIComponent(`${B}/mole-run/v2`)}`);
   assert.equal(remixLink(`${B}/mole-run/v2`, "rpc=x"), `/build/?remix=${encodeURIComponent(`${B}/mole-run/v2`)}&rpc=x`);
   assert.equal(remixId(`?remix=${encodeURIComponent(`${B}/mole-run/v2`)}&rpc=x`), `${B}/mole-run/v2`);
+  assert.equal(remixId(`?remix=${encodeURIComponent(`${B}/v3`)}`), null, "an alias whose slug looks like a version: not a version");
+  assert.equal(remixId(`?remix=${encodeURIComponent(`${B}/v3/v1`)}`), `${B}/v3/v1`, "its own version is");
   for (const q of ["", "?remix=", "?remix=garden/1/v1", "?remix=nope", `?remix=${B}/Bad Slug/v1`]) assert.equal(remixId(q), null, q);
 });
 

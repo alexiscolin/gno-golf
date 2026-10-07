@@ -506,6 +506,9 @@ test("holeData: a version's data read once a visit (it never changes), an alias'
   await chain.holeData(alias);
   await chain.holeData(alias);
   assert.equal(asked.length, 3, "an alias names the next version once one is published: read each time");
+  await chain.holeData(`${ADDR1}/v3`);
+  await chain.holeData(`${ADDR1}/v3`);
+  assert.equal(asked.length, 3 + 2, "an alias whose slug looks like a version (\"v3\"): an alias, read each time");
   down = true;
   await assert.rejects(chain.holeData(`${ADDR1}/lane/v2`));
   const tried = asked.length;

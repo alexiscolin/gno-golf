@@ -74,6 +74,17 @@ void test("a version's verdict is kept by its id on its chain (its data never ch
   assert.deepEqual(reseeded.asked, [`${A}/good/v1`]);
 });
 
+void test("an alias whose slug looks like a version (\"v3\") is an alias: its verdict never kept by it, a new version under it judged again", async () => {
+  const alias = `${A}/v3`, data: Record<string, string> = { [alias]: goodHex };
+  const chain = chainOf(data);
+  assert.deepEqual(await verdictOf(chain, alias, deps), { ok: true });
+  assert.ok(!Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? "").some((k) => k.endsWith(`|${alias}`)), "never a key by the alias");
+  data[alias] = hostileHex; // its author publishes v2 at the same slug, with gnokey
+  assert.equal((await verdictOf(chain, alias, deps)).ok, false, "the new version judged");
+  assert.equal(await playable(chain, alias, deps), false);
+  assert.equal((await knownVerdict(chain, alias))?.ok, false, "and known as it is now");
+});
+
 void test("knownVerdict: a verdict this browser already has, never a judging (the phone's /build screen loads no builder.wasm)", async () => {
   const chain = chainOf({ [`${A}/good/v1`]: goodHex });
   let loads = 0;

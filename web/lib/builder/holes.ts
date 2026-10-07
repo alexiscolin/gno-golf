@@ -2,7 +2,7 @@
 // an author's own, and everyone else's, each at its latest version, never a
 // course hole, never one the site took down (takedown.ts).
 import { GNOKEY_ADDR_KEY } from "../adena";
-import { buildRpc, buildWeb, isAddress, isHoleId, safeEndpoint, shortAddr } from "../chain";
+import { buildRpc, buildWeb, isAddress, isVersion, safeEndpoint, shortAddr } from "../chain";
 import { worldName } from "./rules";
 import { takenDown } from "../takedown";
 import type { HoleRow } from "../types";
@@ -33,7 +33,7 @@ export const remixLink = (id: string, keep = "") => `/build/?remix=${encodeURICo
 /** The community hole's version a Builder's address asks to remix (?remix=), null if none or not one. */
 export function remixId(search: string): string | null {
   const id = new URLSearchParams(search).get("remix") || "";
-  return isHoleId(id) && /\/v\d+$/.test(id) && authorOf(id) ? id : null;
+  return isVersion(id) && authorOf(id) ? id : null;
 }
 
 /** The node the Builder reads (and its gnoweb): the page's ?rpc= and ?web= as the game takes them, else the build's. */
