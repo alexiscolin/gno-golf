@@ -143,13 +143,16 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   }
 
   const onChain = look === "chain" ? portraitsOf(chain) : null;
-  // his picture, the look switch under it (switch: in his first view alone), his tier, number and wave, a title
+  // his picture, the look switch under it (in his first view alone), then who he is on the same axis: his tier and
+  // number on one line, his name (the sheet's title)
   const head = (small = false, title: ReactNode = g.name, swap = false) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
       <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
       {swap && <LookSwitch look={look} onLook={onLook} />}
-      {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /> #{g.id} · Wave {g.wave} · {worldName(g.home)}</span>}
-      <h2>{title}</h2>
+      <div className="gsheet__id">
+        {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /><span>#{g.id} · Wave {g.wave} · {worldName(g.home)}</span></span>}
+        <h2>{title}</h2>
+      </div>
     </div>
   );
   const why = can && row && !row.sold ? whyNot(can, c, g, now) : null;
@@ -164,9 +167,25 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
         <>
           {head(false, g.name, true)}
           <p className="gsheet__line">{g.line}</p>
+          {/* what is said of him (above), his traits and his share, then his one action in the footer, last */}
           {row && row.closed ? (
             <p className="gsheet__fine"><b>Never made.</b> The sale closed before this gnome found a player.</p>
-          ) : mine ? (
+          ) : owner && !mine ? (
+            <p className="gsheet__fine">Found a player. <button className="linkish" onClick={() => onTheirs(owner)}>Their gnomes →</button></p>
+          ) : !mine && !unread && region ? (
+            <div className="gsheet__offer">
+              {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
+              <ul className="trust">{TRUST.slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
+            </div>
+          ) : null}
+          {traits && (
+            <details className="more">
+              <summary>Traits</summary>
+              <dl className="review">{traitRows(traits).map((r, i) => <Term key={`${r.trait}-${i}`} k={r.trait} v={r.value} />)}</dl>
+            </details>
+          )}
+          <Share text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} what="hole" kind="share" />
+          {row && row.closed ? null : mine ? (
             <div className="gsheet__foot">
               <Button variant="gold" className="btn--wide" onClick={() => (onPlay(skin.id), onClose())}>{playing === skin.id ? `Playing ${g.name}` : `Play with ${g.name}`}</Button>
               {worn !== skin.id && region && (
@@ -178,27 +197,14 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
               {equip === "done" && <Share text={shareWords.equipped(g.name, g.home)} link={`g/${g.id}/`} label={`Your rivals will see ${g.name}`} kind="share" />}
               <p className="gsheet__fine">Playing any gnome you hold is free. {worn === skin.id ? "Everyone sees this one on your ball." : ""}</p>
             </div>
-          ) : owner ? (
-            <p className="gsheet__fine">Found a player. <button className="linkish" onClick={() => onTheirs(owner)}>Their gnomes →</button></p>
-          ) : unread ? (
+          ) : owner ? null : unread ? (
             <div className="gsheet__foot"><p className="note note--bad" role="alert">The chain did not answer.</p><Button variant="primary" className="btn--wide" onClick={read}>Try again</Button></div>
           ) : region ? (
-            <>
-              {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
-              <ul className="trust">{TRUST.slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
-              <div className="gsheet__foot">
-                <Button variant="chain" className="btn--wide" disabled={!row || !!why} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
-                {why && why.note && <p className="gsheet__fine">{why.note}</p>}
-              </div>
-            </>
+            <div className="gsheet__foot">
+              <Button variant="chain" className="btn--wide" disabled={!row || !!why} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
+              {why && why.note && <p className="gsheet__fine">{why.note}</p>}
+            </div>
           ) : null}
-          {traits && (
-            <details className="more">
-              <summary>Traits</summary>
-              <dl className="review">{traitRows(traits).map((r, i) => <Term key={`${r.trait}-${i}`} k={r.trait} v={r.value} />)}</dl>
-            </details>
-          )}
-          <Share text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} what="hole" kind="share" />
         </>
       );
       break;

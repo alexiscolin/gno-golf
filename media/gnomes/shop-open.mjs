@@ -8,7 +8,7 @@
 // everything, the network banner too (never a chip over its Buy), its Buy
 // footer over nothing that follows it (its Traits there to click); the
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
-// every card's #number in sight however long its name; the toolbar's controls, on each of its
+// every card's #number in sight however long its name, the cards of a row one height (the shop's, a player's); the toolbar's controls, on each of its
 // lines, as tall as one another, on one top, their words on one baseline, and More filters open
 // gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card,
 // one slim row (its thumbnails of one frame, its line on one line, two on a phone, on its button's baseline), its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
@@ -203,4 +203,26 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
     console.log(`${ok ? "PASS" : "FAIL"} ${at} at ${w}×${h}: scrolled to its foot, nothing under the network chip`, ok ? "" : JSON.stringify(under));
     b.kill();
   }
+// the gallery's cards, a row one height (the shop's, and a player's gnomes, found from a gnome that found a player)
+for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [390, 844, true]])) {
+  const b = await launch({ width: w, height: h, mobile, touch: mobile });
+  const rows = `(() => { const byTop = new Map(); for (const c of document.querySelectorAll(".gshelf li .gcard")) { const r = c.getBoundingClientRect(); const k = Math.round(r.top); byTop.set(k, [...(byTop.get(k) || []), r.height]); } return [...byTop.values()].filter((hs) => Math.max(...hs) - Math.min(...hs) > 0.5).length; })()`;
+  await b.send("Page.navigate", { url: APP + "/g/" });
+  for (let i = 0; i < 120 && !(await b.ev(`!!document.querySelector(".gshelf li .gcard")`)); i++) await sleep(500);
+  await sleep(1000);
+  const shop = await b.ev(rows);
+  // a player's gnomes: the All view, a gnome that found a player, his owner's page
+  await b.js(`[...document.querySelectorAll(".gbar__views button")].find((x) => /^All/.test(x.textContent))?.click(); true`);
+  await sleep(1500);
+  await b.js(`[...document.querySelectorAll(".gshelf li .gcard")].find((c) => /Found a player/.test(c.textContent))?.click(); true`);
+  for (let i = 0; i < 40 && !(await b.ev(`!![...document.querySelectorAll(".gsheet button")].find((x) => /Their gnomes/.test(x.textContent))`)); i++) await sleep(250);
+  await b.js(`[...document.querySelectorAll(".gsheet button")].find((x) => /Their gnomes/.test(x.textContent))?.click(); true`);
+  for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".shop .btn--cta") && !!document.querySelector(".gshelf li .gcard")`)); i++) await sleep(500);
+  await sleep(1000);
+  const theirs = (await b.ev(`!!document.querySelector(".shop .btn--cta")`)) ? await b.ev(rows) : "not reached";
+  const ok = shop === 0 && theirs === 0;
+  results.push({ w, ok });
+  console.log(`${ok ? "PASS" : "FAIL"} the cards a row one height at ${w}: the shop ${shop} rows uneven, a player's gnomes ${theirs}`);
+  b.kill();
+}
 process.exit(results.every((r) => r.ok) ? 0 : 1);

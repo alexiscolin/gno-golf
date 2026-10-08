@@ -7,9 +7,8 @@
 /* the tiers: one colour and one shape each (the shape reads in grey too); never --chain's blue */
 :root {
   --tier-common: #e8dfcc; --tier-rare: #7cc8f0; --tier-epic: #c6a4f5; --tier-legendary: #ffd75e;
-  /* the shop's spacing scale: every gap, padding and margin of its pieces */
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
 }
+/* (every gap, padding and margin of the shop's pieces on the game's spacing scale: globals.css --sp-*) */
 .shop, .gsheet { font-variant-numeric: tabular-nums; }
 
 /* a tier's chip: its shape and its name, on its colour */
@@ -51,17 +50,18 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .gcard__buy.gcard__buy--skel { background: rgba(var(--ink-rgb), .08); border-color: transparent; box-shadow: none; }
 .shop__pitch { margin: var(--sp-2) auto 0; max-width: 640px; text-align: center; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); } /* (small words in ink: the soft ink is under 4.5:1 on a front's ground) */
 /* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
-.gcard__buy { justify-self: stretch; margin: 2px 2px 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
+.gcard__buy { justify-self: stretch; margin: var(--sp-2) 0 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
 .wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
 
 /* the shop's head: the game's front head (its pill, its title at the rival's size, its line), level with the corner
    buttons; then the sale's line and the toolbar, the gnomes above the fold */
 /* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf */
-/* room to breathe, the game's steps: a section's gap (24) between the head, the card, the toolbar and the shelf, the card
-   a step more on each side (28); a phone a step tighter (16, the card 20) */
-.shop .worlds__in { padding-top: 34px; gap: var(--sp-5); }
+/* room to breathe, the game's steps: 32 between the head, the card, the toolbar and the shelf, the card a step more
+   on each side (40); a phone a step tighter (24, the card 28) */
+.shop .worlds__in { padding-top: 34px; gap: var(--sp-6); }
 .shop .wcard { margin-block: var(--sp-1); }
-@media (max-width: 700px) { .shop .worlds__in { gap: var(--sp-4); } }
+.shop .gbar { margin-top: var(--sp-2); } /* (40 over the toolbar, 32 under it: the toolbar the gallery's) */
+@media (max-width: 700px) { .shop .worlds__in { gap: var(--sp-5); } .shop .wcard { margin-block: var(--sp-1); } }
 .shop .front__head { margin: 0; }
 /* a phone: the title alone (title.css), between the corner buttons, a line clear of them */
 @media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } .shop .worlds__title { margin-inline: 56px; } }
@@ -70,7 +70,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
    gallery's width, 720 at most, compact: the wave's Legendary on the left, its title with the state's chip at its
    right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
    (fixed tracks: the slot while it is read is the same room) */
-.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: var(--sp-5); color: var(--ink); font-style: normal; text-align: left; }
+.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: calc(var(--sp-5) + var(--sp-1)); color: var(--ink); font-style: normal; text-align: left; } /* (28 round its words) */
 .wcard__legend { grid-area: legend; align-self: center; width: 48px; height: 48px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
 .wcard__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
 .wcard__title { grid-area: title; min-width: 0; font-size: 17px; font-weight: 800; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -94,7 +94,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 @media (prefers-reduced-motion: reduce) { .fw__ball { animation: none; } }
 /* a phone: the count and the Legendary's words on two clean lines, the chip's words short */
 @media (max-width: 480px) {
-  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: 22px 36px 36px; column-gap: var(--sp-2); padding: var(--sp-4); }
+  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: 22px 36px 36px; column-gap: var(--sp-2); padding: calc(var(--sp-4) + var(--sp-1)); } /* (20 round it) */
   .wcard__legend { width: 40px; height: 40px; }
   .wcard__title { font-size: 15px; }
   .wcard__count { font-size: 13px; line-height: 18px; }
@@ -176,16 +176,22 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 @media (max-width: 700px) { .gbar .seg--look button { padding-inline: 8px; font-size: 12px; } }
 
 /* the grid of cards: as many columns as fit, two on a phone */
-.gshelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--sp-4); }
-@media (max-width: 600px) { .gshelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); } }
-.gcard { display: grid; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-2) var(--sp-2) 10px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
+.gshelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); gap: var(--sp-5); } /* (a card wide enough for a long name and its number, with its room inside) */
+@media (max-width: 600px) { .gshelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); } }
+/* a card: a column as tall as its row (the row's cards one height), its name, its tier over its fact, its Buy at its foot */
+.gshelf > li { display: flex; }
+.gcard { display: flex; flex-direction: column; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
 .gcard:hover { transform: translateY(-3px); }
-/* the name cut short when it is long, never his number: the gnome's identity in the shop */
-.gcard__name { display: flex; align-items: baseline; min-width: 0; margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; }
-.gcard__name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.gcard__name small { flex: none; margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-.gcard__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin: 0 2px; min-height: 26px; }
-.gcard__fact { min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the name on two lines at most, his number right after it (its room kept: two lines whatever the name, the blank
+   card's too) */
+.gcard__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 2.3em; margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; }
+.gcard__name small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+/* his tier over his fact, always (fixed rows: every card the same) */
+.gcard__foot { display: grid; grid-template-rows: 24px 18px; align-items: center; justify-items: start; gap: var(--sp-1); margin: 0 2px; }
+.gcard__foot:not(:last-child) { margin-bottom: var(--sp-2); } /* (8 more over Buy) */
+.gcard > :last-child { margin-top: auto; } /* (the last line at the card's foot) */
+@media (max-width: 600px) { .gcard { padding: var(--sp-2); } } /* (with its 3 px edge, 11 round a phone's card) */
+.gcard__fact { max-width: 100%; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard--mine { background: var(--ink); color: var(--paper); }
 .gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
 .gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
@@ -205,46 +211,66 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .more > :not(summary) { margin-top: 6px; color: var(--ink-soft); line-height: 1.45; }
 
 /* the trust strip: short facts under a buy button */
-.trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.trust { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-1) var(--sp-4); margin: 0; padding: 0; list-style: none; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .trust li { text-align: center; } /* (a line that wraps on a phone stays centred under the first) */
 
 /* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
-.gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-3); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
+.gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-5); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
 html:has(.gsheet) { overflow: hidden; }
 /* the shop's sheets open inside its screen (its stacking context, under the network banner, a later sibling): the
    banner goes while one is open, as the corner buttons do (globals.css), never a chip over the sheet's Buy */
 body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet > * { margin: 0 !important; }
-.gsheet__head { display: grid; justify-items: center; gap: var(--sp-2); text-align: center; }
+/* a gnome's sheet on one axis, centred: his picture, the look switch 16 under it, who he is (his tier and number on one
+   line, his name 8 under); then 24 between each group: his line, his price block, his traits, the share; then his
+   action in the footer */
+.gsheet__head { display: grid; justify-items: center; gap: var(--sp-4); text-align: center; }
+.gsheet__id { display: grid; justify-items: center; gap: var(--sp-2); width: 100%; text-align: center; }
+.gsheet__meta { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-2); }
+.gsheet .more { text-align: center; }
+.gsheet .more .review { text-align: left; }
 .gsheet__head .gtile { width: min(220px, 60vw); }
 .gsheet__head--small .gtile { width: 64px; border-radius: 14px; }
 .gsheet__head h2 { padding-inline: 40px; overflow-wrap: anywhere; }
 .gsheet__meta { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
-.gsheet__line { color: var(--ink) !important; text-align: center; }
-.gsheet__price { font-size: 28px; font-weight: 700; text-align: center; }
-.gsheet__price small { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
-.gsheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-3) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-2); text-align: center; }
+.gsheet__line { margin: 0; color: var(--ink) !important; text-align: center; text-wrap: pretty; }
+/* the price block: his price, the trust lines under it, 8 apart; the price stronger than the small print */
+.gsheet__offer { display: grid; justify-items: center; gap: var(--sp-2); }
+.gsheet .gsheet__price { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); text-align: center; }
+.gsheet .gsheet__price small { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+/* the share: its icons on the axis, no label */
+.gsheet .share { justify-self: center; padding: 6px 10px; }
+.gsheet .share__label { display: none; }
+/* the close in the corner, level with the picture's top (a phone: 12 in, the picture clear of it) */
+.gsheet .sheet__close { top: 22px; right: 22px; }
+@media (max-width: 600px) { .gsheet .sheet__close { top: 12px; right: 12px; } }
+.gsheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-4) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-3); text-align: center; }
 /* (its negative bottom margin is the sheet's last child's: with Traits and Share after it, it sits in the flow, never over them) */
 .gsheet__foot:not(:last-child) { margin-bottom: 0 !important; }
 .gsheet__foot .btn { margin: 0; width: 100%; }
 .gsheet__foot .btn--save { min-height: 52px; }
-.gsheet .real__fine, .gsheet__fine { margin: 0; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
-@media (max-width: 600px) { .gsheet__foot { bottom: -22px; margin: 0 -18px -22px !important; padding: var(--sp-3) 18px 22px; } .gsheet .real__fine, .gsheet__fine, .trust { font-size: 15px; } }
+.gsheet .real__fine, .gsheet__fine { margin: 0; font-size: 12px; color: var(--ink-soft); text-align: center; }
+/* a phone: 16 between the parts, 16 over and under the footer's rule, the picture clear of the close by 8 at least */
+@media (max-width: 600px) {
+  .gsheet.sheet__in { gap: var(--sp-4); }
+  .gsheet__foot { bottom: -22px; margin: 0 -18px -22px !important; padding: var(--sp-4) 18px 22px; }
+  .gsheet__head .gtile { width: min(200px, 52vw); }
+}
 
 /* the order, term by term: label left, term right; one column on a phone */
-.review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-2) var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; }
+.review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-3) var(--sp-4); margin: 0; padding: var(--sp-4) var(--sp-5); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; }
 .review dt { font-weight: 700; color: var(--ink-soft); }
 .review dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
 @media (max-width: 600px) { .review { grid-template-columns: 1fr; gap: 0; font-size: 15px; } .review dd { margin-bottom: var(--sp-2); } }
 /* a consent: its own box, never pre-ticked; the order waits for both */
-.box { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; padding: var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.4; cursor: pointer; }
+.box { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; padding: var(--sp-4); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.4; cursor: pointer; }
 .box input { width: 22px; height: 22px; margin: 0; accent-color: var(--green); }
 .box:has(input:checked) { border-color: var(--green); background: #eaf4ee; }
 @media (max-width: 600px) { .box { font-size: 15px; } }
 .legal { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); text-align: center; }
 .legal a, .gsheet a { color: var(--green); }
 /* the receipt: printed, or saved as a PDF, alone */
-.receipt { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--white); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.receipt { display: grid; gap: var(--sp-3); padding: var(--sp-5); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--white); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .receipt h3 { margin: 0; font-size: 16px; }
 .receipt p { margin: 0 !important; color: var(--ink) !important; }
 @media print {
@@ -259,7 +285,7 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .gsheet--done .gtile, .gsheet__hop .gtile { animation: none; } }
 
 /* the picker: one row of the gnomes a player holds, under the game's stage, and one line */
-.owned { display: grid; gap: var(--sp-1); justify-items: center; width: min(360px, 100%); margin: var(--sp-2) auto 0; }
+.owned { display: grid; gap: var(--sp-2); justify-items: center; width: min(360px, 100%); margin: var(--sp-2) auto 0; }
 .owned__line { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); text-align: center; }
 .owned__row { display: flex; gap: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-2); overflow-x: auto; overscroll-behavior: contain; scrollbar-width: none; border: 2px solid var(--gold); border-radius: var(--pill); background: rgba(var(--paper-rgb), .7); }
 .owned__row::-webkit-scrollbar { display: none; }
@@ -272,7 +298,7 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
    width: one slim row about a button high, its thumbnails, its line and its button on one middle line; the line
    shortened at its end, never wrapped on a computer, two lines at most on a phone; the player's own gnomes, their
    line over their faces, the whole collection under them */
-.gcollect { display: flex; align-items: center; gap: 10px; width: fit-content; min-width: max(var(--pick-w, 100%), 230px); max-width: 100%; margin: 0 auto var(--gap-l, 12px); padding: 6px 6px 6px 8px; border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
+.gcollect { display: flex; align-items: center; gap: var(--sp-3); width: fit-content; min-width: max(var(--pick-w, 100%), 230px); max-width: 100%; margin: 0 auto var(--gap-l, 12px); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
 .gcollect:has(.owned) { flex-direction: column; align-items: stretch; width: max(var(--pick-w, 100%), 230px); }
 .gcollect .owned { min-width: 0; width: 100%; margin: 0; }
 .gcollect__all { align-self: center; font-size: 13px; }
