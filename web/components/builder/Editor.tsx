@@ -81,6 +81,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [again, setAgain] = useState(false); // the hints asked for again (the header's "?")
   const draft = session.now(), kept = session.kept();
   const [palette, setPalette] = useState<readonly PaletteEntry[] | null>(null);
+  // the world the palette is of (a switch hands it over with the draft: nothing unmounts to load it again)
+  const paletteWorld = useRef("");
   // its load failed (offline, an old deploy's chunk gone), and each Try again (the world's loader forgets a failed load)
   const [unloaded, setUnloaded] = useState(false), [tries, setTries] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -134,12 +136,13 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
 
   // the world's palette, loaded with its module
   useEffect(() => {
+    if (palette && paletteWorld.current === draft.world) return;
     let stale = false;
     setPalette(null);
     setUnloaded(false);
-    void loadPalette(draft.world).then((p) => !stale && setPalette(p), () => !stale && setUnloaded(true));
+    void loadPalette(draft.world).then((p) => !stale && ((paletteWorld.current = draft.world), setPalette(p)), () => !stale && setUnloaded(true));
     return () => void (stale = true);
-  }, [draft.world, tries]);
+  }, [draft.world, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (palette: read, not a reason to load)
 
   const quick: ValidateOptions | null = useMemo(() => palette && { host, palette, slug: draft.slug || undefined }, [host, palette, draft.slug]);
   const full: ValidateOptions | null = useMemo(() => quick && { ...quick, census }, [quick]);
@@ -269,6 +272,9 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       const r = toWorld(session.kept(), w, p, full);
       if ("refused" in r) return say(`The ${w} has no ${r.refused.join(", ")}.`);
       if ("why" in r) return say(`Not in the ${w}: ${r.why}`);
+      // (its pieces with it, in the same render: the board and the column stay mounted, the hole built once)
+      paletteWorld.current = w;
+      setPalette(p);
       set(r);
     }, () => say(`The ${w}'s pieces could not load: try again.`)); // (offline, a deploy mid-flight: the hole stays where it is)
   };
