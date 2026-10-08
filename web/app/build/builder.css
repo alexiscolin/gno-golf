@@ -397,19 +397,21 @@ button.issue__why:hover { text-decoration-style: solid; }
 .pub__doneform h2 { margin: 0; font-size: 28px; }
 .pub__doneform p { margin: 0; font-size: 15px; }
 .pub__doneform .btn { margin: 0; }
-.pub__hole { display: grid; align-content: start; gap: var(--sp-4); min-width: 0; min-height: 0; }
-/* the 3D no taller than the window leaves under the header with the card under it (116: its gap and its height; a short, wide window) */
-.pub__hole .preview { width: 100%; max-height: calc(100dvh - 64px - 3 * var(--sp-3) - 116px); }
+.pub__hole { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--sp-4); min-width: 0; min-height: 0; }
+/* the 3D as tall as the form beside it leaves over the card (its own 16:10 no more) */
+.pub__hole .preview { width: 100%; height: 100%; min-height: 240px; aspect-ratio: auto; }
+.pub--done .pub__hole .preview { height: auto; aspect-ratio: 16 / 10; } /* (published: no form beside it, its own shape) */
 .pub__card { display: grid; gap: 2px; padding: var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); }
 .pub__card b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub__card small { color: var(--ink-soft); font-weight: 600; }
-.pub__form { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; border: var(--edge); border-radius: var(--r-card); background: var(--white); overflow: hidden; }
-.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-4); padding: var(--sp-5); }
+.pub__form { min-height: 0; max-height: 100%; display: grid; grid-template-rows: minmax(0, auto) auto; border: var(--edge); border-radius: var(--r-card); background: var(--white); overflow: hidden; }
+.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-5); padding: var(--sp-5); }
 .pub__foot { padding: var(--sp-4) var(--sp-5); border-top: var(--rule); background: var(--paper); }
 .pub__foot .btn { margin: 0; width: 100%; }
+.pub__foot .pub__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (the footer one line, holding the action) */
 .pub__forever a { color: var(--green); font-weight: 700; }
 .pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
-.pub__field { display: grid; gap: var(--sp-1); font-size: 13px; font-weight: 700; }
+.pub__field { display: grid; gap: var(--sp-2); font-size: 13px; font-weight: 700; }
 .pub__field span { display: flex; justify-content: space-between; }
 .pub__field em { font-style: normal; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .pub__field input, .pub__field textarea { min-height: 44px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; resize: none; }
