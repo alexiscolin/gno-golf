@@ -56,8 +56,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   worlds: readonly string[];
   step: Step;
   steps: Record<Step, StepState>;
-  /** the mode's one action: its words, its look, off with why */
-  action: { text: string; kind: "gold" | "chain" | "secondary"; off?: string; pulse?: boolean; onClick: () => void } | null;
+  /** the mode's one action: its words, its look, its key (in a cap), off with why */
+  action: { text: string; kind: "gold" | "chain" | "secondary"; key?: string; off?: string; pulse?: boolean; onClick: () => void } | null;
   history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } | null;
   /** the difficulty meter, in Edit: none elsewhere */
   meter?: MeterChip;
@@ -125,7 +125,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
         {action && (
           // its own words always (nothing moves as the reason changes), readable and reachable when off: the reason is
           // the dock's verdict (bench-verdict), and its title
-          <Button variant={action.kind} size="m" type="button" className={`bhead__act${action.pulse && !action.off ? " btn--pulse" : ""}`}
+          <Button variant={action.kind} size="m" type="button" keycap={action.key} className={`bhead__act${action.pulse && !action.off ? " btn--pulse" : ""}`}
             aria-disabled={action.off ? true : undefined} aria-describedby={action.off ? "bench-verdict" : undefined} title={action.off || undefined} onClick={() => !action.off && action.onClick()}>
             {action.text}
           </Button>
