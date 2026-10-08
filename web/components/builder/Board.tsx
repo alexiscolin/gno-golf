@@ -33,7 +33,7 @@ import { sound } from "@/lib/feel";
 import { Button, Chip } from "@/components/ui";
 import { chain, labelAt, lean, reactionAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
-import { KEYS } from "@/lib/builder/keys";
+import { KEY_LINE } from "@/lib/builder/keys";
 import { pt, xy } from "@/lib/builder/rules";
 import { pulled, type Played, type QuickShot } from "@/lib/builder/quickshot";
 import type { Shown } from "@/lib/builder/difficulty";
@@ -395,7 +395,7 @@ export default function Board(props: BoardProps) {
       )}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
       {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
-      {!props.said && <p className="board__keys" aria-hidden="true">{KEYS.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
+      {!props.said && <p className="board__keys" aria-hidden="true">{KEY_LINE.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live || (aiming && ball?.aimed)) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">

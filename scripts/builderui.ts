@@ -81,6 +81,9 @@ for (const [w, h] of SIZES) {
     return { broken: spans.filter((_, i) => rects[i].length > 1).map((s) => s.textContent), led: spans.filter((s, i) => lineStart(i) && !s.textContent.trim().startsWith(s.querySelector("kbd").textContent)).map((s) => s.textContent) };
   })()`);
   assert.deepEqual(legend, { broken: [], led: [] }, `${at}: the keys line breaks inside an entry, or a line starts with a separator`);
+  // one line, inside the board (the few keys most used; ? shows them all)
+  const line = await c.js<{ h: number; lh: number; over: number }>(`(() => { const e = document.querySelector(".board__keys"), r = e.getBoundingClientRect(), b = document.querySelector(".board").getBoundingClientRect(); return { h: r.height, lh: e.querySelector("span").getBoundingClientRect().height, over: r.right - b.right }; })()`);
+  assert.ok(line.h < 2 * line.lh && line.over <= 0, `${at}: the keys line wraps or spills (${JSON.stringify(line)})`);
   // the dock: its line and every gauge inside it, the gauges open (no disclosure), one width each, side by side on one top
   const dock = (await box(c, ".checks"))!;
   const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__line > *, .checks .gauge, .checks__chain")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
@@ -467,7 +470,12 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelector('.palette .look[aria-pressed="true"]')?.dataset.look`), water, "4: the water as chosen, its look gold");
   await key("Escape", "Escape");
   const keys = await c.js<string>(`document.querySelector(".board__keys").textContent`);
-  for (const k of ["1–5", "Space", "F", "T"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
+  for (const k of ["1–5", "R", "T", "?"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
+  // ?: every key, in the glossary
+  await key("?", "Slash");
+  assert.ok(await c.js<boolean>(`["Space", "F", "V", "Q", "Esc", "⌫"].every((k) => document.querySelector(".bgloss__keys")?.textContent.includes(k))`), "?: the glossary with every key");
+  await c.js(`document.querySelector(".bhint__ok").click()`);
+  await sleep(300);
   // Space held, a drag over a piece pans (the piece stays)
   const tee = () => c.js<[number, number]>(`(() => { const r = document.querySelector("[data-end='tee'] circle").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const piece = await c.js<[number, number]>(`(() => { const r = document.querySelector("[data-piece]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
