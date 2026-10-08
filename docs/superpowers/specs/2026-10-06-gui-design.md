@@ -435,7 +435,7 @@ near, proved, world; at 1440, 1280 and 1024.
   it; selected and playing, the board keeps them moving); the numbers
   (Every, On, From) under "Fine". Loops are not offered yet. Nothing selected: "Click a piece to change
   it. Drag its handles to size and turn it."
-- **The checks** (one line under the board): "Ready: press T to try it, or hole it in every weather."
+- **The checks** (one line under the board): "Ready: press T to try it, or hole it."
   or the one thing to fix, in words, with "Show me"; a limit appears only
   when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
   full gauges are the hole-builder spec's, behind the limit's tap.

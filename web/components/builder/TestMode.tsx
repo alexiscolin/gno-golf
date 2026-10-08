@@ -336,7 +336,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       {/* holed: the game's hole-finished card (Golf.tsx's banner--win), its ways on */}
       {card && (
         <div className="banner banner--win tmode__won">
-          <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label={card.rows ? "Every weather proved" : "Hole finished"}>
+          <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label={card.rows ? "Holed in every weather" : "Hole finished"}>
             <span className="eyebrow">In the hole! · {draft.title || "Your hole"}</span>
             <h2>{card.title}</h2>
             {card.line && <p aria-live="polite">{card.line}</p>}

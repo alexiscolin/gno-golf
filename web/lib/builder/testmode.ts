@@ -58,7 +58,7 @@ export const parSaid = (par: number, guess: number): string => (par ? `par ${par
 /** A finished card's action: play the weather again (R), back to the editor (Escape), and the one going on: prove it (a quick test's), publish. */
 export type Act = "again" | "edit" | "prove" | "publish";
 export interface Finished {
-  /** "Holed in 3"; "Every weather proved" */
+  /** "Holed in 3"; "Holed in every weather" */
   title: string;
   /** a sentence under it ("" none) */
   line: string;
@@ -84,12 +84,12 @@ export function finished(o: { quick: boolean; strokes: number; kind: string; why
 }
 
 /** The HUD's brief word as a weather is proved and the next one starts on its own. */
-export const provedNote = (kind: string, next: string) => `${weatherName(kind)} proved · next: ${weatherName(next)}`;
+export const provedNote = (kind: string, next: string) => `${weatherName(kind)} holed · next: ${weatherName(next)}`;
 
 /** The Hole it step's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
 export function summary(rows: readonly { kind: string; strokes: number; ms?: number }[], par: number): Finished {
   return {
-    title: "Every weather proved",
+    title: "Holed in every weather",
     line: par ? `Par ${par}, from your rounds.` : "",
     rows: rows.map((r) => ({ weather: weatherName(r.kind), strokes: String(r.strokes), time: r.ms != null ? clock(r.ms) : "–" })),
     actions: [AGAIN, EDIT, { act: "publish", text: "Publish →", primary: true }],

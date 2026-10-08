@@ -172,7 +172,7 @@ try {
     }
     // proved: the next weather on its own, said in the HUD, or the summary
     await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === ${JSON.stringify(kind)})`, `${kind} proved`, 60_000);
-    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__done")?.textContent || "").startsWith(${JSON.stringify(`${kind} proved · next: `)})`, `${kind}: the summary or the next weather said`, 10_000);
+    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__done")?.textContent || "").startsWith(${JSON.stringify(`${kind} holed · next: `)})`, `${kind}: the summary or the next weather said`, 10_000);
     said(`${kind}: holed and proved · ${await c.js<string>(`document.querySelector(".tmode__sum") ? "the summary" : document.querySelector(".tmode__done").textContent`)}`);
     if (await c.ev<boolean>(`!!document.querySelector(".tmode__sum")`)) break;
   }

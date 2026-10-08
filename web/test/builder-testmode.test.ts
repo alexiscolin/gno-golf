@@ -94,13 +94,13 @@ void test("finished: a test's hole-finished card, a quick test's or a round that
 });
 
 void test("provedNote: the HUD's brief word as a weather is proved and the next starts on its own", () => {
-  assert.equal(provedNote("wind", "rain"), "Wind proved · next: Rain");
-  assert.equal(provedNote("", "wind"), "Clear proved · next: Wind");
+  assert.equal(provedNote("wind", "rain"), "Wind holed · next: Rain");
+  assert.equal(provedNote("", "wind"), "Clear holed · next: Wind");
 });
 
 void test("summary: the Hole it step's one card at the end, each weather proved with its strokes and time, Publish the way on", () => {
   const s = summary([{ kind: "", strokes: 2, ms: 4_130 }, { kind: "wind", strokes: 3, ms: 65_000 }, { kind: "rain", strokes: 4 }], 3);
-  assert.equal(s.title, "Every weather proved");
+  assert.equal(s.title, "Holed in every weather");
   assert.equal(s.line, "Par 3, from your rounds.");
   assert.deepEqual(s.rows, [
     { weather: "Clear", strokes: "2", time: "0:04.1" },
