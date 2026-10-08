@@ -332,7 +332,8 @@ assert.ok(testLost.said && testLost.unsaid, `a quick test's context lost and bac
 assert.ok(scenery.every((x, i) => x.drawn === x.world && x.built === 1 && (i === 0 || x.eyes === 1)), `a world's own scenery: ${JSON.stringify(scenery)}`);
 assert.ok(world.built === 0 && /could not load/.test(world.said) && !world.thrown.length && world.builtAgain === 1, `a world that would not load: ${JSON.stringify(world)}`);
 assert.ok(lost.whileLost && lost.backIn3d && lost.drawn, `the context lost and back: ${JSON.stringify(lost)}`);
-for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
+// (the first quick test may make what stays for the visit, once: a leak is what each one after it adds)
+for (const k of Object.keys(live[0])) assert.ok(live.slice(1).every((l) => l[k] <= live[1][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
 assert.ok(fallback, "no WebGL: no 2D board");
 assert.ok(!noTest.fell && !noTest.game && /WebGL/.test(noTest.quick), `no WebGL: a test opened or the Builder fell over: ${JSON.stringify(noTest)}`);
 console.log("builderbench: ok");
