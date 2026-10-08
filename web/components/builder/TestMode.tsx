@@ -22,6 +22,7 @@
 // goes back to Build.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Dialog } from "@/components/ui";
+import { FrontHead } from "@/components/About";
 import Weather, { SkyIcon } from "@/components/Weather";
 import { connect, hasAdena } from "@/lib/adena";
 import { isAddress, makeChain, RULES } from "@/lib/chain";
@@ -60,7 +61,7 @@ function Weathers({ world, list }: { world: string; list: readonly { kind: strin
           title={done ? `Holed in ${best ?? "?"}` : playing ? "Playing now" : "To hole"}>
           <SkyIcon sky={SKY[kind] ?? "sun"} mine={world === "mines"} className="tmode__sky" />
           <span className="weather__say">{weatherName(kind)}</span>
-          <b className="tmode__tick">{done ? `✓ ${best ?? ""}` : "\u00a0"}</b>
+          <b className="tmode__tick">{done ? (best ? `✓ in ${best}` : "✓") : "\u00a0"}</b>
         </span>
       ))}
     </div>
@@ -83,22 +84,25 @@ function AddressStep({ world, onAddress }: { world: string; onAddress: (a: strin
   };
   return (
     <div className="tmode__ask">
+      <FrontHead eyebrow="Hole it" title="Hole it in every weather" h1 />
       <p className="tmode__intro">{HOLE_IT}</p>
       <Weathers world={world} list={checklist(world, required(world))} />
-      <h2>Sign your hole</h2>
-      <p>Your address is part of its name and sets its weather, so your proofs still count when you publish. Nothing is signed now.</p>
-      {hasAdena() ? <Button variant="primary" onClick={() => void adena()}>Use my Adena address</Button>
-        : <p className="tmode__small">No Adena here: get it at <a href={ADENA_URL} target="_blank" rel="noopener noreferrer">adena.app</a>, then come back.</p>}
-      {paste ? (
-        <>
-          <label className="tmode__addr">
-            <span>Your address</span>
-            <input value={typed} placeholder="g1…" spellCheck={false} autoCapitalize="off" autoFocus aria-invalid={!!typed && !ok} onChange={(e) => setTyped(e.target.value)} />
-          </label>
-          <Button variant="gold" disabled={!ok} onClick={() => onAddress(typed.trim())}>Use this address</Button>
-        </>
-      ) : <button type="button" className="linkish" onClick={() => setPaste(true)}>Or paste an address (g1…)</button>}
-      {why && <p role="alert" className="tmode__why">{why}</p>}
+      <section className="tmode__sign" aria-label="Sign your hole">
+        <h2>Sign your hole</h2>
+        <p>Your address is part of its name and sets its weather, so your proofs still count when you publish. Nothing is signed now.</p>
+        {hasAdena() ? <Button variant="primary" onClick={() => void adena()}>Use my Adena address</Button>
+          : <p className="tmode__small">No Adena here: get it at <a href={ADENA_URL} target="_blank" rel="noopener noreferrer">adena.app</a>, then come back.</p>}
+        {paste ? (
+          <>
+            <label className="tmode__addr">
+              <span>Your address</span>
+              <input value={typed} placeholder="g1…" spellCheck={false} autoCapitalize="off" autoFocus aria-invalid={!!typed && !ok} onChange={(e) => setTyped(e.target.value)} />
+            </label>
+            <Button variant="gold" disabled={!ok} onClick={() => onAddress(typed.trim())}>Use this address</Button>
+          </>
+        ) : <button type="button" className="linkish" onClick={() => setPaste(true)}>Or paste an address (g1…)</button>}
+        {why && <p role="alert" className="tmode__why">{why}</p>}
+      </section>
     </div>
   );
 }
@@ -276,7 +280,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     return () => clearTimeout(t);
   }, [proved, kinds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!author && !quick) return <main className="tmode tmode--ask"><AddressStep world={draft.world} onAddress={(a) => { try { localStorage.setItem(AUTHOR_KEY, a); } catch {} onAuthor(a); }} /></main>;
+  if (!author && !quick) return <main className={`tmode tmode--ask front tint--${draft.world}`}><AddressStep world={draft.world} onAddress={(a) => { try { localStorage.setItem(AUTHOR_KEY, a); } catch {} onAuthor(a); }} /></main>;
   const mineProofs = draft.proofs.filter((p) => p.key === proofKey && p.id === id);
   const par = proved ? suggestPar(mineProofs) : 0;
   const time = took ?? (now && tick ? Math.max(0, tick - since.current) : null);

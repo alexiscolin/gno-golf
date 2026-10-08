@@ -292,6 +292,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         return setArmed(en);
       }
       if (act?.t === "frame") return setFrameAsk((n) => n + 1);
+      if (act?.t === "help") return setAgain(true);
       if (act?.t === "tilt") return setLook((l) => ({ ...l, tilt: l.tilt ? 0 : TILT }));
       if (act?.t === "turn") return setLook((l) => ({ ...l, turns: (l.turns + act.by + 4) % 4 }));
       if (act?.t === "test") return tryIt();

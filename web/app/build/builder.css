@@ -208,11 +208,11 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* its padding the same on every side: the steps never touch its edges */
 .bholes__sign {
   position: relative; display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
-  margin-top: 28px; padding: var(--sp-5); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
+  margin-top: 28px; padding: var(--sp-4) var(--sp-5); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
   background: var(--blueprint); box-shadow: var(--deep-card);
 }
 /* a section's gap under the sign (its deep shadow eats some): the world tabs never right under it */
-.bholes__sign + .bholes__new { margin-top: var(--sp-3); }
+.bholes__sign + .bholes__new { margin-top: var(--sp-2); }
 /* the Miner stands out over the sign's top edge, as a menu panel's gnome does */
 .bholes__gnome { position: relative; display: block; width: 210px; height: 210px; margin: -78px -31px -26px; }
 .bholes__gnome > svg { position: absolute; left: 50%; bottom: 36px; width: 124px; height: 124px; transform: translateX(-50%); filter: drop-shadow(0 4px 0 var(--ink)); }
@@ -220,12 +220,12 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the screen's head (the game's: its pill and outlined title) at the sign's start, what the Builder is for under it */
 .bholes__say { display: grid; justify-items: start; gap: 6px; min-width: 0; }
 .bholes__say .front__head { justify-items: start; margin: 0; }
-.front .bholes__say .worlds__title { font-size: var(--fs-fit); }
+.front .bholes__say .worlds__title, .front .tmode__ask .worlds__title { font-size: var(--fs-fit); }
 .bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
 /* the three steps: paper chips, a little picture each, joined by a dashed line */
 .bholes__steps { display: grid; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; counter-reset: none; }
 .bholes__step { position: relative; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-2); border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); }
-.bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: -10px; height: 10px; border-left: 2px dashed rgba(255, 255, 255, .7); }
+.bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: calc(-2px - var(--sp-3)); height: var(--sp-3); border-left: 2px dashed rgba(255, 255, 255, .7); }
 .bholes__step svg { flex: none; width: 34px; height: 34px; padding: 4px; border-radius: 10px; background: var(--lamp); overflow: visible; }
 .bholes__step span { display: grid; line-height: 1.15; }
 .bholes__step b { display: flex; align-items: center; gap: 6px; font-size: 15px; }
@@ -335,13 +335,13 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode .card--weather { min-width: 132px; justify-content: center; } /* (its width kept as the weather changes: the weathers to prove stay put) */
 /* the weathers to prove, as the weather card pictures a sky: one each, the one played gold, ticked once proved */
 .tmode__weathers { display: flex; align-items: stretch; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); }
-.tmode__chip { display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 64px; padding: 2px var(--sp-2); border: 2px solid transparent; border-radius: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* a weather to hole, one tile in three states: to hole (a dashed edge), played now (the gold), holed (pale, ticked with its strokes) */
+.tmode__chip { display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 72px; padding: 4px var(--sp-2); border: 2px dashed rgba(var(--ink-rgb), .4); border-radius: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tmode__sky { width: 34px; height: 24px; }
 .tmode__tick { font-size: 12px; line-height: 1; }
-.tmode__chip--now { border-color: var(--ink); background: var(--gold); }
-.tmode__chip--now.tmode__chip--done { border-color: var(--green); }
-.tmode__chip--done { border-color: var(--green); background: var(--mint); color: var(--green); }
-.tmode__chip--bad { border-color: var(--hat-ink); color: var(--hat-ink); background: var(--white); }
+.tmode__chip--now { border: 2px solid var(--ink); background: var(--gold); }
+.tmode__chip--done { border: 2px solid var(--green); background: var(--mint); color: var(--green); }
+.tmode__chip--bad { border: 2px solid var(--hat-ink); color: var(--hat-ink); background: var(--white); }
 /* the last weather proved: the chips fill one by one, a little confetti, Publish pulses (calm, short; none with reduced motion) */
 .tmode--party .tmode__chip--done { animation: bfill .5s ease-out both; }
 @keyframes bfill { from { background: var(--white); transform: scale(.92); } 60% { transform: scale(1.08); } }
@@ -367,14 +367,17 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__won .banner__row { position: static; margin-top: 18px; }
 .tmode__won .btn { margin: 0; }
 .tmode__won .banner__in .tmode__small { margin: 10px 0 0; font-size: 14px; }
-.tmode--ask { display: grid; place-items: center; padding: 120px var(--sp-4) var(--sp-4); overflow: auto; overscroll-behavior: contain; background: var(--paper); }
-.tmode__ask { width: min(480px, 100%); display: grid; gap: var(--sp-4); text-align: center; }
+/* the Hole it step's first page: the game's page head (its pill, its title), what the step asks in a line, the weathers to hole,
+   then the address step in its card; from just under the header (16 + 68 + 40) */
+.tmode--ask { display: grid; justify-items: center; align-content: start; padding: 124px var(--sp-4) var(--sp-4); overflow: auto; overscroll-behavior: contain; }
+.tmode__ask { position: relative; z-index: 2; width: min(560px, 100%); display: grid; justify-items: center; gap: var(--sp-4); text-align: center; }
+.tmode__ask .front__head { margin: 0; }
 .tmode__ask h2 { margin: 0; font-size: 26px; }
 .tmode__ask p { margin: 0; font-size: 15px; line-height: 1.4; }
 .tmode__ask .btn { margin: 0; }
 /* the Hole it step's first words (over its weathers to hole: the HUD's chips, here a card of their own) */
-.tmode__ask .tmode__intro { font-size: 17px; font-weight: 700; }
-.tmode__ask .tmode__weathers { justify-self: center; margin-bottom: var(--sp-3); }
+.tmode__ask .tmode__intro { max-width: 56ch; font-size: 17px; font-weight: 400; line-height: 1.45; text-wrap: pretty; }
+.tmode__sign { display: grid; justify-items: center; gap: var(--sp-3); width: 100%; margin-top: var(--sp-4); padding: var(--sp-5); border: var(--edge); border-radius: var(--r-card); background: var(--white); }
 .tmode__notes .tmode__intro { color: var(--ink); font-weight: 700; }
 .tmode__addr { display: grid; gap: var(--sp-1); text-align: left; font-size: 13px; font-weight: 700; }
 .tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
@@ -486,6 +489,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .board__ball { fill: var(--white); stroke: var(--ink); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .board__line polyline { fill: none; stroke: var(--gold); stroke-width: 3px; stroke-dasharray: 1 6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .board__line circle { fill: #ffb547; }
+.board__keys { white-space: nowrap; } /* (one line: the few keys most used; ? shows them all) */
 .board__tools { position: absolute; right: var(--sp-3); top: var(--sp-3); z-index: 1; display: flex; align-items: center; gap: var(--sp-2); }
 .board__tools .btn { margin: 0; white-space: nowrap; }
 .board__quick { background: var(--ink); color: var(--paper); }
