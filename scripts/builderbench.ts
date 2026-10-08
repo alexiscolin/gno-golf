@@ -13,7 +13,7 @@
 //   the pointer moves or the board zooms;
 // - zoomed with the wheel (motion on), the board drawn once a frame at most;
 // - idle, the loop stopped: no frame asked for, little CPU;
-// - one WebGL context for the page, a quick test and Prove it visited and
+// - one WebGL context for the page, a quick test and Hole it visited and
 //   left (stage.ts);
 // - five quick tests in a row leave no GL program, texture or buffer behind
 //   (the game draws with the board's own renderer, lent to it);
@@ -28,7 +28,7 @@
 //   built with its own world's scenery, the player's view painted with it;
 // - a world's module that would not load (offline): the hole left where it
 //   is, said, nothing thrown; picked again once it loads, built there;
-// - no WebGL: the 2D board, and no test (T and Prove it say why; the
+// - no WebGL: the 2D board, and no test (T and Hole it say why; the
 //   Builder never falls over).
 // It prints the numbers as JSON. Every step waits on what it is about (the
 // scene's build count and world, the select's value, the line said), each
@@ -207,9 +207,9 @@ for (let k = 0; k < 5; k++) {
   await until(`!document.querySelector(".tbench--quick") && !!document.querySelector(".board--3d canvas")`, "back from the quick test");
   live.push(await settled<Record<string, number>>(c, `window.__live`, "the GL objects after the quick test", 800));
 }
-// and Prove it, and back: still the one context
-await c.js(`[...document.querySelectorAll("button")].find((b) => /^Prove it$/.test(b.textContent)).click()`);
-await until(`!!document.querySelector(".tmode")`, "Prove");
+// and Hole it, and back: still the one context
+await c.js(`[...document.querySelectorAll("button")].find((b) => /^Hole it$/.test(b.textContent)).click()`);
+await until(`!!document.querySelector(".tmode")`, "Hole it");
 await c.js(`[...document.querySelectorAll("button")].find((b) => /^Back to edit$/.test(b.textContent)).click()`);
 await until(`!!document.querySelector(".board--3d canvas")`, "the board again");
 await settled(c, `window.__renders`, "the board drawn again", 500);
@@ -305,9 +305,9 @@ await waitFor(flat, `!!document.querySelector(".board__toggle[aria-disabled]")`,
 await flat.js(`document.querySelector(".board").focus()`);
 await flat.send("Input.dispatchKeyEvent", { type: "keyDown", key: "t", code: "KeyT", text: "t" });
 await flat.send("Input.dispatchKeyEvent", { type: "keyUp", key: "t", code: "KeyT" });
-await flat.js(`[...document.querySelectorAll("button")].find((b) => /^Prove it$/.test(b.textContent))?.click()`);
+await flat.js(`[...document.querySelectorAll("button")].find((b) => /^Hole it$/.test(b.textContent))?.click()`);
 // (what must not happen: a test opening or the page falling over, watched until nothing more changes)
-await settled(flat, `[!!document.querySelector(".tbench--quick, .tmode"), !!document.querySelector(".board")]`, "the page after T and Prove it", 1500);
+await settled(flat, `[!!document.querySelector(".tbench--quick, .tmode"), !!document.querySelector(".board")]`, "the page after T and Hole it", 1500);
 const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 

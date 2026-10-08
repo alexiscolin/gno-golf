@@ -326,7 +326,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tbench { position: fixed; inset: 0; overflow: hidden; font-family: var(--font); color: var(--ink); }
 .tbench > .bhead { position: absolute; left: var(--sp-3); right: var(--sp-3); top: var(--sp-3); z-index: 2; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .96); }
 .tmode { position: absolute; inset: 0; }
-/* its HUD: the game's own (globals.css .hud, .card, .card--score, .card--weather), held in the test's frame, under Prove's header */
+/* its HUD: the game's own (globals.css .hud, .card, .card--score, .card--weather), held in the test's frame, under the Hole it step's header */
 .tmode .hud { position: absolute; z-index: 1; }
 .tbench:not(.tbench--quick) .tmode .hud--top { top: 92px; } /* (under the header: 12 + 68, and a step) */
 .tmode__label h1 { display: flex; align-items: center; gap: var(--sp-2); }
@@ -372,6 +372,10 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__ask h2 { margin: 0; font-size: 26px; }
 .tmode__ask p { margin: 0; font-size: 15px; line-height: 1.4; }
 .tmode__ask .btn { margin: 0; }
+/* the Hole it step's first words (over its weathers to hole: the HUD's chips, here a card of their own) */
+.tmode__ask .tmode__intro { font-size: 17px; font-weight: 700; }
+.tmode__ask .tmode__weathers { justify-self: center; margin-bottom: var(--sp-3); }
+.tmode__notes .tmode__intro { color: var(--ink); font-weight: 700; }
 .tmode__addr { display: grid; gap: var(--sp-1); text-align: left; font-size: 13px; font-weight: 700; }
 .tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
 

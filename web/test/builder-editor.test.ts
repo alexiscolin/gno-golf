@@ -23,11 +23,11 @@ void test("verdict: what to fix first, then ready to test, then proved", () => {
   assert.deepEqual(verdict({ pieces: 0, errors: 0, proved: false }), { ok: false, text: "Place pieces between the tee and the cup" });
   assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false }), { ok: false, text: "2 things to fix" });
   assert.deepEqual(verdict({ pieces: 3, errors: 1, proved: false }), { ok: false, text: "1 thing to fix" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false }), { ok: true, text: "Ready: press T to try it, or Prove it." });
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false }), { ok: true, text: "Ready: press T to try it, or hole it in every weather." });
   assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: true }), { ok: true, text: "Holed in every weather: press Publish." });
   // the one place the next step's reason is said, in words (the header's action keeps its own words, so nothing moves)
   assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Give it a short name first" }), { ok: false, text: "Give it a short name first" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Checking…" }), { ok: true, text: "Ready: press T to try it, or Prove it." }, "a check under way changes nothing said");
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Checking…" }), { ok: true, text: "Ready: press T to try it, or hole it in every weather." }, "a check under way changes nothing said");
   assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false, off: "Fix 2 first" }), { ok: false, text: "2 things to fix" });
   // proofs over an edit: the rounds that broke said, the weathers still holed after them, ready to test again
   assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, rounds: { kept: ["", "rain"], broken: ["Your Wind round now stops short"] } }),
@@ -160,7 +160,7 @@ void test("the Editor keeps one session (its undo history) for as long as it is 
 void test("quick shots in Edit: said on the board to be no proof, never handed to a proof, and the meter's line shown only on the hole it measured", () => {
   const board = fs.readFileSync(new URL("../components/builder/Board.tsx", import.meta.url), "utf8");
   const editor = fs.readFileSync(new URL("../components/builder/Editor.tsx", import.meta.url), "utf8");
-  assert.match(board, />Quick shot: not a proof</);
+  assert.match(board, />Quick shot: just to try</);
   assert.match(editor, /quickShots\(host, /);
   assert.doesNotMatch(editor, /replay\(|onProof/, "the editor never makes a proof: Test does");
   assert.match(editor, /est\?\.of === kept && draft === kept/, "the line: of the hole as kept, and not while a drag moves it");

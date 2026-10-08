@@ -508,8 +508,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await key("t", "KeyT");
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__score")`)); k++) await sleep(300);
   assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__score") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
-  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__label").textContent`), /Quick test not a proof$/, "its label: a quick test, no proof");
-  assert.equal(await c.js<number>(`document.querySelector(".tbench--quick").textContent.split("not a proof").length - 1`), 1, "no proof, said once");
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__label").textContent`), /Quick test just to try$/, "its label: a quick test, no proof");
+  assert.equal(await c.js<number>(`document.querySelector(".tbench--quick").textContent.split("just to try").length - 1`), 1, "no proof, said once");
   // the game's HUD: its cards in one row along the top, in the window, none over another; Try again at the bottom
   const cards = await c.js<Box[]>(`[...document.querySelectorAll(".tbench--quick .hud--top > *")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
   const wide = await c.js<number>("innerWidth");

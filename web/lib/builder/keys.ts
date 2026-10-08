@@ -25,10 +25,10 @@ export const KEYS: readonly { key: string; short: string; long: string }[] = [
   { key: "Q", short: "Rotate", long: "turns the board a quarter (with ⇧, the other way)" },
   { key: "T", short: "Try it", long: "a quick test: plays it in calm weather, then back here (never a proof)" },
   { key: "⇧ drag", short: "Quick shot", long: "on the board, pulls back a quick shot from the tee, or from where the last one stopped (calm weather; never a proof)" },
-  { key: "Esc", short: "Back", long: "drops the piece in hand and the quick shots; in a test, back to Edit (R plays again, V swaps the view)" },
+  { key: "Esc", short: "Back", long: "drops the piece in hand and the quick shots; in a test, back to Build (R plays again, V swaps the view)" },
 ];
 
-/** What a press asks for in a test: play again from the tee (R, Backspace), the overview camera and back (V), back to Edit (Escape); null for none. */
+/** What a press asks for in a test: play again from the tee (R, Backspace), the overview camera and back (V), back to Build (Escape); null for none. */
 export type PlayKey = "restart" | "view" | "leave" | null;
 export function playKey(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey">): PlayKey {
   if (e.metaKey || e.ctrlKey || e.altKey) return null;

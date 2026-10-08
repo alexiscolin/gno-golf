@@ -29,7 +29,7 @@ export interface Opened {
 /**
  * A draft from a file's text, or why not: whole and of its world's pieces;
  * judged by every rule (the census too). One that breaks them opens as it is,
- * said broken: the editor marks its pieces at fault and locks Prove and
+ * said broken: the editor marks its pieces at fault and locks Hole it and
  * Publish until it passes, and no edit may make it worse (edit.ts).
  */
 export async function fromFile(text: string, host: BuilderHost, census: Census): Promise<Opened | string> {
@@ -38,7 +38,7 @@ export async function fromFile(text: string, host: BuilderHost, census: Census):
   const palette = await loadPalette(d.world), unknown = unknownEntry(d, palette);
   if (unknown) return unknown;
   const why = errorsOf(d, { host, palette, census })[0];
-  return { draft: d, broken: why ? `This draft breaks the Builder's rules: ${plainOf(why)} Fix what is marked: Prove and Publish stay locked until it passes.` : "" };
+  return { draft: d, broken: why ? `This draft breaks the Builder's rules: ${plainOf(why)} Fix what is marked: Hole it and Publish stay locked until it passes.` : "" };
 }
 
 /** How many refused pieces a sentence names before "and n more". */

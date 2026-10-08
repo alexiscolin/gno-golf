@@ -1,6 +1,6 @@
 // The Builder's one canvas and its one WebGL context, for as long as the page
 // lives (as the game's own stage does): the 3D board draws on it, and Test
-// (Prove it, a quick test) is lent it, so no visit makes a context of its
+// (Hole it, a quick test) is lent it, so no visit makes a context of its
 // own (a browser holds about sixteen). Whoever holds it last has it; let
 // go, it goes back to the one before (the board under a quick test), told
 // so it can draw again. The board's renderer is made once on it; none if

@@ -19,6 +19,12 @@ export function holeId(author: string, slug: string, versions: Versions | null):
   return `${author}/${slug}/v${last + 1}`;
 }
 
+/** The Hole it step's first words, over its weathers to hole. */
+export const HOLE_IT = "Before your hole goes on chain, you must sink it yourself in each weather that moves the ball (calm, wind, rain…). That proves anyone can.";
+
+/** The weathers to hole, in order (required), each ticked once holed (left: those not holed yet). */
+export const checklist = (world: string, left: readonly string[]): { kind: string; done: boolean }[] => required(world).map((kind) => ({ kind, done: !left.includes(kind) }));
+
 /** The weathers to beat in order (required), each with the period it is played in (periodFor). */
 export function plan(host: BuilderHost, id: string, world: string, now: number): { kind: string; period: number }[] {
   return required(world).map((kind) => ({ kind, period: periodFor(host, id, kind, now) }));
@@ -65,14 +71,14 @@ const AGAIN = { act: "again", text: "Try again", key: "R" } as const, EDIT = { a
 
 /**
  * The card of a round holed in a test, as the game's hole-finished card: a
- * quick test's (never a proof: Prove it is the way on), or a round of
- * Prove's that does not count (why, and play it again). A round of Prove's
+ * quick test's (never a proof: Hole it is the way on), or a round of
+ * the Hole it step's that does not count (why, and play it again). A round of the Hole it step's
  * that counts has none: the next weather starts on its own (provedNote),
  * the last one ends on the summary.
  */
 export function finished(o: { quick: boolean; strokes: number; kind: string; why?: string; proveOff?: string }): Finished | null {
   const title = `Holed in ${o.strokes}`;
-  if (o.quick) return { title, line: "Prove it in every weather to publish it.", actions: [AGAIN, EDIT, { act: "prove", text: "Prove it", primary: true, ...(o.proveOff ? { off: o.proveOff } : {}) }] };
+  if (o.quick) return { title, line: "Hole it in every weather to publish it.", actions: [AGAIN, EDIT, { act: "prove", text: "Hole it in every weather", primary: true, ...(o.proveOff ? { off: o.proveOff } : {}) }] };
   if (!o.why) return null;
   return { title, line: `That ${weatherName(o.kind).toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...AGAIN, primary: true }, EDIT] };
 }
@@ -80,7 +86,7 @@ export function finished(o: { quick: boolean; strokes: number; kind: string; why
 /** The HUD's brief word as a weather is proved and the next one starts on its own. */
 export const provedNote = (kind: string, next: string) => `${weatherName(kind)} proved · next: ${weatherName(next)}`;
 
-/** Prove's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
+/** The Hole it step's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
 export function summary(rows: readonly { kind: string; strokes: number; ms?: number }[], par: number): Finished {
   return {
     title: "Every weather proved",

@@ -385,7 +385,7 @@ export default function Board(props: BoardProps) {
       </svg>
       {ball && (
         <div className="board__tools">
-          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: not a proof</Chip>}
+          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: just to try</Chip>}
           <Button size="s" type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
             title={ball.line ? "The difficulty meter's best line, and where its shots stopped (a guess, calm weather)" : "Shown once the meter has measured the hole as it is"}
             onClick={ball.onLine}>Show the line</Button>
