@@ -25,7 +25,9 @@
 //   alone draws, at the window's own shape; its context lost meanwhile, the
 //   test says so, and says no more once it is back;
 // - round the worlds (Island, Town, Mountain, back to the Garden): each hole
-//   built with its own world's scenery, the player's view painted with it;
+//   built once with its own world's scenery (the board and its column kept
+//   mounted: the world's pieces handed over with the draft), the player's
+//   view painted once with it;
 // - a world's module that would not load (offline): the hole left where it
 //   is, said, nothing thrown; picked again once it loads, built there;
 // - no WebGL: the 2D board, and no test (T and Hole it say why; the
@@ -249,13 +251,13 @@ await c.js(`document.querySelector(".pview__big form button").click()`);
 await until(`!document.querySelector(".pview__big")?.open`, "the large view closed");
 let lent = { renders: 0, frames: 0, shape: 0, window: 0 }, testLost = { said: false, unsaid: false };
 // round the worlds and back: each built with its own scenery (Scene's ?camlog __scenery: the module that drew it), the player's view painted with it
-const scenery: { world: string; drawn: string; eyes: number }[] = [{ world: "island", drawn: await c.js<string>(`window.__scenery`), eyes: 0 }];
+const scenery: { world: string; drawn: string; built: number; eyes: number }[] = [{ world: "island", drawn: await c.js<string>(`window.__scenery`), built: 1, eyes: 0 }];
 for (const w of ["town", "mountain", "garden"]) {
   const b0 = await builds(), e0 = await eyes();
   await pickWorld(c, w);
   await builtIn(c, w, b0).catch(() => null); // (a world that never came: said by the assertion, with what was drawn)
   await settled(c, `[window.__builds, window.__eyes]`, `the ${w}'s build`, 600);
-  scenery.push({ world: w, drawn: await c.js<string>(`window.__scenery`), eyes: (await eyes()) - e0 });
+  scenery.push({ world: w, drawn: await c.js<string>(`window.__scenery`), built: (await builds()) - b0, eyes: (await eyes()) - e0 });
 }
 
 // in the mountain, Moving air dropped on the lane (selected, playing: the board's loop kept going), then a quick test:
@@ -327,7 +329,7 @@ assert.equal(contexts, 1, `${contexts} WebGL contexts`);
 assert.ok(lent.renders <= lent.frames + 1 && Math.abs(lent.shape - lent.window) <= 0.02, `a quick test over a timed piece kept moving: ${JSON.stringify(lent)} (the board drew on the lent canvas)`);
 assert.ok(large.px >= Math.round(large.css * Math.min(large.dpr, 1.25)) - 1, `the player's view large: ${large.px} px drawn for ${large.css} css px (stretched)`);
 assert.ok(testLost.said && testLost.unsaid, `a quick test's context lost and back: ${JSON.stringify(testLost)}`);
-assert.ok(scenery.every((x, i) => x.drawn === x.world && (i === 0 || x.eyes === 1)), `a world's own scenery: ${JSON.stringify(scenery)}`);
+assert.ok(scenery.every((x, i) => x.drawn === x.world && x.built === 1 && (i === 0 || x.eyes === 1)), `a world's own scenery: ${JSON.stringify(scenery)}`);
 assert.ok(world.built === 0 && /could not load/.test(world.said) && !world.thrown.length && world.builtAgain === 1, `a world that would not load: ${JSON.stringify(world)}`);
 assert.ok(lost.whileLost && lost.backIn3d && lost.drawn, `the context lost and back: ${JSON.stringify(lost)}`);
 for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
