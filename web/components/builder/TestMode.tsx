@@ -317,7 +317,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
         )}
         {quick && onLeave && (
           <div className="hud__right">
-            <Button keycap="Esc" onClick={onLeave}>Back to edit</Button>
+            <Button size="m" keycap="Esc" onClick={onLeave}>Back to edit</Button>
           </div>
         )}
       </header>

@@ -212,7 +212,7 @@ for (let k = 0; k < 5; k++) {
 // and Hole it, and back: still the one context
 await c.js(`[...document.querySelectorAll("button")].find((b) => /^Hole it$/.test(b.textContent)).click()`);
 await until(`!!document.querySelector(".tmode")`, "Hole it");
-await c.js(`[...document.querySelectorAll("button")].find((b) => /^Back to edit$/.test(b.textContent)).click()`);
+await c.js(`[...document.querySelectorAll("button")].find((b) => /^Back to edit/.test(b.textContent)).click()`);
 await until(`!!document.querySelector(".board--3d canvas")`, "the board again");
 await settled(c, `window.__renders`, "the board drawn again", 500);
 const contexts = await c.js<number>(`window.__gl.size`);

@@ -64,6 +64,23 @@ export const lookOf = (t: Tile, chosen: Readonly<Record<string, string>>): Palet
 /** The looks a piece shows under its row, each to drag on: every one of a piece of several, in its order; none for a piece of one (its row is it). */
 export const looksShown = (t: Tile): readonly PaletteEntry[] => (t.looks.length > 1 ? t.looks : []);
 
+/** A row of looks under a piece: as many as the palette's column holds side by side. */
+export const LOOKS_ROW = 4;
+/** A piece's looks as its row shows them (open: all of them, opened by its +N): a row's worth, or the first ones and +N (more) filling the row. */
+export function looksRow(t: Tile, open: boolean): { shown: readonly PaletteEntry[]; more: number } {
+  const all = looksShown(t);
+  return open || all.length <= LOOKS_ROW ? { shown: all, more: 0 } : { shown: all.slice(0, LOOKS_ROW - 1), more: all.length - (LOOKS_ROW - 1) };
+}
+const looksKey = (tile: string) => `gnogolf.builder.looks.${tile}`;
+/** Whether a piece's looks are open past their row: as the author left them this visit, else shut. */
+export function looksOpen(tile: string): boolean {
+  try { return sessionStorage.getItem(looksKey(tile)) === "1"; } catch { return false; }
+}
+/** A piece's looks opened or shut, kept for the visit (a browser that keeps nothing: forgotten). */
+export function saveLooksOpen(tile: string, open: boolean) {
+  try { sessionStorage.setItem(looksKey(tile), open ? "1" : "0"); } catch {}
+}
+
 /** What 1 to 5 arm (n from 0): the first five pieces, each in its look as chosen; null past them. */
 export function armedByKey(palette: readonly PaletteEntry[], n: number, chosen: Readonly<Record<string, string>>): PaletteEntry | null {
   const t = tilesOf(palette).first[n];

@@ -660,10 +660,15 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   const wallPx = await outline(".board__piece--on > :first-child");
   assert.ok(wallPx !== null && wallPx <= 4, `${w}×${h}@${dpr}: the right wall selected, its outline ${wallPx} px wide`);
   // every look: armed from the keyboard (Enter: gold, pressed again: put back), and carried onto the board by a drag (its ghost there)
-  const looks = await c.js<number>(`document.querySelectorAll(".palette .look:not([disabled])").length`);
+  // every tray opened past its row (+N), in place: then every look
+  const trays = await c.js<{ before: number; after: number }>(`(() => { const before = document.querySelectorAll(".palette .look:not(.look--more)").length; document.querySelectorAll('.palette .look--more[aria-expanded="false"]').forEach((b) => b.click()); return { before, after: 0 }; })()`);
+  await sleep(300);
+  trays.after = await c.js<number>(`document.querySelectorAll(".palette .look:not(.look--more)").length`);
+  assert.ok(trays.after >= trays.before && !(await c.js<boolean>(`!!document.querySelector('.palette .look--more[aria-expanded="false"]')`)), `${w}: +N did not open its looks (${JSON.stringify(trays)})`);
+  const looks = await c.js<number>(`document.querySelectorAll(".palette .look:not(.look--more):not([disabled])").length`);
   assert.ok(looks > 0, `${w}: no look under a piece`);
   for (let k = 0; k < looks; k++) {
-    const sel = `document.querySelectorAll(".palette .look:not([disabled])")[${k}]`, label = await c.js<string>(`${sel}.getAttribute("aria-label")`);
+    const sel = `document.querySelectorAll(".palette .look:not(.look--more):not([disabled])")[${k}]`, label = await c.js<string>(`${sel}.getAttribute("aria-label")`);
     assert.ok(label && (await c.js<string>(`${sel}.title`)).startsWith(label), `${w}: a look with no name`);
     await c.js(`${sel}.focus()`);
     await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });

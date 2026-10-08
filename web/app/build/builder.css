@@ -8,9 +8,9 @@
 
 .bench, .bholes, .tbench, .pbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; }
 
-.bench { --palette-w: 220px; --col-w: 300px; position: fixed; inset: 0; display: grid; grid-template: 64px minmax(0, 1fr) / var(--palette-w) minmax(0, 1fr) var(--col-w); gap: var(--sp-3); padding: var(--sp-3) max(var(--sp-3), env(safe-area-inset-right)) var(--sp-3) max(var(--sp-3), env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: none; font-family: var(--font); color: var(--ink); background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0, var(--paper)); }
-@media (min-width: 1280px) { .bench { --palette-w: 248px; } }
-@media (min-width: 1400px) { .bench { --palette-w: 264px; --col-w: 340px; grid-template-columns: var(--palette-w) minmax(0, 1fr) var(--col-w); } }
+.bench { --palette-w: 212px; --col-w: 292px; position: fixed; inset: 0; display: grid; grid-template: 44px minmax(0, 1fr) / var(--palette-w) minmax(0, 1fr) var(--col-w); gap: var(--sp-5) var(--sp-4); padding: var(--sp-4) max(var(--sp-4), env(safe-area-inset-right)) var(--sp-4) max(var(--sp-4), env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: none; font-family: var(--font); color: var(--ink); background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0, var(--paper)); }
+@media (min-width: 1280px) { .bench { --palette-w: 240px; } }
+@media (min-width: 1400px) { .bench { --palette-w: 256px; --col-w: 332px; grid-template-columns: var(--palette-w) minmax(0, 1fr) var(--col-w); } }
 .bench__wait { grid-column: 1 / -1; place-self: center; font-size: 17px; text-align: center; }
 .bench__unkept { position: fixed; left: 50%; bottom: var(--sp-3, 12px); transform: translateX(-50%); margin: 0; padding: 8px 16px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-weight: 700; white-space: nowrap; z-index: 2; }
 .bench__unkept--elsewhere { display: flex; align-items: center; gap: var(--sp-2, 8px); }
@@ -65,22 +65,27 @@
 .palette__group { display: grid; gap: var(--sp-3); }
 .palette__group + .palette__group { margin-top: var(--sp-5); }
 .palette__group > summary { cursor: pointer; width: max-content; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
-.ptiles { display: grid; gap: var(--sp-4); --pic: 52px; }
+.ptiles { display: grid; gap: var(--sp-5); --pic: 52px; }
 @media (min-width: 1280px) { .ptiles { --pic: 60px; } }
-.ptile { display: grid; gap: var(--sp-2); min-width: 0; }
-.piece { display: grid; grid-template: auto auto / var(--pic) minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); min-width: 0; padding: 6px var(--sp-3) 6px 6px; border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font: inherit; color: var(--ink); cursor: grab; touch-action: none; text-align: left; }
+/* a piece's card: its row, and its looks' tray under a hairline */
+.ptile { min-width: 0; border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 2px 0 var(--ink); overflow: hidden; }
+.piece { display: grid; grid-template: auto auto / var(--pic) minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); width: 100%; min-width: 0; padding: 6px var(--sp-3) 6px 6px; border: 0; background: none; font: inherit; color: var(--ink); cursor: grab; touch-action: none; text-align: left; }
 .piece img { grid-row: 1 / 3; width: var(--pic); height: var(--pic); border-radius: 10px; pointer-events: none; background: rgba(var(--ink-rgb), .06); }
 .piece__name { align-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 800; line-height: 1.2; }
-.piece__does { align-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--ink-soft); }
-.piece--on { background: var(--gold); } /* (on, as a button is: gold, its box kept) */
+/* what it does: two lines when it needs them, never cut (the picture's height holds both) */
+.piece__does { align-self: start; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--ink-soft); }
+.piece--on { background: var(--gold); } /* (on, as a button is: gold) */
 .piece--on .piece__does { color: var(--ink); } /* (its words read on the gold) */
 .piece:disabled { opacity: .45; cursor: not-allowed; }
-/* a piece's looks, under its row: each the game's picture of it, named in its label, to drag on; the one armed gold */
-.plooks { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: var(--sp-2); }
-.look { aspect-ratio: 1; min-width: 0; padding: 3px; border: var(--edge); border-radius: 10px; background: var(--white); box-shadow: 0 2px 0 var(--ink); cursor: grab; touch-action: none; }
+/* the tray: a row of looks (LOOKS_ROW), each the game's picture of it, named in its label, to drag on; the one armed gold, the
+   piece's look as now (the row's picture) ringed; +N opens the rest in place */
+.plooks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); padding: var(--sp-2); border-top: 1px solid rgba(var(--ink-rgb), .15); }
+.look { aspect-ratio: 1; min-width: 0; padding: 3px; border: var(--edge); border-radius: 10px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font: inherit; cursor: grab; touch-action: none; }
 .look img { display: block; width: 100%; height: 100%; border-radius: 7px; pointer-events: none; }
+.look--now { outline: 3px solid var(--gold); outline-offset: 1px; }
 .look[aria-pressed="true"] { background: var(--gold); }
 .look:disabled { opacity: .45; cursor: not-allowed; }
+.look--more { display: grid; place-items: center; background: var(--paper); font-size: 15px; font-weight: 800; color: var(--ink); cursor: pointer; }
 .palette__more { display: grid; gap: var(--sp-3); }
 .palette__more > summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
 .palette__more[open] > summary { margin-bottom: var(--sp-3); }
@@ -324,11 +329,14 @@ button.issue__why:hover { text-decoration-style: solid; }
 
 /* ------------------------------------------------------------ test mode (B3): the game under the header, the weathers over it */
 .tbench { position: fixed; inset: 0; overflow: hidden; font-family: var(--font); color: var(--ink); }
-.tbench > .bhead { position: absolute; left: var(--sp-3); right: var(--sp-3); top: var(--sp-3); z-index: 2; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .96); }
+.tbench > .bhead { position: absolute; left: var(--sp-4); right: var(--sp-4); top: var(--sp-4); z-index: 2; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .96); }
 .tmode { position: absolute; inset: 0; }
 /* its HUD: the game's own (globals.css .hud, .card, .card--score, .card--weather), held in the test's frame, under the Hole it step's header */
 .tmode .hud { position: absolute; z-index: 1; }
-.tbench:not(.tbench--quick) .tmode .hud--top { top: 92px; } /* (under the header: 12 + 68, and a step) */
+.tbench:not(.tbench--quick) .tmode .hud--top { top: 92px; } /* (under the header: 16 + 68, and 24 to the HUD's cards, its own padding 16 in it) */
+/* the Builder's one outer edge (16) round the game's HUD too */
+.tmode .hud--top { padding-top: var(--sp-4); }
+.tmode .hud--bottom { padding-bottom: var(--sp-4); }
 .tmode__label h1 { display: flex; align-items: center; gap: var(--sp-2); }
 .tmode__label .pro-chip { margin: 0; }
 .tmode__score { min-width: 104px; font-variant-numeric: tabular-nums; }
@@ -352,7 +360,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 @keyframes bpulse { 50% { box-shadow: 0 0 0 6px rgba(var(--ink-rgb), .12); transform: scale(1.04); } }
 @media (prefers-reduced-motion: reduce) { .tmode--party .tmode__chip--done, .btn--pulse { animation: none; } .bconfetti { display: none; } }
 .tmode__notes { position: absolute; top: 108px; left: 50%; transform: translateX(-50%); z-index: 1; display: grid; justify-items: center; gap: var(--sp-3); width: min(640px, calc(100% - 2 * var(--sp-3))); pointer-events: none; }
-.tbench:not(.tbench--quick) .tmode__notes { top: 200px; }
+.tbench:not(.tbench--quick) .tmode__notes { top: 208px; }
 .tmode__why, .tmode__note, .tmode__done { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-size: 15px; font-weight: 700; text-align: center; }
 .tmode__note { border-color: rgba(var(--ink-rgb), .3); color: var(--ink); background: rgba(var(--paper-rgb), .96); font-weight: 600; }
 .tmode__done { border-color: var(--green); color: var(--green); }
@@ -383,25 +391,27 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
 
 /* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */
-.pbench { position: fixed; inset: 0; display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3); overflow: hidden; font-family: var(--font); color: var(--ink); background: var(--paper); }
-.pub { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: var(--sp-5); }
+.pbench { position: fixed; inset: 0; display: grid; grid-template-rows: 44px minmax(0, 1fr); gap: var(--sp-5); padding: var(--sp-4); overflow: hidden; font-family: var(--font); color: var(--ink); background: var(--paper); }
+.pub { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); grid-template-rows: minmax(0, auto); align-content: start; gap: var(--sp-5); } /* (one row, the form's height: the hole beside it ends where it ends) */
 .pub__doneform { display: grid; align-content: center; justify-items: center; gap: var(--sp-3); padding: var(--sp-4); text-align: center; }
 .pub__doneform h2 { margin: 0; font-size: 28px; }
 .pub__doneform p { margin: 0; font-size: 15px; }
 .pub__doneform .btn { margin: 0; }
-.pub__hole { display: grid; align-content: start; gap: var(--sp-4); min-width: 0; min-height: 0; }
-/* the 3D no taller than the window leaves under the header with the card under it (116: its gap and its height; a short, wide window) */
-.pub__hole .preview { width: 100%; max-height: calc(100dvh - 64px - 3 * var(--sp-3) - 116px); }
+.pub__hole { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--sp-4); min-width: 0; min-height: 0; }
+/* the 3D as tall as the form beside it leaves over the card (its own 16:10 no more) */
+.pub__hole .preview { width: 100%; height: 100%; min-height: 240px; aspect-ratio: auto; }
+.pub--done .pub__hole .preview { height: auto; aspect-ratio: 16 / 10; } /* (published: no form beside it, its own shape) */
 .pub__card { display: grid; gap: 2px; padding: var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); }
 .pub__card b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub__card small { color: var(--ink-soft); font-weight: 600; }
-.pub__form { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; border: var(--edge); border-radius: var(--r-card); background: var(--white); overflow: hidden; }
-.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-4); padding: var(--sp-5); }
+.pub__form { min-height: 0; max-height: 100%; display: grid; grid-template-rows: minmax(0, auto) auto; border: var(--edge); border-radius: var(--r-card); background: var(--white); overflow: hidden; }
+.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-5); padding: var(--sp-5); }
 .pub__foot { padding: var(--sp-4) var(--sp-5); border-top: var(--rule); background: var(--paper); }
 .pub__foot .btn { margin: 0; width: 100%; }
+.pub__foot .pub__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (the footer one line, holding the action) */
 .pub__forever a { color: var(--green); font-weight: 700; }
 .pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
-.pub__field { display: grid; gap: var(--sp-1); font-size: 13px; font-weight: 700; }
+.pub__field { display: grid; gap: var(--sp-2); font-size: 13px; font-weight: 700; }
 .pub__field span { display: flex; justify-content: space-between; }
 .pub__field em { font-style: normal; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .pub__field input, .pub__field textarea { min-height: 44px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; resize: none; }
@@ -454,13 +464,13 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Test it's hint at the board's top right,
    under the steps' hint; the palette's lower, by its tiles; Got it in the board's middle under them */
 .bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
-.bhint--test { right: calc(var(--col-w) + 3 * var(--sp-3)); top: 160px; }
+.bhint--test { right: calc(var(--col-w) + 3 * var(--sp-4)); top: 160px; }
 .bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
-.bhints__centre { position: absolute; left: calc(var(--palette-w) + 2 * var(--sp-3)); right: calc(var(--col-w) + 2 * var(--sp-3)); top: 280px; display: flex; justify-content: center; pointer-events: none; }
+.bhints__centre { position: absolute; left: calc(var(--palette-w) + 2 * var(--sp-4)); right: calc(var(--col-w) + 2 * var(--sp-4)); top: 280px; display: flex; justify-content: center; pointer-events: none; }
 .bhint__ok { flex: none; margin: 0; pointer-events: auto; }
 /* the "?": one panel in the board's middle, the three hints then the world's pieces (each tile's picture, name and
    what it does) on one screen, Got it pinned at its foot; it scrolls in itself only in a short window */
-.bhints__centre--help { top: 88px; bottom: var(--sp-3); align-items: flex-start; }
+.bhints__centre--help { top: 84px; bottom: var(--sp-4); align-items: flex-start; }
 .bgloss { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 100%; width: min(640px, 100%); overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); pointer-events: auto; }
 .bgloss__hints { display: grid; gap: var(--sp-1); }
 .bhint--in { position: static; max-width: none; padding: 0; border: 0; box-shadow: none; background: none; }
@@ -479,6 +489,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the keys at the board's foot */
 .board__keys { position: absolute; left: var(--sp-3); bottom: var(--sp-3); max-width: calc(100% - 2 * var(--sp-3)); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink); pointer-events: none; }
 /* an entry whole on its line, its separator after it: a line never starts with one */
+.board__keys { white-space: nowrap; } /* (one line: the few keys most used; ? shows them all) */
 .board__keys > span { white-space: nowrap; }
 .board__keys > span:not(:last-child)::after { content: "\00a0·"; }
 .board__keys kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
@@ -489,7 +500,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 .board__ball { fill: var(--white); stroke: var(--ink); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .board__line polyline { fill: none; stroke: var(--gold); stroke-width: 3px; stroke-dasharray: 1 6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .board__line circle { fill: #ffb547; }
-.board__keys { white-space: nowrap; } /* (one line: the few keys most used; ? shows them all) */
 .board__tools { position: absolute; right: var(--sp-3); top: var(--sp-3); z-index: 1; display: flex; align-items: center; gap: var(--sp-2); }
 .board__tools .btn { margin: 0; white-space: nowrap; }
 .board__quick { background: var(--ink); color: var(--paper); }

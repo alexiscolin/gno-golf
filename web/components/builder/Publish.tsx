@@ -12,7 +12,7 @@
 // and the census, the proofs replayed in their strokes, the par (publish.ts
 // holeHolds, publishSteps).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useCopied } from "@/components/common";
+import { shortAddr, useCopied } from "@/components/common";
 import { Button } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
@@ -177,7 +177,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             <input value={draft.title} maxLength={MAX_NAME * 2} aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, title: [...e.target.value].slice(0, MAX_NAME).join("") })} disabled={!!sent} />
             {name !== draft.title && <small>Kept as: {name}</small>}
           </label>
-          <div className="pub__field"><span>Address</span><code>{id || `${alias}/v…`}</code><small>Fixed at the test: the weather comes from it.</small></div>
+          <div className="pub__field"><span>Address</span><code title={id || undefined}>{(id || `${alias}/v…`).replace(/^g1\w+/, (a) => shortAddr(a))}</code><small>Fixed at the test: the weather comes from it.</small></div>
           {/* the par, explained by the rounds that proved it */}
           {par && <div className="pub__field"><span>Par</span><code>{draft.par}</code><small>{par}</small></div>}
           <label className="pub__field">
@@ -214,7 +214,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
                 : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${aboutGnot(b.most)} GNOT`}</Button>
-                  : <p className="pub__note">Adena is not in this browser: publish with gnokey above.</p>}
+                  : <p className="pub__note">No Adena here: publish with gnokey above.</p>}
         </div>
       </section>
     </main>
