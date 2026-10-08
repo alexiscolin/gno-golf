@@ -144,15 +144,14 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
 
   const onChain = look === "chain" ? portraitsOf(chain) : null;
   // his picture, the look switch under it (in his first view alone), then who he is on the same axis: his tier and
-  // number on one line, his name (the sheet's title), his line
-  const head = (small = false, title: ReactNode = g.name, swap = false, line = "") => (
+  // number on one line, his name (the sheet's title)
+  const head = (small = false, title: ReactNode = g.name, swap = false) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
       <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
       {swap && <LookSwitch look={look} onLook={onLook} />}
       <div className="gsheet__id">
         {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /><span>#{g.id} · Wave {g.wave} · {worldName(g.home)}</span></span>}
         <h2>{title}</h2>
-        {line && <p className="gsheet__line">{line}</p>}
       </div>
     </div>
   );
@@ -166,17 +165,18 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       const traits = decode(g.traits);
       body = (
         <>
-          {head(false, g.name, true, g.line)}
+          {head(false, g.name, true)}
+          <p className="gsheet__line">{g.line}</p>
           {/* what is said of him (above), his traits and his share, then his one action in the footer, last */}
           {row && row.closed ? (
             <p className="gsheet__fine"><b>Never made.</b> The sale closed before this gnome found a player.</p>
           ) : owner && !mine ? (
             <p className="gsheet__fine">Found a player. <button className="linkish" onClick={() => onTheirs(owner)}>Their gnomes →</button></p>
           ) : !mine && !unread && region ? (
-            <>
+            <div className="gsheet__offer">
               {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
               <ul className="trust">{TRUST.slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
-            </>
+            </div>
           ) : null}
           {traits && (
             <details className="more">
