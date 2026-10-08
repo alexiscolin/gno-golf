@@ -9,7 +9,7 @@
 // dock keep their places as their words change, what a step says when it is
 // off is readable, and the note of a browser that keeps
 // nothing covers no control; undo and redo stand whole in the header; the
-// palette opens on all its groups, folds as left for the visit and scrolls
+// palette opens on all its groups (each folding too), folds as left for the visit and scrolls
 // in itself; the
 // start screen (a player back) never scrolls sideways, keeps clear of the
 // corner's Back and shows its starters above the fold. Exits non-zero on the first failure.
@@ -123,7 +123,8 @@ for (const [w, h] of SIZES) {
   assert.ok(off, `${at}: the action is not off with no name`);
   assert.ok(off.opacity === 1 && off.ratio >= 4.5, `${at}: the action's reason, off, reads at ${off.ratio.toFixed(2)}:1, opacity ${off.opacity}`);
   // the palette: "More pieces" open at first (every group in sight), "From other worlds" folded; it scrolls in itself, never the window
-  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more true", "others false"], `${at}: the palette's folds at first`);
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette .palette__more")].map((d) => d.dataset.fold + " " + d.open)`), ["more true", "others false"], `${at}: the palette's folds at first`);
+  assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".palette .palette__group")].every((d) => d.open && d.dataset.fold.startsWith("group/"))`), `${at}: a group of the palette folded at first`);
   const pal = await c.js<{ over: string; sh: number; ch: number }>(`(() => { const p = document.querySelector(".palette"); return { over: getComputedStyle(p).overflowY, sh: p.scrollHeight, ch: p.clientHeight }; })()`);
   assert.ok(pal.over === "auto" && (pal.sh <= pal.ch || (await c.js(`document.documentElement.scrollHeight <= innerHeight`))), `${at}: the palette spills onto the page (${JSON.stringify(pal)})`);
   console.log(`${at}: ok`);
@@ -133,7 +134,7 @@ for (const [w, h] of SIZES) {
 // the buttons in a row as tall as one another, on one top and their words on one baseline (Button's sizes): the
 // header's (Back, the steps, the meter, ?, undo, redo, the action), the board's, the Inspector's; off, a button keeps
 // the box it has on (undo, before and after an edit), and so does one on (Show the line: gold, as every on control);
-// the header's address shows its short name whole, and the palette's "More pieces" lie on the column's grid
+// the header's address shows its short name whole, and the palette's pieces are rows on one grid, their looks under them
 for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   const c = await editor(w, h);
   const at = `buttons ${w}×${h}`;
@@ -165,24 +166,26 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   assert.deepEqual(await c.js<object>(footprint(".board__toggle")), unpressed, `${at}: Show the line's box changes as it comes on`);
   assert.equal(await c.js(gold(".board__toggle")), true, `${at}: Show the line on, not gold`);
   assert.deepEqual(await c.js<string[]>(misaligned([rows[1]])), [], `${at}: the board's row out of line with Show the line on`);
-  const grid = await c.js<{ col: number; tiles: { l: number; w: number }[] }>(`(() => { const r = document.querySelector(".ptiles--first").getBoundingClientRect(); return { col: r.width, tiles: [...document.querySelectorAll('.palette [data-fold="more"] .ptile')].map((t) => ({ l: t.getBoundingClientRect().left - r.left, w: t.getBoundingClientRect().width })) }; })()`);
-  for (const t of grid.tiles) assert.ok(Math.abs(t.w - grid.col) < 1 || (Math.abs(t.l) < 1 || Math.abs(t.l + t.w - grid.col) < 1) && t.w < grid.col / 2, `${at}: a "More pieces" tile off the column's grid (${JSON.stringify(t)} in ${grid.col})`);
-  const alone = await c.js<number>(`[...document.querySelectorAll('.palette [data-fold="more"] .ptiles')].filter((g) => { const t = [...g.children].map((x) => x.getBoundingClientRect()); return t.some((a) => a.width < g.getBoundingClientRect().width / 2 && !t.some((b) => b !== a && Math.abs(b.top - a.top) < 1)); }).length`);
-  assert.equal(alone, 0, `${at}: a "More pieces" tile half the column's width, alone on its row`);
+  // the palette: every piece one row on one grid (as tall, as wide, one left edge), a piece's looks under it, no badge, no popover
+  const rowsOf = await c.js<{ l: number; w: number; h: number }[]>(`[...document.querySelectorAll(".palette .ptile > .piece")].filter((e) => e.checkVisibility()).map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, w: r.width, h: r.height }; })`);
+  for (const r of rowsOf) assert.ok(Math.abs(r.l - rowsOf[0].l) < 0.5 && Math.abs(r.w - rowsOf[0].w) < 0.5 && Math.abs(r.h - rowsOf[0].h) < 0.5, `${at}: a palette row off the others' grid (${JSON.stringify(r)} against ${JSON.stringify(rowsOf[0])})`);
+  assert.equal(await c.js(`document.querySelectorAll(".palette .ptile__looks, .looks, .palette [aria-haspopup]").length`), 0, `${at}: a looks badge or popover left`);
+  assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".palette .ptile")].every((t) => { const n = t.querySelectorAll(".look").length; return n === 0 || n > 1; })`), `${at}: a piece showing one look under it`);
   console.log(`${at}: ok`);
   c.kill();
 }
 
-// the palette's folds kept as left for the visit: "More pieces" folded, the page loaded again, still folded
+// the palette's folds kept as left for the visit: "More pieces" and its Traps folded, the page loaded again, still folded
 {
   const c = await editor(1440, 900);
-  await c.js(`document.querySelector('.palette [data-fold="more"] summary').click()`);
+  await c.js(`document.querySelector('.palette [data-fold="group/Traps"] > summary').click()`);
+  await c.js(`document.querySelector('.palette [data-fold="more"] > summary').click()`);
   await sleep(300);
   await c.send("Page.reload");
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette [data-fold], .bholes__starts button")`)); k++) await sleep(500);
   await c.js(`document.querySelector(".palette") || document.querySelector(".bholes__starts button").click()`);
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette [data-fold]")`)); k++) await sleep(500);
-  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more false", "others false"], "the palette's folds not kept for the visit");
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more false", "group/Walls true", "group/Obstacles true", "group/Ground true", "group/Traps false", "others false"], "the palette's folds not kept for the visit");
   console.log("the palette's folds kept: ok");
   c.kill();
 }
@@ -453,6 +456,16 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await key("2", "Digit2");
   assert.equal(await c.js(`document.querySelector(".palette .piece--on .piece__name")?.textContent`), "Bumper", "2: the second piece, armed");
   await key("Escape", "Escape");
+  // a look pressed is its piece's look from then on: 4 arms the water as chosen (the look gold, not the row)
+  const water = await c.js<string>(`(() => { const looks = [...document.querySelectorAll(".palette > .ptiles .look")].filter((l) => l.closest(".ptile").querySelector(".piece__name").textContent === "Water"); looks.at(-1).focus(); return looks.at(-1).dataset.look; })()`);
+  await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+  await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+  await sleep(150);
+  await key("Escape", "Escape");
+  await c.js(`document.querySelector(".board").focus()`);
+  await key("4", "Digit4");
+  assert.equal(await c.js(`document.querySelector('.palette .look[aria-pressed="true"]')?.dataset.look`), water, "4: the water as chosen, its look gold");
+  await key("Escape", "Escape");
   const keys = await c.js<string>(`document.querySelector(".board__keys").textContent`);
   for (const k of ["1–5", "Space", "F", "T"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
   // Space held, a drag over a piece pans (the piece stays)
@@ -591,7 +604,7 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   await c.js(`document.querySelector(".bholes__start--blank").click()`);
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece=p1]")`)); k++) await sleep(300);
   await sleep(1500);
-  await c.js(`document.querySelector(".palette__more")?.setAttribute("open", "")`);
+  await c.js(`document.querySelectorAll(".palette details").forEach((d) => d.setAttribute("open", ""))`);
   await sleep(300);
   const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: 1 });
   // the outline's width on screen: its stroke, in css px if non-scaling, else times the board's scale
@@ -633,7 +646,39 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   await sleep(300);
   const wallPx = await outline(".board__piece--on > :first-child");
   assert.ok(wallPx !== null && wallPx <= 4, `${w}×${h}@${dpr}: the right wall selected, its outline ${wallPx} px wide`);
-  console.log(`palette drops ${w}×${h}@${dpr}: ok (${tiles} entries)`);
+  // every look: armed from the keyboard (Enter: gold, pressed again: put back), and carried onto the board by a drag (its ghost there)
+  const looks = await c.js<number>(`document.querySelectorAll(".palette .look:not([disabled])").length`);
+  assert.ok(looks > 0, `${w}: no look under a piece`);
+  for (let k = 0; k < looks; k++) {
+    const sel = `document.querySelectorAll(".palette .look:not([disabled])")[${k}]`, label = await c.js<string>(`${sel}.getAttribute("aria-label")`);
+    assert.ok(label && (await c.js<string>(`${sel}.title`)).startsWith(label), `${w}: a look with no name`);
+    await c.js(`${sel}.focus()`);
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await sleep(120);
+    assert.equal(await c.js(`${sel}.getAttribute("aria-pressed")`), "true", `${w}: ${label}: Enter did not arm it`);
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await sleep(80);
+    assert.equal(await c.js(`${sel}.getAttribute("aria-pressed")`), "false", `${w}: ${label}: pressed again, still armed`);
+    await c.js(`${sel}.scrollIntoView({ block: "center" })`);
+    const at = await c.js<[number, number]>(`(() => { const r = ${sel}.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+    await mouse("mouseMoved", ...at); await mouse("mousePressed", ...at);
+    for (let i = 1; i <= 4; i++) await c.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0] + ((spot[0] - at[0]) * i) / 4, y: at[1] + ((spot[1] - at[1]) * i) / 4, button: "left", buttons: 1 });
+    await sleep(150);
+    assert.ok(await c.js<boolean>(`!!document.querySelector(".board__ghost")`), `${w}: ${label}: dragged, no ghost on the board`);
+    const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
+    await mouse("mouseReleased", ...spot);
+    await sleep(400);
+    if ((await c.js<number>(`document.querySelectorAll("[data-piece]").length`)) > n) {
+      await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "z", code: "KeyZ", modifiers: 4, windowsVirtualKeyCode: 90 });
+      await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "z", code: "KeyZ", modifiers: 4, windowsVirtualKeyCode: 90 });
+      await sleep(300);
+    }
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  }
+  console.log(`palette drops ${w}×${h}@${dpr}: ok (${tiles} entries, ${looks} looks)`);
   c.kill();
 }
 console.log("builderui: all ok");

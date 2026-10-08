@@ -9,7 +9,7 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { foldOpen, GROUPS, pictureOf, saveFold, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { armedByKey, foldOpen, GROUPS, lookOf, looksShown, pictureOf, saveFold, tilesOf, type Tile } from "../lib/builder/tiles.ts";
 import { entryName, TILES } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
@@ -69,6 +69,27 @@ void test("variants that play alike are one tile with looks: water, hills, tunne
   assert.ok(skins(named("town", "Floor")).includes("brick") && !skins(named("town", "Sand")).includes("brick"));
   assert.deepEqual(skins(named("town", "Blinking bar")), ["clock hand"], "named for what it does: it blinks, it never sweeps");
   assert.equal(entryName(named("garden", "Tunnel").looks.at(-1)!), "Pipe", "the plain tunnel, a pipe as drawn");
+});
+
+void test("each piece's looks under its row: every look of a piece of several, each once, in the tile's order; none for a piece of one", () => {
+  for (const w of palettes.keys())
+    for (const t of tiles(w)) {
+      const shown = looksShown(t);
+      if (t.looks.length === 1) assert.deepEqual(shown, [], `${w} ${t.name}: one look, its row is it`);
+      else assert.deepEqual(shown.map((e) => e.id), t.looks.map((e) => e.id), `${w} ${t.name}: all its looks, in order`);
+    }
+  assert.equal(looksShown(named("garden", "Obstacle")).length, 6, "the garden's obstacle: its six looks");
+  assert.deepEqual(looksShown(named("mountain", "Ice")), [], "the ice: one look, none under it");
+});
+
+void test("1 to 5 arm the first five pieces, each in its look as chosen (its first until then); past five, nothing", () => {
+  const p = palettes.get("island")!, { first } = tilesOf(p);
+  assert.deepEqual([0, 1, 2, 3, 4].map((n) => armedByKey(p, n, {})?.id), first.map((t) => t.looks[0].id), "the first look of each");
+  const water = first[3], lagoon = water.looks.find((e) => e.skin === "lagoon")!;
+  assert.equal(armedByKey(p, 3, { [water.key]: lagoon.id })?.id, lagoon.id, "4: the water as chosen, the lagoon");
+  assert.equal(lookOf(water, { [water.key]: lagoon.id }), lagoon);
+  assert.equal(lookOf(water, { [water.key]: "a look it has not" }), water.looks[0], "a look not its own: its first");
+  assert.equal(armedByKey(p, 5, {}), null, "6: nothing");
 });
 
 void test("the moving pieces the course's own holes have: the mountain's snow cannon and falling serac, the island's blowhole, each timed from the start", () => {

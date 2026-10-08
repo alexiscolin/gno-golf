@@ -42,7 +42,7 @@ import type { Eye } from "./Scene";
 import { canonicalHex as hexOf } from "@/lib/builder/proof";
 import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
-import { tilesOf } from "@/lib/builder/tiles";
+import { armedByKey } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
 import { quickShots, roundOf, type QuickShot } from "@/lib/builder/quickshot";
 import { FLAT, fromPlane, TILT, type Look } from "@/lib/builder/view";
@@ -285,7 +285,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (e.key === " " && !mod && (!t.closest("button, a, summary") || document.querySelector(".board:hover"))) return (e.preventDefault(), setPan(true));
       const act = keyAction(e);
       if (act?.t === "arm" && palette) {
-        const tile = tilesOf(palette).first[act.n], en = tile && (tile.looks.find((x) => x.id === looks[tile.key]) ?? tile.looks[0]);
+        const en = armedByKey(palette, act.n, looks);
         if (!en) return;
         if (off.has(en.id)) return say(off.get(en.id)!);
         if (armed?.id !== en.id) sound("select");
