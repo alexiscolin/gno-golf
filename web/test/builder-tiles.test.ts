@@ -9,7 +9,7 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { armedByKey, foldOpen, GROUPS, lookOf, looksShown, pictureOf, saveFold, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { armedByKey, foldOpen, GROUPS, LOOKS_ROW, lookOf, looksOpen, looksRow, looksShown, pictureOf, saveFold, saveLooksOpen, tilesOf, type Tile } from "../lib/builder/tiles.ts";
 import { entryName, TILES } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
@@ -80,6 +80,28 @@ void test("each piece's looks under its row: every look of a piece of several, e
     }
   assert.equal(looksShown(named("garden", "Obstacle")).length, 6, "the garden's obstacle: its six looks");
   assert.deepEqual(looksShown(named("mountain", "Ice")), [], "the ice: one look, none under it");
+});
+
+void test("a piece's looks on one row: past a row, the first ones and +N, which opens them all in place, kept for the visit", () => {
+  const obstacle = named("garden", "Obstacle"), water = named("garden", "Water");
+  assert.equal(LOOKS_ROW, 4);
+  assert.deepEqual(looksRow(water, false), { shown: water.looks, more: 0 }, "a row's worth: all of them");
+  const shut = looksRow(obstacle, false);
+  assert.deepEqual([shut.shown.map((e) => e.id), shut.more], [obstacle.looks.slice(0, 3).map((e) => e.id), 3], "six looks: three and +3, the row full");
+  assert.deepEqual(looksRow(obstacle, true), { shown: obstacle.looks, more: 0 }, "opened: every one");
+  sessionStorage.clear();
+  assert.equal(looksOpen(obstacle.key), false, "shut at first");
+  saveLooksOpen(obstacle.key, true);
+  assert.equal(looksOpen(obstacle.key), true, "opened, for the visit");
+  sessionStorage.clear();
+  const real = globalThis.sessionStorage;
+  Object.defineProperty(globalThis, "sessionStorage", { get: () => { throw new Error("blocked"); }, configurable: true });
+  try {
+    saveLooksOpen(obstacle.key, true);
+    assert.equal(looksOpen(obstacle.key), false, "a browser that keeps nothing: shut");
+  } finally {
+    Object.defineProperty(globalThis, "sessionStorage", { value: real, configurable: true, writable: true });
+  }
 });
 
 void test("1 to 5 arm the first five pieces, each in its look as chosen (its first until then); past five, nothing", () => {

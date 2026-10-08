@@ -65,22 +65,27 @@
 .palette__group { display: grid; gap: var(--sp-3); }
 .palette__group + .palette__group { margin-top: var(--sp-5); }
 .palette__group > summary { cursor: pointer; width: max-content; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
-.ptiles { display: grid; gap: var(--sp-4); --pic: 52px; }
+.ptiles { display: grid; gap: var(--sp-5); --pic: 52px; }
 @media (min-width: 1280px) { .ptiles { --pic: 60px; } }
-.ptile { display: grid; gap: var(--sp-2); min-width: 0; }
-.piece { display: grid; grid-template: auto auto / var(--pic) minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); min-width: 0; padding: 6px var(--sp-3) 6px 6px; border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font: inherit; color: var(--ink); cursor: grab; touch-action: none; text-align: left; }
+/* a piece's card: its row, and its looks' tray under a hairline */
+.ptile { min-width: 0; border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 2px 0 var(--ink); overflow: hidden; }
+.piece { display: grid; grid-template: auto auto / var(--pic) minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); width: 100%; min-width: 0; padding: 6px var(--sp-3) 6px 6px; border: 0; background: none; font: inherit; color: var(--ink); cursor: grab; touch-action: none; text-align: left; }
 .piece img { grid-row: 1 / 3; width: var(--pic); height: var(--pic); border-radius: 10px; pointer-events: none; background: rgba(var(--ink-rgb), .06); }
 .piece__name { align-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 800; line-height: 1.2; }
-.piece__does { align-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--ink-soft); }
-.piece--on { background: var(--gold); } /* (on, as a button is: gold, its box kept) */
+/* what it does: two lines when it needs them, never cut (the picture's height holds both) */
+.piece__does { align-self: start; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--ink-soft); }
+.piece--on { background: var(--gold); } /* (on, as a button is: gold) */
 .piece--on .piece__does { color: var(--ink); } /* (its words read on the gold) */
 .piece:disabled { opacity: .45; cursor: not-allowed; }
-/* a piece's looks, under its row: each the game's picture of it, named in its label, to drag on; the one armed gold */
-.plooks { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: var(--sp-2); }
-.look { aspect-ratio: 1; min-width: 0; padding: 3px; border: var(--edge); border-radius: 10px; background: var(--white); box-shadow: 0 2px 0 var(--ink); cursor: grab; touch-action: none; }
+/* the tray: a row of looks (LOOKS_ROW), each the game's picture of it, named in its label, to drag on; the one armed gold, the
+   piece's look as now (the row's picture) ringed; +N opens the rest in place */
+.plooks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); padding: var(--sp-2); border-top: 1px solid rgba(var(--ink-rgb), .15); }
+.look { aspect-ratio: 1; min-width: 0; padding: 3px; border: var(--edge); border-radius: 10px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font: inherit; cursor: grab; touch-action: none; }
 .look img { display: block; width: 100%; height: 100%; border-radius: 7px; pointer-events: none; }
+.look--now { outline: 3px solid var(--gold); outline-offset: 1px; }
 .look[aria-pressed="true"] { background: var(--gold); }
 .look:disabled { opacity: .45; cursor: not-allowed; }
+.look--more { display: grid; place-items: center; background: var(--paper); font-size: 15px; font-weight: 800; color: var(--ink); cursor: pointer; }
 .palette__more { display: grid; gap: var(--sp-3); }
 .palette__more > summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
 .palette__more[open] > summary { margin-bottom: var(--sp-3); }
