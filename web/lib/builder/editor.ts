@@ -31,10 +31,10 @@ export function verdict({ pieces, errors, proved, off = "", rounds }: { pieces: 
     const more = rounds.broken.length - 1;
     return { ok: true, warn: true, text: `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathers(rounds.kept)} still holed` : ""}` };
   }
-  return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready: press T to try it, or Prove it." };
+  return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready: press T to try it, or hole it in every weather." };
 }
 
-/** Why Prove it and a quick test are off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */
+/** Why Hole it and a quick test are off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */
 export const NO_GL = "Testing needs 3D (WebGL), which this browser has turned off";
 
 /**

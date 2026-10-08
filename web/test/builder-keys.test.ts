@@ -31,7 +31,7 @@ void test("KEYS: each key once, in a few words for the key line and a sentence f
   for (const k of KEYS) assert.ok(k.short.split(" ").length <= 2 && k.long.length > k.short.length, k.key);
 });
 
-void test("playKey: in a test, R or Backspace plays again from the tee, V swaps the overview, Escape goes back to Edit; with a modifier, none", () => {
+void test("playKey: in a test, R or Backspace plays again from the tee, V swaps the overview, Escape goes back to Build; with a modifier, none", () => {
   const k = (key: string, meta = false) => playKey({ key, metaKey: meta, ctrlKey: false, altKey: false });
   assert.deepEqual([k("r"), k("R"), k("Backspace"), k("v"), k("Escape")], ["restart", "restart", "restart", "view", "leave"]);
   assert.equal(k("r", true), null, "⌘R: the browser's");

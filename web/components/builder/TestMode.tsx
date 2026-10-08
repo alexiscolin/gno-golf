@@ -9,7 +9,7 @@
 // strokes card with the par and the time in play, the weather card, and
 // beside them the weathers to prove, ticked once proved, red once for a
 // round that does not count. The hole's id is fixed first (the author's
-// address, the slug, the next version): its weather hangs on it. Prove
+// address, the slug, the next version): its weather hangs on it. Hole it
 // opens on the first weather not proved (the others proved already, their
 // rounds replayed by the editor: carry.ts); each one proved, the next starts
 // on its own, said a moment in the HUD, and the last ends on one card, the
@@ -19,7 +19,7 @@
 // in calm weather only, under an id of its own: no address asked, nothing
 // replayed, nothing proved (its label says so, once). In play R or
 // Backspace plays again from the tee, V swaps the overview camera, Escape
-// goes back to Edit.
+// goes back to Build.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Dialog } from "@/components/ui";
 import Weather, { SkyIcon } from "@/components/Weather";
@@ -30,13 +30,13 @@ import { camlog } from "@/lib/testhooks";
 import { AUTHOR_KEY, endpoints } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
-import { clock, finished, holeId, holeRow, parSaid, plan, provedNote, QUICK_HOLE, quickPlan, summary, testChain, type Act } from "@/lib/builder/testmode";
+import { checklist, clock, finished, HOLE_IT, holeId, holeRow, parSaid, plan, provedNote, QUICK_HOLE, quickPlan, summary, testChain, type Act } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
 import { NO_GL } from "@/lib/builder/editor";
 import { hold, onStage, stageCanvas, stageRenderer, stageUp } from "@/lib/builder/stage";
 import { ADENA_URL } from "@/lib/network";
 import { confetti } from "@/lib/builder/juice";
-import { weatherName } from "@/lib/builder/rules";
+import { required, weatherName } from "@/lib/builder/rules";
 import { sound } from "@/lib/feel";
 import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost } from "@/lib/builder/wasm";
@@ -51,8 +51,24 @@ const BITS = confetti(28);
 /** How far back a weather is looked for (FIND_BACK periods), in days, for a sentence. */
 const FIND_DAYS = Math.round((FIND_BACK * RULES.periodMs) / 86_400_000);
 
-/** The address step, Prove's alone: Adena's account, or an address pasted (kept in this browser). */
-function AddressStep({ onAddress }: { onAddress: (a: string) => void }) {
+/** The weathers to hole, a chip each (the HUD's, the step's first page's): its sky and name, ticked with its strokes once holed, the one played lit, one that did not count red. */
+function Weathers({ world, list }: { world: string; list: readonly { kind: string; done: boolean; playing?: boolean; bad?: boolean; best?: number }[] }) {
+  return (
+    <div className="card tmode__weathers" role="list" aria-label="The weathers to hole">
+      {list.map(({ kind, done, playing = false, bad = false, best }, i) => (
+        <span key={kind} role="listitem" style={{ animationDelay: `${i * 140}ms` }} className={`tmode__chip${done ? " tmode__chip--done" : ""}${playing ? " tmode__chip--now" : ""}${bad ? " tmode__chip--bad" : ""}`}
+          title={done ? `Holed in ${best ?? "?"}` : playing ? "Playing now" : "To hole"}>
+          <SkyIcon sky={SKY[kind] ?? "sun"} mine={world === "mines"} className="tmode__sky" />
+          <span className="weather__say">{weatherName(kind)}</span>
+          <b className="tmode__tick">{done ? `✓ ${best ?? ""}` : "\u00a0"}</b>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The address step, the Hole it step's first page: its one line and the weathers to hole, then Adena's account, or an address pasted (kept in this browser). */
+function AddressStep({ world, onAddress }: { world: string; onAddress: (a: string) => void }) {
   const [typed, setTyped] = useState("");
   const [paste, setPaste] = useState(false);
   const [why, setWhy] = useState("");
@@ -67,6 +83,8 @@ function AddressStep({ onAddress }: { onAddress: (a: string) => void }) {
   };
   return (
     <div className="tmode__ask">
+      <p className="tmode__intro">{HOLE_IT}</p>
+      <Weathers world={world} list={checklist(world, required(world))} />
       <h2>Sign your hole</h2>
       <p>Your address is part of its name and sets its weather, so your proofs still count when you publish. Nothing is signed now.</p>
       {hasAdena() ? <Button variant="primary" onClick={() => void adena()}>Use my Adena address</Button>
@@ -103,10 +121,10 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   quick?: boolean;
   /** a quick test's round that holed, its shots (left on the board as a trail) */
   onRound?: (shots: readonly string[]) => void;
-  /** a quick test's way on, from its finished card: Prove (off with why: proveOff) */
+  /** a quick test's way on, from its finished card: Hole it in every weather (off with why: proveOff) */
   onProve?: () => void;
   proveOff?: string;
-  /** Prove's way on once every weather is proved, from its finished card */
+  /** The Hole it step's way on once every weather is proved, from its finished card */
   onPublish?: () => void;
   /** Escape: back to the editor (not while aiming: Escape drops the aim, the game's) */
   onLeave?: () => void;
@@ -258,7 +276,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     return () => clearTimeout(t);
   }, [proved, kinds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!author && !quick) return <main className="tmode tmode--ask"><AddressStep onAddress={(a) => { try { localStorage.setItem(AUTHOR_KEY, a); } catch {} onAuthor(a); }} /></main>;
+  if (!author && !quick) return <main className="tmode tmode--ask"><AddressStep world={draft.world} onAddress={(a) => { try { localStorage.setItem(AUTHOR_KEY, a); } catch {} onAuthor(a); }} /></main>;
   const mineProofs = draft.proofs.filter((p) => p.key === proofKey && p.id === id);
   const par = proved ? suggestPar(mineProofs) : 0;
   const time = took ?? (now && tick ? Math.max(0, tick - since.current) : null);
@@ -267,18 +285,19 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     : finished({ quick, strokes: holed, kind: now.kind, why: why[now.kind], proveOff });
   const waits = card?.actions.find((a) => a.off)?.off; // (why the way on waits, under it)
   const act: Record<Act, (() => void) | undefined> = { again, edit: onLeave, prove: onProve, publish: onPublish };
-  const mine = draft.world === "mines";
+  // the step as it opens (nothing holed yet, no stroke played): its one line over the HUD
+  const opening = !quick && kinds.length > 0 && left.length === kinds.length && !holed && !snap?.strokes;
   return (
     <main className={`tmode${quick ? " tmode--quick" : ""}${party ? " tmode--party" : ""}`}>
       {party && <div className="bconfetti" aria-hidden="true">{BITS.map((b, i) => <i key={i} style={{ left: `${b.x}%`, background: b.color, animationDelay: `${b.delay}ms`, ["--drift" as string]: `${b.drift}px`, ["--turn" as string]: `${b.turn}deg` }} />)}</div>}
       <div ref={stage} className="tmode__stage" />
-      {/* the game's own HUD (Golf.tsx's hud--top): what is played, the strokes and the time, the weather now; Prove's weathers to prove beside */}
+      {/* the game's own HUD (Golf.tsx's hud--top): what is played, the strokes and the time, the weather now; the Hole it step's weathers to prove beside */}
       <header className="hud hud--top">
         {quick && (
           <div className="card card--hole tmode__label">
             <div className="card__text">
               <span className="eyebrow">{draft.title || "Your hole"}</span>
-              <h1>Quick test <i className="pro-chip pro-chip--row">not a proof</i></h1>
+              <h1>Quick test <i className="pro-chip pro-chip--row">just to try</i></h1>
             </div>
           </div>
         )}
@@ -289,20 +308,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
         </div>
         <Weather w={snap?.weather ?? CALM} flash={snap?.flash ?? 0} night={snap?.time === "night"} world={snap?.look ?? draft.world} />
         {!quick && (
-          <div className="card tmode__weathers" role="list" aria-label="The weathers to prove">
-            {kinds.map(({ kind }, i) => {
-              const done = !left.includes(kind), playing = now?.kind === kind, bad = !!why[kind] && !done;
-              const best = draft.proofs.find((p) => p.kind === kind && p.key === proofKey && p.id === id)?.strokes;
-              return (
-                <span key={kind} role="listitem" style={{ animationDelay: `${i * 140}ms` }} className={`tmode__chip${done ? " tmode__chip--done" : ""}${playing ? " tmode__chip--now" : ""}${bad ? " tmode__chip--bad" : ""}`}
-                  title={done ? `Proved in ${best ?? "?"}` : playing ? "Playing now" : "To prove"}>
-                  <SkyIcon sky={SKY[kind] ?? "sun"} mine={mine} className="tmode__sky" />
-                  <span className="weather__say">{weatherName(kind)}</span>
-                  <b className="tmode__tick">{done ? `✓ ${best ?? ""}` : "\u00a0"}</b>
-                </span>
-              );
-            })}
-          </div>
+          <Weathers world={draft.world} list={kinds.map(({ kind }) => ({ kind, done: !left.includes(kind), playing: now?.kind === kind, bad: !!why[kind] && left.includes(kind),
+            best: draft.proofs.find((p) => p.kind === kind && p.key === proofKey && p.id === id)?.strokes }))} />
         )}
         {quick && onLeave && (
           <div className="hud__right">
@@ -310,8 +317,9 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
           </div>
         )}
       </header>
-      {(snap?.error || lost || note || checking || said || (proved && !now)) && (
+      {(snap?.error || lost || note || checking || said || (proved && !now) || opening) && (
         <div className="tmode__notes">
+          {opening && <p className="tmode__note tmode__intro">{HOLE_IT}</p>}
           {snap?.error && <p className="tmode__why" role="alert">{snap.error}</p>}
           {lost && <p className="tmode__why" role="alert">{gone ? "The 3D view did not come back. Reloading brings it back; your draft is kept." : "The browser took the 3D view away for a moment. Bringing it back…"}{gone && <Button variant="primary" onClick={() => window.location.reload()}>Reload</Button>}</p>}
           {note && <p className="tmode__note" role="status">{note}</p>}

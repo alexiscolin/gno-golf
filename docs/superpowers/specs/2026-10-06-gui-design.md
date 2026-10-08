@@ -303,12 +303,12 @@ the chain's checks in the wasm, the proofs):
   every check, **not yet holed** (a proof is bound to its author's address and
   the hole's id: a starter cannot ship one), with **three short hints, dismissible at once** ("Got it"), never a
   tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press T to
-  try it, Prove it to make it count" (at the big button), ③ "Then Publish, once holed in
+  try it, Hole it to make it count" (at the big button), ③ "Then Publish, once holed in
   every weather" (at the steps). They show on the first visit only, and
   never over the 3D. The header's "?" shows them again in one panel with,
   under them, a one-screen glossary of the world's pieces: each palette
   tile's picture, its name and what it does.
-- **The next step is always one big button**, top right: "Prove it" (gold),
+- **The next step is always one big button**, top right: "Hole it" (gold; the header's short form of "Hole it in every weather"),
   then "Publish →" (blue). When it waits, the reason sits beside it in a few
   words ("1 thing to fix ↓") and, in full, in the player's words under the
   board.
@@ -398,7 +398,7 @@ near, proved, world; at 1440, 1280 and 1024.
   - a frame's main-thread work within 33 ms with the CPU four times slower;
   - the hole never built during a drag, and once after the drop;
   - idle, no frame asked for and next to no CPU;
-  - one WebGL context after a quick test and Prove;
+  - one WebGL context after a quick test and Hole it;
   - without WebGL, the 2D board.
   Measured: 60 fps; 0.8 ms of work a frame, 1.6 ms at 4×.
 - **The board** (2D, the fallback): the hole from above on its snapping grid; a piece
@@ -419,7 +419,7 @@ near, proved, world; at 1440, 1280 and 1024.
   ball; in calm weather, by `builder.wasm`'s `round` and `from` (the
   realm's own physics). Its path is drawn, white, the last three faded, and
   the pull under way dashed; as a piece is dragged, they all play again on
-  the hole as it is. The board says "Quick shot: not a proof" (a quick shot
+  the hole as it is. The board says "Quick shot: just to try" (a quick shot
   is never kept with the draft, never replayed into a proof: Test proves).
   "Show the line" (top right of the board) draws the difficulty meter's best
   line, gold, and a light heat map of where its shots stopped; only on the
@@ -435,7 +435,7 @@ near, proved, world; at 1440, 1280 and 1024.
   it; selected and playing, the board keeps them moving); the numbers
   (Every, On, From) under "Fine". Loops are not offered yet. Nothing selected: "Click a piece to change
   it. Drag its handles to size and turn it."
-- **The checks** (one line under the board): "Ready: press T to try it, or Prove it."
+- **The checks** (one line under the board): "Ready: press T to try it, or hole it in every weather."
   or the one thing to fix, in words, with "Show me"; a limit appears only
   when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
   full gauges are the hole-builder spec's, behind the limit's tap.
@@ -448,18 +448,23 @@ near, proved, world; at 1440, 1280 and 1024.
   first weather not proved. Only the author's own rounds are replayed: the
   solver never makes a proof.
 
-### B4. Quick test and Prove
+### B4. Quick test and Hole it
 
 Two ways to play the hole, and only one counts.
 
 - **Quick test** (T, or "Quick test" on the board): the game, at once, over
   the editor, in calm weather only; no address asked, nothing replayed,
-  nothing proved ("Quick test: calm weather, not a proof. Prove it to
-  publish."). Escape, or "Back to edit", returns to the editor as it was
+  nothing proved ("Quick test", tagged "just to try"; its finished card:
+  "Hole it in every weather to publish it."). Escape, or "Back to edit", returns to the editor as it was
   left: the same zoom, selection, history and quick shots.
-- **Prove it** (the big button; the steps say Edit → Prove → Publish):
+- **Hole it** (the big button, "Hole it in every weather" where there is room;
+  the steps say Build → Hole it → Publish): the step opens on one plain line,
+  "Before your hole goes on chain, you must sink it yourself in each weather
+  that moves the ball (calm, wind, rain…). That proves anyone can.", over a
+  checklist of the weathers to hole (the HUD's weather chips), each ticked
+  once holed.
   `builder-test.html`: address, playing, proved, missed. First, once, the
-  address the hole is proved under, Prove's alone: "Sign your hole", "Your
+  address the hole is proved under, the Hole it step's alone: "Sign your hole", "Your
   address is part of its name and sets its weather, so your proofs still
   count when you publish. Nothing is signed now.", the primary "Use my Adena
   address" (without Adena, one line: "No Adena here: get it at adena.app,
@@ -495,7 +500,7 @@ dare".
 
 A scripted headless walkthrough (`scripts/builderwalk.ts`, on the repo's
 headless Chrome, `media/lib/cdp.mjs`) plays a new player: open `/build`; "Got it"; drag a Bumper onto the starter, off the
-ball's line; "Prove it"; paste the address; hole each weather with the starter's committed shots
+ball's line; "Hole it"; paste the address; hole each weather with the starter's committed shots
 (the starter's proofs are its shot lists; the bumper is placed off their
 path); "Publish →"; stop on the form with the suggested name, ready to sign.
 Test mode needs no chain (`builder.wasm` answers it). The Publish form reads
@@ -510,7 +515,7 @@ it.
 | Open `/build` (the starter, the hints) | 0 | 0 |
 | "Got it" | 1 | 0 |
 | A Bumper onto the board | 0 | 1 |
-| "Prove it" | 1 | 0 |
+| "Hole it" | 1 | 0 |
 | The address the hole is proved under ("Or paste an address", one field typed and "Use this address"; with Adena, "Use my Adena address" instead) | 2 | 0 |
 | Clear, wind, rain holed (about 2 shots each; the next weather starts by itself) | 0 | 6 |
 | "Publish →", the form ready (name suggested) | 1 | 0 |
@@ -518,7 +523,7 @@ it.
 
 Measured on the implementation (`scripts/builderwalk.ts`): 16 s, 5 clicks,
 7 drags, 1 field typed. Past the path, the script also checks that the
-Publish card stays in sight at 1366 × 650 and that the Publish header's Prove
+Publish card stays in sight at 1366 × 650 and that the Publish header's Hole it
 step returns to the test.
 
 ### B7. Your holes, the community's

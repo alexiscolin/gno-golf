@@ -72,7 +72,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
   const lens = useRef<THREE.PerspectiveCamera>(null);
 
   /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn; none while the canvas is
-   *  lent (a quick test, Prove it: the game sizes and draws it). Whether it drew. */
+   *  lent (a quick test, Hole it: the game sizes and draws it). Whether it drew. */
   const draw = (now = performance.now()): boolean => {
     const t = three.current, r = stageRenderer();
     if (!t || !r || !latest.current.size.w || r.domElement.parentElement !== box.current) return false;

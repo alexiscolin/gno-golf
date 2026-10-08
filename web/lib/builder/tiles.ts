@@ -58,18 +58,31 @@ export function tilesOf(palette: readonly PaletteEntry[]): { first: Tile[]; more
   };
 }
 
-/** The palette's folding sections, each open at first or not: "More pieces" open (every group in sight), "From other worlds" folded. */
-export const FOLDS = { more: true, others: false } as const;
-export type Fold = keyof typeof FOLDS;
+/** A tile's look as chosen (chosen: the tile's key to a look's id), its first until then, or for a look not its own. */
+export const lookOf = (t: Tile, chosen: Readonly<Record<string, string>>): PaletteEntry => t.looks.find((e) => e.id === chosen[t.key]) ?? t.looks[0];
+
+/** The looks a piece shows under its row, each to drag on: every one of a piece of several, in its order; none for a piece of one (its row is it). */
+export const looksShown = (t: Tile): readonly PaletteEntry[] => (t.looks.length > 1 ? t.looks : []);
+
+/** What 1 to 5 arm (n from 0): the first five pieces, each in its look as chosen; null past them. */
+export function armedByKey(palette: readonly PaletteEntry[], n: number, chosen: Readonly<Record<string, string>>): PaletteEntry | null {
+  const t = tilesOf(palette).first[n];
+  return t ? lookOf(t, chosen) : null;
+}
+
+/** The palette's folding sections, each open at first or not: "More pieces" open (every group in sight), "From other worlds" folded, each group ("group/Walls") open. */
+export const FOLDS: Readonly<Record<string, boolean>> = { more: true, others: false };
+export type Fold = "more" | "others" | `group/${Group}`;
 const foldKey = (k: Fold) => `gnogolf.builder.fold.${k}`;
+const atFirst = (k: Fold) => FOLDS[k] ?? true;
 
 /** Whether a section is open: as the author left it this visit (the tab's session), else as at first. */
 export function foldOpen(k: Fold): boolean {
   try {
     const v = sessionStorage.getItem(foldKey(k));
-    return v === null ? FOLDS[k] : v === "1";
+    return v === null ? atFirst(k) : v === "1";
   } catch {
-    return FOLDS[k];
+    return atFirst(k);
   }
 }
 /** A section opened or folded, kept for the visit (a browser that keeps nothing: forgotten). */

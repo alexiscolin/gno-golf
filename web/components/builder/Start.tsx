@@ -243,7 +243,7 @@ function Workshop() {
       <ol className="bholes__steps" aria-label="How it goes">
         <Step n={1} name="Pick" line="a template or a blank lane"><path d="M5 6h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" className="i-paper" /><path d="M6 16q4-7 8-2t4-4" className="i-dash" /><circle cx="18" cy="10" r="1.6" className="i-ink" /></Step>
         <Step n={2} name="Build" line="drag pieces onto the board"><path d="M4 20 13 11" className="i-line" /><path d="M11 6.5 15 3l6 6-3.5 4z" className="i-gold" /></Step>
-        <Step n={3} name="Test & publish" line="hole it, then sign it"><path d="M8 21V4" className="i-line" /><path d="M8 4l10 3.5L8 11z" className="i-flag" /><ellipse cx="9" cy="21" rx="6" ry="1.6" className="i-ink" /></Step>
+        <Step n={3} name="Hole it & publish" line="in every weather, then sign it"><path d="M8 21V4" className="i-line" /><path d="M8 4l10 3.5L8 11z" className="i-flag" /><ellipse cx="9" cy="21" rx="6" ry="1.6" className="i-ink" /></Step>
       </ol>
     </header>
   );

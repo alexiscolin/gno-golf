@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { clock, finished, holeId, holeRow, parSaid, plan, provedNote, QUICK_HOLE, quickPlan, summary, testChain, type Finished } from "../lib/builder/testmode.ts";
+import { checklist, clock, finished, HOLE_IT, holeId, holeRow, parSaid, plan, provedNote, QUICK_HOLE, quickPlan, summary, testChain, type Finished } from "../lib/builder/testmode.ts";
+import { required } from "../lib/builder/rules.ts";
 import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { makeChain } from "../lib/chain.ts";
@@ -64,20 +65,30 @@ void test("parSaid: the score card's par, the rounds' once proved, else the mete
   assert.equal(parSaid(0, 0), "");
 });
 
+void test("the Hole it step opens on one plain line, then the weathers to hole, each ticked once holed", () => {
+  assert.equal(HOLE_IT, "Before your hole goes on chain, you must sink it yourself in each weather that moves the ball (calm, wind, rain…). That proves anyone can.");
+  for (const w of ["garden", "island", "town", "mountain", "mines"]) {
+    const all = required(w);
+    assert.deepEqual(checklist(w, all), all.map((kind) => ({ kind, done: false })), `${w}: none holed yet`);
+    assert.deepEqual(checklist(w, all.slice(1)).map((x) => x.done), all.map((_, i) => i === 0), `${w}: the first holed, ticked`);
+    assert.ok(checklist(w, []).every((x) => x.done), `${w}: every one holed`);
+  }
+});
+
 void test("finished: a test's hole-finished card, a quick test's or a round that does not count (the way on last, the one primary)", () => {
   const acts = (f: Finished) => f.actions.map((a) => `${a.text}${a.key ? ` (${a.key})` : ""}${a.primary ? "*" : ""}${a.off ? "!" : ""}`);
-  // a quick test: never a proof, Prove it the way on (off with why while the hole cannot be proved)
+  // a quick test: never a proof, Hole it in every weather the way on (off with why while the hole cannot be proved)
   const q = finished({ quick: true, strokes: 7, kind: "" })!;
   assert.equal(q.title, "Holed in 7");
-  assert.doesNotMatch(q.line, /not a proof/, "said once, on the label");
-  assert.deepEqual(acts(q), ["Try again (R)", "Back to edit (Esc)", "Prove it*"]);
+  assert.equal(q.line, "Hole it in every weather to publish it.");
+  assert.deepEqual(acts(q), ["Try again (R)", "Back to edit (Esc)", "Hole it in every weather*"]);
   assert.equal(finished({ quick: true, strokes: 7, kind: "", proveOff: "Fix the errors first" })!.actions[2].off, "Fix the errors first");
   assert.ok(finished({ quick: true, strokes: 2, kind: "", why: "x" })!.actions.some((a) => a.act === "prove"), "a quick test is never replayed");
-  // Prove: a round that does not count says why, play it again first
+  // Hole it: a round that does not count says why, play it again first
   const w = finished({ quick: false, strokes: 3, kind: "wind", why: "It took too much work." })!;
   assert.equal(w.line, "That wind round doesn't count: It took too much work.");
   assert.deepEqual(acts(w), ["Try again (R)*", "Back to edit (Esc)"]);
-  // a round of Prove's that counts: no card (the next weather starts on its own; the last, the summary)
+  // a round of the Hole it step's that counts: no card (the next weather starts on its own; the last, the summary)
   assert.equal(finished({ quick: false, strokes: 3, kind: "wind" }), null);
   for (const f of [q, w]) assert.equal(f.actions.filter((a) => a.primary).length, 1, "one primary");
 });
@@ -87,7 +98,7 @@ void test("provedNote: the HUD's brief word as a weather is proved and the next 
   assert.equal(provedNote("", "wind"), "Clear proved · next: Wind");
 });
 
-void test("summary: Prove's one card at the end, each weather proved with its strokes and time, Publish the way on", () => {
+void test("summary: the Hole it step's one card at the end, each weather proved with its strokes and time, Publish the way on", () => {
   const s = summary([{ kind: "", strokes: 2, ms: 4_130 }, { kind: "wind", strokes: 3, ms: 65_000 }, { kind: "rain", strokes: 4 }], 3);
   assert.equal(s.title, "Every weather proved");
   assert.equal(s.line, "Par 3, from your rounds.");
@@ -101,7 +112,7 @@ void test("summary: Prove's one card at the end, each weather proved with its st
   assert.equal(summary([{ kind: "", strokes: 2 }], 0).line, "", "no par yet: nothing said");
 });
 
-void test("the address step, Prove's alone: its words, Adena first, an address pasted behind a tap, where to get Adena", () => {
+void test("the address step, the Hole it step's alone: its words, Adena first, an address pasted behind a tap, where to get Adena", () => {
   const src = fs.readFileSync(new URL("../components/builder/TestMode.tsx", import.meta.url), "utf8");
   assert.match(src, /<h2>Sign your hole<\/h2>/);
   assert.ok(src.includes("Your address is part of its name and sets its weather, so your proofs still count when you publish. Nothing is signed now."));

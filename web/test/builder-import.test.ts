@@ -40,7 +40,7 @@ void test("fromFile, fromPublished: an opened hole goes through the editor's own
   assert.ok(typeof broken === "object", "a broken file opens");
   if (typeof broken === "string") return;
   assert.deepEqual(broken.draft, onCup, "as it is, nothing changed");
-  assert.equal(broken.broken, "This draft breaks the Builder's rules: The cup is inside the bumper: move the cup or the bumper. Fix what is marked: Prove and Publish stay locked until it passes.");
+  assert.equal(broken.broken, "This draft breaks the Builder's rules: The cup is inside the bumper: move the cup or the bumper. Fix what is marked: Hole it and Publish stay locked until it passes.");
   // never proved nor published while broken: the editor's gate (and every edit judged against it as it was: never worse)
   const palette = await loadPalette("garden");
   assert.match(testGate(onCup, { of: onCup, v: validate(onCup, { host, palette, census }) }), /^Fix \d+ first$/);

@@ -42,7 +42,7 @@ import type { Eye } from "./Scene";
 import { canonicalHex as hexOf } from "@/lib/builder/proof";
 import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
-import { tilesOf } from "@/lib/builder/tiles";
+import { armedByKey } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
 import { quickShots, roundOf, type QuickShot } from "@/lib/builder/quickshot";
 import { FLAT, fromPlane, TILT, type Look } from "@/lib/builder/view";
@@ -285,7 +285,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (e.key === " " && !mod && (!t.closest("button, a, summary") || document.querySelector(".board:hover"))) return (e.preventDefault(), setPan(true));
       const act = keyAction(e);
       if (act?.t === "arm" && palette) {
-        const tile = tilesOf(palette).first[act.n], en = tile && (tile.looks.find((x) => x.id === looks[tile.key]) ?? tile.looks[0]);
+        const en = armedByKey(palette, act.n, looks);
         if (!en) return;
         if (off.has(en.id)) return say(off.get(en.id)!);
         if (armed?.id !== en.id) sound("select");
@@ -335,7 +335,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? (gl ? "Fix the errors first" : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Prove it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
+        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Hole it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={meterFace(clean, est, kept)}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)}
