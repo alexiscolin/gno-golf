@@ -208,11 +208,11 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* its padding the same on every side: the steps never touch its edges */
 .bholes__sign {
   position: relative; display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
-  margin-top: 28px; padding: var(--sp-5); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
+  margin-top: 28px; padding: var(--sp-4) var(--sp-5); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
   background: var(--blueprint); box-shadow: var(--deep-card);
 }
 /* a section's gap under the sign (its deep shadow eats some): the world tabs never right under it */
-.bholes__sign + .bholes__new { margin-top: var(--sp-3); }
+.bholes__sign + .bholes__new { margin-top: var(--sp-2); }
 /* the Miner stands out over the sign's top edge, as a menu panel's gnome does */
 .bholes__gnome { position: relative; display: block; width: 210px; height: 210px; margin: -78px -31px -26px; }
 .bholes__gnome > svg { position: absolute; left: 50%; bottom: 36px; width: 124px; height: 124px; transform: translateX(-50%); filter: drop-shadow(0 4px 0 var(--ink)); }
@@ -225,7 +225,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the three steps: paper chips, a little picture each, joined by a dashed line */
 .bholes__steps { display: grid; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; counter-reset: none; }
 .bholes__step { position: relative; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-2); border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); }
-.bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: -10px; height: 10px; border-left: 2px dashed rgba(255, 255, 255, .7); }
+.bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: calc(-2px - var(--sp-3)); height: var(--sp-3); border-left: 2px dashed rgba(255, 255, 255, .7); }
 .bholes__step svg { flex: none; width: 34px; height: 34px; padding: 4px; border-radius: 10px; background: var(--lamp); overflow: visible; }
 .bholes__step span { display: grid; line-height: 1.15; }
 .bholes__step b { display: flex; align-items: center; gap: 6px; font-size: 15px; }

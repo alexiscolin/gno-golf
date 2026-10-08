@@ -211,9 +211,14 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const sign = (await box(c, ".bholes__sign"))!, starts = (await box(c, ".bholes__starts"))!;
   assert.ok(Math.abs(sign.l + sign.r - w) <= 2 && Math.abs(starts.l + starts.r - w) <= 2, `${at}: the column is not centred`);
   // room: the steps inside the sign by its own padding at least, the world tabs a section's gap under it
-  const steps = (await box(c, ".bholes__steps"))!, bar = (await box(c, ".bholes__bar"))!, pad = await c.js<number>(`parseFloat(getComputedStyle(document.querySelector(".bholes__sign")).paddingLeft)`);
-  assert.ok(steps.t - sign.t >= pad && sign.b - steps.b >= pad && sign.r - steps.r >= pad, `${at}: the steps touch the sign's edges (${JSON.stringify({ sign, steps, pad })})`);
+  const steps = (await box(c, ".bholes__steps"))!, bar = (await box(c, ".bholes__bar"))!, pad = await c.js<{ y: number; x: number }>(`(() => { const s = getComputedStyle(document.querySelector(".bholes__sign")); return { y: parseFloat(s.paddingTop), x: parseFloat(s.paddingRight) }; })()`);
+  assert.ok(steps.t - sign.t >= pad.y && sign.b - steps.b >= pad.y && sign.r - steps.r >= pad.x, `${at}: the steps touch the sign's edges (${JSON.stringify({ sign, steps, pad })})`);
   assert.ok(bar.t - sign.b >= 32, `${at}: the world tabs sit right under the sign (${bar.t - sign.b}px)`);
+  // at 1440 × 900, all of it in the window's frame: the last line ("Open a file, or a published hole") too
+  if (w === 1440) {
+    const more = (await box(c, ".bholes__more summary"))!;
+    assert.ok(more.b <= h - 16, `${at}: "Open a file" cut by the window's frame (${more.b} > ${h - 16})`);
+  }
   // its world tabs: the one chosen gold (the one selected look), and so the next one chosen, its box kept
   assert.equal(await c.js(gold(".bholes__world.on")), true, `${at}: the world chosen is not gold`);
   const tab = await c.js<object>(footprint(".bholes__world:not(.on)"));
