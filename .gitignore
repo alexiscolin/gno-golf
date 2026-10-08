@@ -35,3 +35,6 @@ media/promo/*-cover.jpg
 
 # internal notes, decisions by hand and the bot check cron: their own repo (gno-golf-private)
 private/
+
+# Legal drafts and the lawyer pack stay out of the public repo (kept privately)
+docs/superpowers/legal/
