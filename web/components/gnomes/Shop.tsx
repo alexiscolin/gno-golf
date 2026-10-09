@@ -22,7 +22,7 @@ import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
-import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, TierChip, TierFilter, useSearch } from "./parts";
+import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchButton, SearchRow, TierChip, TierFilter, useSearch } from "./parts";
 import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
@@ -185,13 +185,13 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
             <div className="gbar__end">
               <LookSwitch look={look} onLook={onLook} />
-              {search.button}
+              <SearchButton search={search} />
               <Button variant="icon" size="s" type="button" className={`gbar__icon gbar__more${f.home ? " btn--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
               </Button>
             </div>
           </div>
-          {search.row}
+          <SearchRow search={search} />
           {more && (
             <div className="gfilters" id="gmore">
               <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>

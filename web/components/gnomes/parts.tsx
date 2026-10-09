@@ -4,7 +4,7 @@
 // tier's chip, a gnome's tile (his 3D portrait, or the chain's), his card in
 // a grid (and a Legendary's to come, to look at), the switch between the two
 // looks, the closing date. On the game's own tokens (app/gnomes.css).
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Button, Segmented } from "@/components/ui";
 import { retryIn } from "@/lib/retry";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
@@ -169,33 +169,51 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
   );
 }
 
-/** The search: an icon in the toolbar's right group, pressed while open (a press closes it); open, its field on a
- *  row of its own under the toolbar (`row`, the gallery's width: it covers nothing), focused; Escape or ✕ clears and
- *  closes it (the icon focused again), and only it (the shop stays); a query typed keeps it open. */
-export function useSearch(value: string, onChange: (text: string) => void): { button: ReactNode; row: ReactNode } {
+/** The search's state, shared by its icon and its row (Shop holds it): open while in use; shown while open or a
+ *  query is kept. Open, the field is focused; Escape (anywhere in the row or on the icon) or ✕ clears and closes it,
+ *  and only it (the shop stays), the icon focused again; focus leaving both closes it (an empty search goes, a query
+ *  kept stays shown); the icon opens it, or back to a query kept, and, open, clears and closes it. */
+export function useSearch(value: string, onChange: (text: string) => void) {
   const [open, setOpen] = useState(false);
-  const field = useRef<HTMLInputElement>(null), icon = useRef<HTMLButtonElement>(null), back = useRef(false);
+  const field = useRef<HTMLInputElement>(null), icon = useRef<HTMLButtonElement>(null), row = useRef<HTMLDivElement>(null), back = useRef(false);
   const shown = open || value !== "";
   useEffect(() => {
-    if (shown && open) field.current?.focus();
+    if (open) field.current?.focus();
     if (!shown && back.current) (back.current = false), icon.current?.focus();
   }, [shown, open]);
   const close = () => ((back.current = true), onChange(""), setOpen(false));
   return {
-    button: (
-      <Button ref={icon} variant="icon" size="s" type="button" className={`gbar__icon gbar__find${shown ? " btn--on" : ""}`} aria-label="Find a gnome by name or number" aria-expanded={shown} aria-controls="gsearch" onClick={() => (shown ? close() : setOpen(true))}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
-      </Button>
-    ),
-    row: shown && (
-      <div className="gsearch" id="gsearch" role="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
-        <input ref={field} type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={value}
-          onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), close())} />
-        <button type="button" className="gsearch__close" aria-label="Close the search" onClick={close}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-        </button>
-      </div>
-    ),
+    value, onChange, open, shown, field, icon, row, close,
+    press: () => (open ? close() : setOpen(true)),
+    /** Escape closes the search and goes no further (the game's Escape leaves the screen) */
+    key: (e: KeyboardEvent) => shown && e.key === "Escape" && (e.preventDefault(), e.stopPropagation(), close()),
+    /** focus gone from the row and the icon: no longer in use */
+    blur: (e: FocusEvent) => !row.current?.contains(e.relatedTarget) && e.relatedTarget !== icon.current && setOpen(false),
   };
+}
+type Search = ReturnType<typeof useSearch>;
+
+/** The search's icon, in the toolbar's right group, pressed (gold) while the search shows. */
+export function SearchButton({ search: s }: { search: Search }) {
+  return (
+    <Button ref={s.icon} variant="icon" size="s" type="button" className={`gbar__icon gbar__find${s.shown ? " btn--on" : ""}`} aria-label="Find a gnome by name or number"
+      aria-expanded={s.shown} aria-controls={s.shown ? "gsearch" : undefined} onClick={s.press} onKeyDown={s.key} onBlur={s.blur}
+      onMouseDown={(e) => s.open && e.preventDefault()} /* (open, the field keeps the focus: a press closes it) */>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+    </Button>
+  );
+}
+
+/** The search's row, under the toolbar, the gallery's width (it covers nothing), while it shows. */
+export function SearchRow({ search: s }: { search: Search }) {
+  if (!s.shown) return null;
+  return (
+    <div ref={s.row} className="gsearch" id="gsearch" role="search" onKeyDown={s.key} onBlur={s.blur}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+      <input ref={s.field} type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={s.value} onChange={(e) => s.onChange(e.target.value)} />
+      <button type="button" className="gsearch__close" aria-label="Close the search" onClick={s.close}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+    </div>
+  );
 }

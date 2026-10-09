@@ -111,24 +111,43 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await sleep(300);
   const sel = { box: JSON.stringify(await b.ev(footprint(".gbar .tierbtn"))) === JSON.stringify(tier), gold: await b.ev(gold(".gbar .tierbtn")), view: await b.ev(gold(".gbar__views button.on")), line: await b.ev(misaligned(bar)) };
   const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
-  // the search, between the look and more filters: open, a row of its own under the bar, the gallery's width, over
-  // nothing (the bar's controls where they were), focused; Escape closes it, the row gone, the icon focused again
+  // the search, between the look and more filters: open, a row of its own under the bar, the gallery's width (its
+  // container's, whatever the shelf shows), over nothing (the bar's controls where they were), focused, the gallery's
+  // spacing under it; Escape shuts it from the field, its ✕ or its icon, the shop kept; left empty it shuts; left
+  // with a query it stays, its icon then back to the field (the query kept), pressed again it clears and shuts
   const boxes = `[...document.querySelectorAll(".gbar .seg, .gbar .btn")].map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round).join(" "); })`;
-  const before = await b.ev(boxes);
+  const tap = async (sel) => { const r = await b.ev(`(() => { const q = document.querySelector(${JSON.stringify(sel)})?.getBoundingClientRect(); return q ? [q.left + q.width / 2, q.top + q.height / 2] : null; })()`);
+    if (!r) return; // (gone: the check below says so)
+    await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: r[0], y: r[1] });
+    for (const type of ["mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: r[0], y: r[1], button: "left", clickCount: 1 });
+    await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1 }); // (no hover lift on the boxes measured)
+    await sleep(300); };
+  const esc = async (sel) => { await b.js(`document.querySelector(${JSON.stringify(sel)})?.focus(); true`);
+    for (const type of ["keyDown", "keyUp"]) await b.send("Input.dispatchKeyEvent", { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await sleep(300); };
+  const state = `({ row: !!document.querySelector(".gsearch"), shop: !!document.querySelector(".screen.shop .gbar"), text: document.querySelector(".gsearch input")?.value ?? "", field: document.activeElement === document.querySelector(".gsearch input"), icon: document.activeElement === document.querySelector(".gbar__find"), controls: (() => { const id = document.querySelector(".gbar__find")?.getAttribute("aria-controls"); return !id || !!document.getElementById(id); })() })`;
+  const before = await b.ev(boxes), closed = await b.ev(state);
   const order = await b.ev(`[...document.querySelectorAll(".gbar__end > *")].map((e) => e.matches(".seg--look") ? "look" : e.matches(".gbar__find") ? "search" : e.matches(".gbar__more") ? "filters" : "?").join(" ")`);
-  await b.js(`document.querySelector(".gbar__find")?.click(); true`);
-  await sleep(300);
-  const find = await b.ev(`(() => { const row = document.querySelector(".gsearch"); if (!row) return null; const r = row.getBoundingClientRect(), shelf = document.querySelector(".gshelf, .gempty")?.getBoundingClientRect(), next = row.nextElementSibling?.getBoundingClientRect();
+  await tap(".gbar__find");
+  const find = await b.ev(`(() => { const row = document.querySelector(".gsearch"); if (!row) return null; const r = row.getBoundingClientRect(), box = row.parentElement, s = getComputedStyle(box), c = box.getBoundingClientRect(), next = row.nextElementSibling?.getBoundingClientRect();
     const over = [...document.querySelectorAll(".gbar .seg, .gbar .btn")].filter((e) => { const q = e.getBoundingClientRect(); return q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom; }).length;
-    return { over, under: r.top >= document.querySelector(".gbar").getBoundingClientRect().bottom, wide: !!shelf && Math.abs(r.left - shelf.left) <= 1 && Math.abs(r.width - shelf.width) <= 1, focused: document.activeElement === row.querySelector("input"), gap: next ? Math.round(next.top - r.bottom) : null }; })()`);
-  const kept = JSON.stringify(await b.ev(boxes)) === JSON.stringify(before);
-  await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-  await b.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-  await sleep(300);
-  const shut2 = await b.ev(`!document.querySelector(".gsearch") && document.activeElement === document.querySelector(".gbar__find")`) && JSON.stringify(await b.ev(boxes)) === JSON.stringify(before);
-  const found = order === "look search filters" && !!find && find.over === 0 && find.under && find.wide && find.focused && kept && shut2;
+    return { over, under: r.top >= document.querySelector(".gbar").getBoundingClientRect().bottom, wide: Math.abs(r.left - c.left - parseFloat(s.paddingLeft)) <= 1 && Math.abs(r.right - c.right + parseFloat(s.paddingRight)) <= 1, gap: !!next && Math.abs(next.top - r.bottom - parseFloat(s.rowGap)) <= 1 }; })()`);
+  const opened = await b.ev(state), kept = JSON.stringify(await b.ev(boxes)) === JSON.stringify(before);
+  await esc(".gsearch input"); const escField = await b.ev(state);
+  await tap(".gbar__find"); await esc(".gsearch__close"); const escClose = await b.ev(state);
+  await tap(".gbar__find"); await esc(".gbar__find"); const escIcon = await b.ev(state);
+  await tap(".gbar__find"); await b.js(`document.querySelector(".gbar__views button")?.focus(); true`); await sleep(300); const leftEmpty = await b.ev(state);
+  await tap(".gbar__find"); await b.js(`(() => { const i = document.querySelector(".gsearch input"); if (!i) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, "zz"); i.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await b.js(`document.querySelector(".gbar__views button")?.focus(); true`); await sleep(300); const leftQuery = await b.ev(state);
+  await tap(".gbar__find"); const back = await b.ev(state);
+  await tap(".gbar__find"); const cleared = await b.ev(state);
+  const gone = (s) => !s.row && s.shop && s.controls;
+  const checks = { order: order === "look search filters", closed: gone(closed), open: !!find && find.over === 0 && find.under && find.wide && find.gap && opened.field && opened.controls, kept,
+    escField: gone(escField) && escField.icon, escClose: gone(escClose), escIcon: gone(escIcon), leftEmpty: gone(leftEmpty), leftQuery: leftQuery.row && leftQuery.text === "zz",
+    back: back.row && back.field && back.text === "zz", cleared: gone(cleared) && cleared.icon };
+  const found = Object.values(checks).every(Boolean);
   results.push({ w, ok: found });
-  console.log(`${found ? "PASS" : "FAIL"} the search at ${w}×${h}: ${order}; open, its own row under the bar, over ${find?.over} controls, the gallery's width ${find?.wide}, the bar unmoved ${kept}, focused ${find?.focused}; Escape shuts it ${shut2}`, found ? "" : JSON.stringify(find));
+  console.log(`${found ? "PASS" : "FAIL"} the search at ${w}×${h}: ${order}; its own row under the bar, over nothing, the gallery's width and spacing, the bar unmoved; Escape, leaving it and its icon`, found ? "" : JSON.stringify({ checks, find }));
   results.push({ w, ok });
   console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ off, on, sel }));
   // the picker: the collection between the tile and the aim card, at least as wide, one slim row (about a button
