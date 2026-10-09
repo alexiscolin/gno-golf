@@ -113,7 +113,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 }
 
 /* one toolbar on the gallery's grid: which gnomes at its left edge, the tiers (their prices, once) in its centre, the
-   search, the look and more filters at its right edge, the two side groups one width (the tiers evenly between);
+   look, the search and more filters at its right edge, the two side groups one width (the tiers evenly between);
    every control the small size (32), on one line; two lines narrower, the tiers under, 8 apart; a phone's two lines
    one height, 36 (each line's height fixed: the slot while it is read is the same room) */
 .gbar { --side: 196px; display: grid; grid-template-columns: minmax(var(--side), 1fr) auto minmax(var(--side), 1fr); grid-template-areas: "views tiers end"; grid-template-rows: 32px; align-items: center; gap: var(--sp-2) var(--sp-4); }
@@ -134,11 +134,12 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .gbar__icon svg, .gsearch svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
 .gbar__more svg circle { fill: var(--paper); }
-.gsearch { display: flex; align-items: center; gap: 6px; width: 240px; height: 32px; padding: 0 2px 0 12px; border: var(--edge); border-radius: 12px; background: var(--white); }
-.gsearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--ink); outline: none; }
+/* the search open: a row of its own under the toolbar, the gallery's width (over nothing, the toolbar unmoved) */
+.gsearch { display: flex; align-items: center; gap: var(--sp-2); width: 100%; height: 44px; padding: 0 6px 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); }
+.gsearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
 .gsearch input::-webkit-search-cancel-button { display: none; }
 .gsearch:focus-within { outline: var(--ring); outline-offset: 2px; }
-.gsearch__close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.gsearch__close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
 .gsearch__close svg { width: 16px; height: 16px; }
 .gbar--skel { min-height: 32px; }
 /* under the widest: the tiers' unit said once by their label (GNOT), so the one line still fits */
@@ -148,13 +149,12 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
   .gbar, .gbar--skel { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "views end" "tiers tiers"; grid-template-rows: 32px 32px; min-height: 72px; }
   .gbar__views { min-width: 0; }
 }
-/* a phone: which gnomes, the search and the look; then the tiers (a shape and a price each, the name said to a
-   screen reader) spread to more filters at the line's end; both lines 36; the search open, its own line under them */
+/* a phone: which gnomes, the look and the search; then the tiers (a shape and a price each, the name said to a
+   screen reader) spread to more filters at the line's end; both lines 36 */
 @media (max-width: 700px) {
-  .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views search look" "tiers tiers tiers"; grid-template-rows: 36px 36px; column-gap: var(--sp-2); min-height: 80px; }
-  .gbar:has(.gsearch) { grid-template-areas: "views . look" "tiers tiers tiers" "search search search"; grid-template-rows: 36px 36px 36px; }
+  .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views look search" "tiers tiers tiers"; grid-template-rows: 36px 36px; column-gap: var(--sp-2); min-height: 80px; }
   .gbar__end { display: contents; }
-  .gbar__end > .gbar__icon:not(.gbar__more), .gbar__end > .gsearch { grid-area: search; } .gbar__end > .seg--look { grid-area: look; }
+  .gbar__find { grid-area: search; } .gbar__end > .seg--look { grid-area: look; }
   .gbar__more { grid-area: tiers; justify-self: end; } /* (at the tiers' line's end) */
   .gbar .btn { --h: 36px; }
   .gbar .seg button, .gbar .gbar__end > .seg--look button { min-height: 32px; }
@@ -163,7 +163,6 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
   .gbar__tiers .tierbtn { flex: 1; justify-content: center; }
   .tierbtn__name { display: none; }
   .tierbtn { padding: 0 6px 0 5px; }
-  .gsearch { width: auto; height: 36px; }
 }
 
 /* more filters, unfolded under the toolbar */

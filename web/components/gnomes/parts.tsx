@@ -169,9 +169,10 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
   );
 }
 
-/** The search, an icon until it is used: it opens into its field (focused), Escape or ✕ clears and closes it (the
- *  icon focused again), leaving it empty closes it; a query typed keeps it open. */
-export function SearchToggle({ value, onChange }: { value: string; onChange: (text: string) => void }) {
+/** The search: an icon in the toolbar's right group, pressed while open (a press closes it); open, its field on a
+ *  row of its own under the toolbar (`row`, the gallery's width: it covers nothing), focused; Escape or ✕ clears and
+ *  closes it (the icon focused again), and only it (the shop stays); a query typed keeps it open. */
+export function useSearch(value: string, onChange: (text: string) => void): { button: ReactNode; row: ReactNode } {
   const [open, setOpen] = useState(false);
   const field = useRef<HTMLInputElement>(null), icon = useRef<HTMLButtonElement>(null), back = useRef(false);
   const shown = open || value !== "";
@@ -180,20 +181,21 @@ export function SearchToggle({ value, onChange }: { value: string; onChange: (te
     if (!shown && back.current) (back.current = false), icon.current?.focus();
   }, [shown, open]);
   const close = () => ((back.current = true), onChange(""), setOpen(false));
-  if (!shown)
-    return (
-      <Button ref={icon} variant="icon" size="s" type="button" className="gbar__icon" aria-label="Find a gnome by name or number" aria-expanded={false} onClick={() => setOpen(true)}>
+  return {
+    button: (
+      <Button ref={icon} variant="icon" size="s" type="button" className={`gbar__icon gbar__find${shown ? " btn--on" : ""}`} aria-label="Find a gnome by name or number" aria-expanded={shown} aria-controls="gsearch" onClick={() => (shown ? close() : setOpen(true))}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
       </Button>
-    );
-  return (
-    <span className="gsearch" onBlur={(e) => !value && !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
-      <input ref={field} type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={value}
-        onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (e.preventDefault(), close())} />
-      <button type="button" className="gsearch__close" aria-label="Close the search" onClick={close}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-      </button>
-    </span>
-  );
+    ),
+    row: shown && (
+      <div className="gsearch" id="gsearch" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+        <input ref={field} type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={value}
+          onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), close())} />
+        <button type="button" className="gsearch__close" aria-label="Close the search" onClick={close}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+    ),
+  };
 }

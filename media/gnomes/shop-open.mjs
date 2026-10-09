@@ -9,7 +9,7 @@
 // footer over nothing that follows it (its Traits there to click); the
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
 // every card's #number in sight however long its name, the cards of a row one height (the shop's, a player's); the toolbar's controls, on each of its
-// lines, as tall as one another, on one top, their words on one baseline, and More filters open
+// lines, as tall as one another, on one top, their words on one baseline; the search open a row of its own under it (over nothing), and More filters open
 // gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card,
 // one slim row (its thumbnails of one frame, its line on one line, two on a phone, on its button's baseline), its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
 // and the shop never sideways from 360 to 1440 px wide; the shop, the cups and the menu scrolled to their foot clear
@@ -98,7 +98,7 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.send("Page.navigate", { url: APP + "/g/" });
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".gbar .tierbtn")`)); i++) await sleep(500);
   await sleep(1000);
-  const bar = [{ name: "the shop's bar", box: ".gbar .seg, .gbar .btn, .gbar .gsearch", by: ".gbar" }];
+  const bar = [{ name: "the shop's bar", box: ".gbar .seg, .gbar .btn", by: ".gbar" }];
   const off = await b.ev(misaligned(bar));
   // more filters open: on (gold, as every on control), its box kept, the bar still in line
   const shut = await b.ev(footprint(".gbar__more"));
@@ -111,6 +111,24 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await sleep(300);
   const sel = { box: JSON.stringify(await b.ev(footprint(".gbar .tierbtn"))) === JSON.stringify(tier), gold: await b.ev(gold(".gbar .tierbtn")), view: await b.ev(gold(".gbar__views button.on")), line: await b.ev(misaligned(bar)) };
   const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
+  // the search, between the look and more filters: open, a row of its own under the bar, the gallery's width, over
+  // nothing (the bar's controls where they were), focused; Escape closes it, the row gone, the icon focused again
+  const boxes = `[...document.querySelectorAll(".gbar .seg, .gbar .btn")].map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round).join(" "); })`;
+  const before = await b.ev(boxes);
+  const order = await b.ev(`[...document.querySelectorAll(".gbar__end > *")].map((e) => e.matches(".seg--look") ? "look" : e.matches(".gbar__find") ? "search" : e.matches(".gbar__more") ? "filters" : "?").join(" ")`);
+  await b.js(`document.querySelector(".gbar__find")?.click(); true`);
+  await sleep(300);
+  const find = await b.ev(`(() => { const row = document.querySelector(".gsearch"); if (!row) return null; const r = row.getBoundingClientRect(), shelf = document.querySelector(".gshelf, .gempty")?.getBoundingClientRect(), next = row.nextElementSibling?.getBoundingClientRect();
+    const over = [...document.querySelectorAll(".gbar .seg, .gbar .btn")].filter((e) => { const q = e.getBoundingClientRect(); return q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom; }).length;
+    return { over, under: r.top >= document.querySelector(".gbar").getBoundingClientRect().bottom, wide: !!shelf && Math.abs(r.left - shelf.left) <= 1 && Math.abs(r.width - shelf.width) <= 1, focused: document.activeElement === row.querySelector("input"), gap: next ? Math.round(next.top - r.bottom) : null }; })()`);
+  const kept = JSON.stringify(await b.ev(boxes)) === JSON.stringify(before);
+  await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await b.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(300);
+  const shut2 = await b.ev(`!document.querySelector(".gsearch") && document.activeElement === document.querySelector(".gbar__find")`) && JSON.stringify(await b.ev(boxes)) === JSON.stringify(before);
+  const found = order === "look search filters" && !!find && find.over === 0 && find.under && find.wide && find.focused && kept && shut2;
+  results.push({ w, ok: found });
+  console.log(`${found ? "PASS" : "FAIL"} the search at ${w}×${h}: ${order}; open, its own row under the bar, over ${find?.over} controls, the gallery's width ${find?.wide}, the bar unmoved ${kept}, focused ${find?.focused}; Escape shuts it ${shut2}`, found ? "" : JSON.stringify(find));
   results.push({ w, ok });
   console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ off, on, sel }));
   // the picker: the collection between the tile and the aim card, at least as wide, one slim row (about a button

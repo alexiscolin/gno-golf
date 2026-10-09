@@ -22,7 +22,7 @@ import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
-import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchToggle, TierChip, TierFilter } from "./parts";
+import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, TierChip, TierFilter, useSearch } from "./parts";
 import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
@@ -70,6 +70,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; home?: Home; text: string }>({ view: "sale", text: "" });
   const [shown, setShown] = useState(PAGE);
   const [more, setMore] = useState(false);
+  const search = useSearch(f.text, (text) => setF((x) => ({ ...x, text })));
   // the look the viewer picked, kept in this browser: on chain, the portraits read as the cards come into view
   const [look, setLook] = useState<Look>(savedLook);
   const onLook = (l: Look) => (setLook(l), saveLook(l));
@@ -175,20 +176,22 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       {/* the album (ADR-011): the player's own, or theirs (under their Race), a row a world, a tier, a set */}
       {cat && albumShown(SHOP, region ?? null) && (viewing === "mine" && me ? <Album cat={cat} owned={held || []} chain={chain} player={me} mine onOpen={(o) => onView({ ...view, open: o })} />
         : theirs && theirs.rows.length > 0 && <Album cat={cat} owned={theirs.rows} chain={chain} player={theirs.who} mine={false} onOpen={(o) => onView({ ...view, open: o })} />)}
-      {/* one toolbar: which gnomes, the tiers (their prices, once), the search, the look, more filters folded */}
+      {/* one toolbar: which gnomes, the tiers (their prices, once), the look, the search, more filters folded; the
+          search open and more filters each a row of their own under it */}
       {!theirs && (
         <>
           <div className="gbar">
             <Segmented label="Which gnomes" className="gbar__views" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
             <div className="gbar__end">
-              <SearchToggle value={f.text} onChange={(text) => setF((x) => ({ ...x, text }))} />
               <LookSwitch look={look} onLook={onLook} />
+              {search.button}
               <Button variant="icon" size="s" type="button" className={`gbar__icon gbar__more${f.home ? " btn--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
               </Button>
             </div>
           </div>
+          {search.row}
           {more && (
             <div className="gfilters" id="gmore">
               <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>
