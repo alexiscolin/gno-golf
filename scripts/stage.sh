@@ -5,9 +5,12 @@
 #
 #   p/gnogolf/physics  ->  p/<ns>/gnogolf/physics
 #   p/gnogolf/course   ->  p/<ns>/gnogolf/course
+#   p/gnogolf/weblink  ->  p/<ns>/gnogolf/weblink   the rule an owner's link follows
+#   p/gnogolf/jsonq    ->  p/<ns>/gnogolf/jsonq     a string quoted as JSON
 #   r/gnogolf/golf     ->  r/<ns>/gnogolf/golf      the v1 rules, on onyx
 #   r/gnogolf/store    ->  r/<ns>/gnogolf/store     the records
 #   r/gnogolf/golf/v2  ->  r/<ns>/gnogolf/golf/v2   the rules that write them
+#   r/gnogolf/gnomes   ->  r/<ns>/gnogolf/gnomes    the gnomes (ADR-007), reading store
 #
 #   scripts/stage.sh nym-alexiscolin000 /tmp/stage           onyx
 #   MAINNET=1 scripts/stage.sh nym-alexiscolin000 /tmp/stage mainnet
@@ -43,7 +46,7 @@ to() { sed "s#gno\.land/\([pr]\)/gnogolf/#gno.land/\1/$ns/gnogolf/#g"; }
 back() { sed "s#gno\.land/\([pr]\)/$ns/gnogolf/#gno.land/\1/gnogolf/#g"; }
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-pkgs="gno.land/p/gnogolf/physics gno.land/p/gnogolf/course gno.land/r/gnogolf/golf gno.land/r/gnogolf/store gno.land/r/gnogolf/golf/v2"
+pkgs="gno.land/p/gnogolf/physics gno.land/p/gnogolf/course gno.land/p/gnogolf/weblink gno.land/p/gnogolf/jsonq gno.land/r/gnogolf/golf gno.land/r/gnogolf/store gno.land/r/gnogolf/golf/v2 gno.land/r/gnogolf/gnomes"
 skip='_(file)?test\.gno$'
 if [ "${MAINNET:-}" = 1 ]; then
 	pkgs=$(echo "$pkgs" | sed 's# gno.land/r/gnogolf/golf # #')

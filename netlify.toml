@@ -15,13 +15,30 @@
 #   NEXT_PUBLIC_NAMEREG   optional: the name registrar (found on the chain otherwise)
 #   NEXT_PUBLIC_COMMUNITY optional: 1 lists the community's holes with the cups
 #                         (off until the builder is out)
+#   NEXT_PUBLIC_BUILDER   optional: 1 opens the hole Builder at /build (off: a
+#                         page that says it is not open yet)
 #   NEXT_PUBLIC_CLIPS     optional: 1 offers a clip of the holing shot (ADR-003)
+#   NEXT_PUBLIC_GNOMES    optional: 1 opens the gnome shop (lib/gnomes/shop.ts);
+#                         with it, a production deploy fails without who sells
+#                         and the pages the order links (lib/gnomes/legal.ts):
+#   NEXT_PUBLIC_SELLER_NAME the seller's name, as the order and receipt say it
+#   NEXT_PUBLIC_SELLER_ADDRESS the seller's postal address
+#   NEXT_PUBLIC_SELLER_EMAIL the seller's e-mail, for questions on an order
+#   NEXT_PUBLIC_TERMS_VERSION the Terms of Sale's version and date, which the
+#                         buyer accepts and the receipt records
+#   NEXT_PUBLIC_TERMS_URL the Terms of Sale page (https://)
+#   NEXT_PUBLIC_TOKUSHOHO_URL the seller's notice page, the Act on Specified
+#                         Commercial Transactions' (https://)
+#   NEXT_PUBLIC_PRIVACY_URL the privacy policy page (https://)
 #   NEXT_PUBLIC_POSTHOG_KEY optional: the PostHog project's public key (phc_…),
 #                         anonymous audience measurement (docs/analytics.md);
 #                         unset, nothing loads or is sent
 #   NEXT_PUBLIC_POSTHOG_SURVEY optional: the PostHog API survey the testnet's
 #                         feedback sheet answers (its questions in the sheet's order);
 #                         unset, the answers go as a feedback event
+# Never set here: NEXT_PUBLIC_PLAYGROUND, NEXT_PUBLIC_WALLET_RPC and
+# NEXT_PUBLIC_TEST_HOOKS are the local playground's (scripts/try-local.sh); a
+# production deploy fails with any of them.
 [build]
   base = "web"
   command = "npm ci && npm run build"
@@ -48,6 +65,35 @@
   status = 200
   force = true
   query = { cup = ":cup" }
+
+# The gnome shop's region gate (web/lib/gnomes/geo.ts, ADR-007 "Where the shop
+# opens"): not offered in mainland China nor under the comprehensive
+# sanctions. The list is geo.ts's BLOCKED, the same on both rules (the tests
+# hold them to it): CN, CU, IR, KP, SY, RU, BY. /geo.json, read once when the
+# shop would open, says shut there; a gnome's page is the "not available"
+# page. Everyone else's /geo.json is the open answer (the rule after them:
+# the first rule that matches applies); the file itself says shut, so a host
+# without these rules never opens the shop. The free game plays everywhere.
+# Best effort: a VPN gets round it.
+[[redirects]]
+  from = "/geo.json"
+  to = "/geo-blocked.json"
+  status = 200
+  force = true
+  conditions = {Country = ["CN", "CU", "IR", "KP", "SY", "RU", "BY"]}
+
+[[redirects]]
+  from = "/geo.json"
+  to = "/geo-open.json"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/g/*"
+  to = "/unavailable/"
+  status = 200
+  force = true
+  conditions = {Country = ["CN", "CU", "IR", "KP", "SY", "RU", "BY"]}
 
 # PostHog EU behind the site's own path (lib/analytics.ts api_host), its
 # extensions under /e/static: a blocker sees no third party

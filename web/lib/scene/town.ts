@@ -14,10 +14,11 @@ import { timeOf } from "./camera";
 import { gnomelet, brolly, bunting, mailbox } from "./props";
 import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
 import { ud, type Hole } from "./data";
-import type { Bar } from "./worlds";
+import type { Bar, Skins } from "./worlds";
 import { boxOf, smoothstep, type Terrain } from "../terrain";
 import { STREET_Y } from "./pieces";
 import type { Extras, MutVec2, Post, Vec2, Zone } from "../types";
+import { own } from "../own";
 
 export const T = {
   cobble: 0xcdbb9f, cobbleDark: 0xa99578, curb: 0xe2d6c0, quay: 0xa89c8a,
@@ -1602,6 +1603,16 @@ function canalOnLane(z: Zone, t: Terrain) {
   return g;
 }
 
+/** The skins piece() draws from the piece alone (the builder's palette, worlds.ts Skins); a tram is a line of them (course.ts tramLines). */
+const skins: Skins = {
+  post: ["lamp", "house", "clock", "gnome statue", "roundabout", "chimney", "cat", ...Object.keys(PLAZA_POSTS)],
+  bar: ["clock hand", "stall", "awning", "rail", "ledge"],
+  surface: [...Object.keys(PLAZA_GROUND), "plank bridge", "bridge"],
+  slope: ["funbox", "quarter pipe", "stairs"],
+  hazard: ["fountain", "canal"],
+  tunnel: ["door", "well"],
+};
+
 function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole) {
   const night = timeOf(s.hole) !== "day";
   // seeded by where it stands: two pieces of one skin get different looks
@@ -1656,7 +1667,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
       lip.position.y = 1.65;
       m.add(stack, lip);
     } else if (skin === "cat") m = sleepingCat(r);
-    else if (PLAZA_POSTS[skin]) m = PLAZA_POSTS[skin](r, rand, night);
+    else if (own(PLAZA_POSTS, skin)) m = own(PLAZA_POSTS, skin)!(r, rand, night);
     return m ? onGround(m, x, z, t) : undefined;
   }
   if (kind === "wall") {
@@ -1664,7 +1675,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
     const bar = item as Bar; // (kind says which)
     const [cx, cz] = bar.c, len = bar.length, thick = bar.thick, ang = bar.ang, g = new THREE.Group();
     const make: Record<string, () => THREE.Group> = { tram: () => tramAcross(len, thick, night), "clock hand": () => clockHand(len, thick), stall: () => stallAcross(len, thick, rand), awning: () => awningAcross(len, thick), rail: () => grindRail(len, thick), ledge: () => skateLedge(len, thick) };
-    g.add(make[skin]());
+    g.add(own(make, skin)!());
     g.rotation.y = -ang; // a timed bar is drawn still: course.ts shows and slides it with the replay
     // one mesh per kind of material: a timed bar stays out of the bake
     // (a ledge stands on the park's floor, whatever ramp runs up beside it)
@@ -1678,7 +1689,8 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
   if (kind === "zone") {
     const zone = item as Zone; // (kind says which)
     const [x0, z0] = zone.min, [x1, z1] = zone.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
-    if (PLAZA_GROUND[skin]) return PLAZA_GROUND[skin](zone, t);
+    const ground = own(PLAZA_GROUND, skin);
+    if (ground) return ground(zone, t);
     if (skin === "plank bridge") return plankBridge(zone, t);
     if (skin === "funbox") return funboxEdge(zone, t);
     if (skin === "quarter pipe") return new THREE.Group(); // the ground rises itself: concrete, nothing on it
@@ -1883,4 +1895,4 @@ function extras(ex: Extras, s: Hole) {
   return { group: new THREE.Group(), skins: new Set(["bridge", "canal"]) };
 }
 
-export { base, edging, berms, decor, rough, green, piece, extras };
+export { base, edging, berms, decor, rough, green, piece, skins, extras };

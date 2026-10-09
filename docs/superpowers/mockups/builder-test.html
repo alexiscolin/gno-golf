@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Testing a hole · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<link rel="stylesheet" href="builder.css">
+<!-- Test (step 2 of 3): the game itself, on the Builder's local chain, as big as the window allows.
+     The weathers to beat as chips that tick when holed, the suggested par beside them.
+     states: ?state=address (first, once: the address the hole is proved under) | playing (default: the rain still to hole) | proved (every weather holed: Publish) | missed (a round that does not count) -->
+<style>
+  .play { position: relative; grid-column: 1 / -1; min-height: 0; border: var(--edge-bold); border-radius: var(--r-card); overflow: hidden; background: #2f6b53 url(img/play-garden3.jpg) 30% center / cover; touch-action: none; overscroll-behavior: contain; }
+  .play__top { position: absolute; left: var(--sp-3); right: var(--sp-3); top: var(--sp-3); display: flex; align-items: start; gap: var(--sp-3); }
+  .play .card { height: 64px; min-width: 84px; text-align: center; }
+  .play .card h1 { font-size: 18px; }
+  .wx { display: flex; align-items: center; gap: var(--sp-2); margin: 0 auto; padding: var(--sp-2); border: var(--edge); border-radius: var(--pill); background: var(--paper); box-shadow: var(--shadow-btn); }
+  .wx__chip { display: inline-flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-3) 0 var(--sp-2); border: var(--edge); border-radius: var(--pill); background: var(--white); font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .wx__chip i { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid var(--ink); font-style: normal; font-size: 14px; background: var(--paper); }
+  .wx__chip--done { background: var(--mint); } .wx__chip--done i { background: var(--green); color: var(--paper); }
+  .wx__chip--now { background: var(--ink); color: var(--paper); } .wx__chip--now i { background: var(--gold); color: var(--ink); }
+  .wx__chip--miss { border-color: var(--hat-ink); color: var(--hat-ink); }
+  .wx__par { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-3); font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .wx__par b { font-size: 22px; }
+  .play__note { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); width: min(520px, calc(100% - 32px)); margin: 0; }
+  .hint { position: absolute; left: 50%; bottom: var(--sp-4); transform: translateX(-50%); padding: 4px 12px; border-radius: var(--pill); background: rgba(var(--paper-rgb), .94); font-size: 14px; font-weight: 600; white-space: nowrap; }
+  @media (max-width: 1180px) { .play .card--strokes { display: none; } .wx__chip small { display: none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="kit.js"></script>
+<script src="builder.js"></script>
+<script>
+  if (matchMedia("(max-width: 899px), (pointer: coarse)").matches) location.replace("builder-phone.html");
+  const { state } = Kit;
+  const { header } = Builder;
+  const s = state("playing");
+  const proved = s === "proved";
+  const chips = s === "address" ? [["☀", "Clear", "todo", ""], ["≋", "Wind", "todo", ""], ["☂", "Rain", "todo", ""]] : [["☀", "Clear", "done", "3"], ["≋", "Wind", "done", "4"], ["☂", "Rain", proved ? "done" : s === "missed" ? "miss" : "now", proved ? "4" : ""]];
+  document.getElementById("app").innerHTML = `<main class="bench bench--wide tint--garden">
+    ${header({ mode: "test", proved })}
+    <section class="play" aria-label="Your hole, played as players will play it">
+      <div class="play__top">
+        <div class="card card--strokes"><span class="eyebrow">Strokes</span><strong>${proved ? 4 : s === "address" ? 0 : 2}</strong></div>
+        <div class="wx" role="list" aria-label="The weathers to hole">
+          ${chips.map(([g, n, st, k]) => `<span role="listitem" class="wx__chip wx__chip--${st}" aria-label="${n}: ${st === "done" ? `holed in ${k}` : st === "now" ? "playing now" : st === "miss" ? "does not count, play again" : ""}"><i>${st === "done" ? "✓" : g}</i>${n}${k ? `<small>&nbsp;${k}</small>` : ""}</span>`).join("")}
+          <span class="wx__par">Par <b>${proved ? 5 : "–"}</b></span>
+        </div>
+      </div>
+      ${s === "address" ? `<div class="sheet" style="position:absolute"><div class="sheet__in" role="dialog" aria-modal="true" aria-label="Your address" style="max-width:420px;display:grid;gap:var(--sp-3)">
+        <span class="eyebrow">Before the first round</span><h2 style="margin:0">Your address</h2>
+        <p style="margin:0;text-align:center">The hole's rounds are proved under it, and published under it.</p>
+        <label class="lbl">Your gno.land address<input class="field" placeholder="g1…" value="g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"></label>
+        <div class="sheet__foot"><button class="btn btn--gold btn--wide">${Kit.ICON.play} Test with this address</button><p class="fine">With Adena: <button class="linkish">Connect</button> instead.</p></div></div></div>` : ""}
+      ${s === "missed" ? `<p class="note note--warn play__note">That rain round doesn't count: one shot could run out of room. Play it again, a softer line.</p>` : ""}
+      <p class="hint">${proved ? "Every weather holed: par 5 suggested, the most it took plus one" : "Click anywhere and pull back, like a slingshot"}</p>
+    </section>
+  </main>`;
+</script>
+</body>
+</html>

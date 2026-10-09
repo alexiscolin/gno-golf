@@ -12,6 +12,13 @@ if (process.env.CONTEXT === "production") {
     !https(e.NEXT_PUBLIC_RPC) && "NEXT_PUBLIC_RPC (https://…)",
     !https(e.NEXT_PUBLIC_WEB) && "NEXT_PUBLIC_WEB (https://…)",
     !["testnet", "mainnet"].includes(e.NEXT_PUBLIC_NETWORK || "") && "NEXT_PUBLIC_NETWORK (testnet or mainnet)",
+    // the gnome shop sells: who sells, and the pages the order links, before any sale (lib/gnomes/legal.ts)
+    ...(e.NEXT_PUBLIC_GNOMES === "1"
+      ? ["NEXT_PUBLIC_SELLER_NAME", "NEXT_PUBLIC_SELLER_ADDRESS", "NEXT_PUBLIC_SELLER_EMAIL", "NEXT_PUBLIC_TERMS_VERSION"].filter((k) => !(e[k] || "").trim())
+          .concat(["NEXT_PUBLIC_TERMS_URL", "NEXT_PUBLIC_TOKUSHOHO_URL", "NEXT_PUBLIC_PRIVACY_URL"].filter((k) => !https(e[k])).map((k) => `${k} (https://…)`))
+      : []),
+    // the local playground's (scripts/try-local.sh), never the site's
+    ...["NEXT_PUBLIC_PLAYGROUND", "NEXT_PUBLIC_WALLET_RPC", "NEXT_PUBLIC_TEST_HOOKS"].filter((k) => e[k]).map((k) => `no ${k}`),
   ].filter(Boolean);
   if (bad.length) throw new Error(`a production build needs ${bad.join(", ")}: see netlify.toml`);
 }
@@ -22,5 +29,7 @@ export default {
   images: { unoptimized: true },
   devIndicators: false, // the dev badge sits on the HUD's bottom-left button
   // the commit a build is of (Netlify's COMMIT_REF), said with every analytics event
-  env: { NEXT_PUBLIC_BUILD: (process.env.COMMIT_REF || "").slice(0, 7) },
+  // the gnome shop's flag written in even when unset (""), so a build without it drops the shop's import() and makes
+  // no chunk of it (components/gnomes/Door.tsx)
+  env: { NEXT_PUBLIC_BUILD: (process.env.COMMIT_REF || "").slice(0, 7), NEXT_PUBLIC_GNOMES: process.env.NEXT_PUBLIC_GNOMES || "" },
 };

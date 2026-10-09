@@ -14,7 +14,7 @@ import { loadWorld } from "./worlds";
 import { buildHole } from "./course";
 import { state } from "./state";
 import { makeRenderer, makeScene, weakGpu, setLighting } from "./camera";
-import { makeBall, gnomeById } from "./gnome";
+import { makeBall, gnomeById, rewear, type Skin } from "./gnome";
 import { makeConfetti } from "./fx";
 import { BALL_R, smoothstep } from "../terrain";
 import { TICKS_PER_S } from "../engine/types";
@@ -120,7 +120,7 @@ function makeCast(s: Hole, course: Course, world: string) {
   const face = (m: Gnome, dir: THREE.Vector3) => (m.userData.body.rotation.y = Math.PI / 2 - Math.atan2(dir.z, dir.x));
   const group = new THREE.Group();
 
-  const aimer = makeBall(gnomeById("classic"));
+  let aimer = makeBall(gnomeById("classic")), aimerId = "classic"; // (the player's own once known: wear)
   const aimAt = cup.clone().addScaledVector(d, -1.9).addScaledVector(n, 1.5);
   onGround(aimer, aimAt);
 
@@ -146,6 +146,12 @@ function makeCast(s: Hole, course: Course, world: string) {
   return {
     group,
     cup, d, n, spot,
+    /** The gnome standing by the cup (a skin id). */
+    wearing: () => aimerId,
+    /** The watcher by the cup dressed as the player's own gnome. */
+    wear(skin: Skin) {
+      if (skin.id !== aimerId) (aimer = rewear(aimer, skin)), (aimerId = skin.id);
+    },
     /** The cast at time t (s). */
     pose(t: number) {
       const dt = Math.min(Math.max(t - lastT, 0), 0.1);
@@ -290,6 +296,11 @@ export async function makeTitle(canvas: HTMLCanvasElement, { world = "garden", h
 
   return {
     resize,
+    /** The gnome standing by the cup: the player's own (Title.tsx gives it once the game knows it). */
+    wear(skin: Skin) {
+      cast.wear(skin);
+      if (!running()) draw(performance.now());
+    },
     /** Starts a held splash, its story from the top. */
     go() {
       if (!held) return;
@@ -298,7 +309,7 @@ export async function makeTitle(canvas: HTMLCanvasElement, { world = "garden", h
       wake();
     },
     /** The last frame's draw calls and triangles, the frames drawn so far and their mean main-thread ms (a test hook). */
-    info: () => ({ world, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, frames, ms: +(spent / Math.max(frames, 1)).toFixed(2) }),
+    info: () => ({ world, gnome: cast.wearing(), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, frames, ms: +(spent / Math.max(frames, 1)).toFixed(2) }),
     destroy() {
       alive = false;
       cancelAnimationFrame(raf);

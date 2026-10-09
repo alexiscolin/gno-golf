@@ -21,8 +21,7 @@ export const GNOME = {
 /** The error's own sentence, or the value said as it is. */
 export const messageOf = (e: unknown) => String((e && typeof e === "object" && "message" in e && e.message) || e);
 
-/** An address shortened: its first head and last tail characters ("g1jg8mtu…sqf5"). */
-export const shortAddr = (a: string, head = 8, tail = 4) => `${String(a).slice(0, head)}…${String(a).slice(-tail)}`;
+export { shortAddr } from "@/lib/chain";
 
 /** A new query for a link of the game's: a page pointed at another chain
  *  (?rpc=, ?web=) keeps pointing there, and nothing else is kept. */
@@ -38,7 +37,7 @@ export function chainQuery() {
 
 /** The address of this hole, to put in the bar and in shared links; by: the
  *  sharer, whose best on the chain the friend is dared to beat; src: where it was shared from (analytics). */
-export function holeLink(s: Snapshot, gnome: string, by = "", src?: ShareSrc) {
+export function holeLink(s: Pick<Snapshot, "id" | "place">, gnome: string, by = "", src?: ShareSrc) {
   const q = chainQuery();
   // a cup's hole by its own page (app/h, its link card); one in no cup
   // (community, archived) by its id, never as place 1
@@ -49,6 +48,12 @@ export function holeLink(s: Snapshot, gnome: string, by = "", src?: ShareSrc) {
   if (src) q.set("src", src);
   return (slot ? `h/${slot[1]}-${slot[2]}/` : "") + (String(q) ? `?${q}` : "");
 }
+
+/** The community's holes, those their author has holed first (holed: the chain's answer per hole, as read), each group in its own order. */
+export const authorFirst = <H extends { id: string }>(list: readonly H[], holed: ReadonlyMap<string, boolean>) =>
+  [...list.filter((h) => holed.get(h.id) === true), ...list.filter((h) => holed.get(h.id) !== true)];
+/** A community hole's mark: whether its author has holed it, nothing until the chain has said. */
+export const authorMark = (holed: boolean | undefined) => (holed === undefined ? "" : holed ? "Holed by its author" : "Not yet holed by its author");
 
 /** A dare to the whole course: friends race the player's ghost on every hole they have a best on. */
 export function dareLink(by: string, src?: ShareSrc) {

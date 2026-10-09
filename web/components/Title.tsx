@@ -12,6 +12,7 @@ import { reducedMotion } from "@/lib/device";
 import { CLASSIC, CUPS, guessCup } from "@/lib/card";
 import { stillsOnly } from "@/lib/prefs";
 import type { Title as TitleScene } from "@/lib/scene/title"; // the live title scene, once its module has loaded and made it
+import type { Skin } from "@/lib/scene/gnome";
 
 type Film = ReturnType<typeof makeFilm>;
 declare global {
@@ -342,7 +343,8 @@ const onServer = () => "garden";
  *  bundle is still loading: the first thing on screen is the last thing to go.
  *  The line under the button is fixed text: it shows while the chain is still
  *  being reached, so it must not depend on anything the chain answers. */
-export default function Title({ onStart, onAbout, loading = false, world: given }: { onStart?: () => void; onAbout?: () => void; loading?: boolean; world?: string }) {
+// gnome: the player's own (Golf.tsx): the live scene's watcher by the cup wears it
+export default function Title({ onStart, onAbout, loading = false, world: given, gnome }: { onStart?: () => void; onAbout?: () => void; loading?: boolean; world?: string; gnome?: Skin }) {
   const guessed = useSyncExternalStore(noSubscribe, guessWorld, onServer);
   const world = given || guessed;
   // the loader shows until the game is ready and the ball has dropped; coming
@@ -355,6 +357,11 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
   useEffect(warmClips, []);
   const host = useRef<HTMLDivElement>(null), film = useRef<HTMLDivElement>(null);
   const scene = useTitleScene(host, film);
+  // the scene's watcher in the player's gnome, once the scene and the gnome are both there
+  useEffect(() => {
+    const p = visit && visit.p;
+    if (gnome && p && scene && scene.live) void p.then((t) => t && t.wear(gnome));
+  }, [gnome, scene]);
   // ?titlebake (dev): the stills' and clips' baker (window.__titleStill,
   // __cupClip), for media/camera/titlebake.mjs and media/promo/render.mjs
   useEffect(() => {

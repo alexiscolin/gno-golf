@@ -1,6 +1,7 @@
 package golf
 
 import (
+	"chain/runtime"
 	"encoding/hex"
 	"math"
 	"strconv"
@@ -899,4 +900,48 @@ func asideCourse(cur realm) func() {
 		}
 		saved(cur)
 	}
+}
+
+// DayCandidates: every community hole's alias in alias order, its current
+// version as a Holes row with the block its first version was published at,
+// none hidden; paged, a page at most pageMax keys walked.
+func TestDayCandidates(cur realm, t *testing.T) {
+	a := testutils.TestAddress("dayone")
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(a))
+	PublishMine(cross(cur), "lane", hexOf(cupHole("pond", 1, "Day lane")), "")
+	born := strconv.FormatInt(runtime.ChainHeight(), 10)
+	testing.SkipHeights(5)
+	testing.SetRealm(testing.NewUserRealm(a))
+	now := PublishMine(cross(cur), "lane", hexOf(cupHole("pond", 2, "Day lane, again")), "")
+	testing.SetRealm(testing.NewUserRealm(a))
+	PublishMine(cross(cur), "pond", hexOf(cupHole("pond", 3, "Day pond")), "")
+	testing.SetRealm(testing.NewUserRealm(a))
+	PublishMine(cross(cur), "rude", hexOf(cupHole("pond", 1, "Day rude")), "")
+	setOwner(deployer)
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), a.String()+"/rude", true)
+
+	// its three aliases (from the address on), one key a page, then all at once: the same rows
+	rows := func(p string) string { return p[strings.Index(p, `"rows":[`)+8 : strings.LastIndex(p, `],"next":`)] }
+	var one []string
+	after := a.String()
+	for i := 0; i < 3; i++ {
+		p := DayCandidates(after, 1)
+		if r := rows(p); r != "" {
+			one = append(one, r)
+		}
+		after = p[strings.LastIndex(p, `"next":"`)+8 : len(p)-2]
+	}
+	uassert.Equal(t, 2, len(one), "a key a page: the hidden one's page empty")
+	all := rows(DayCandidates(a.String(), 3))
+	uassert.Equal(t, strings.Join(one, ","), all, "paged by alias")
+	row := `{"id":"` + now + `"`
+	uassert.True(t, strings.Index(all, row) == 0 && strings.Contains(all, `"slot":"`+a.String()+`/pond"`), "in alias order, each its current version")
+	uassert.Equal(t, 1, strings.Count(all, `"slot":"`+a.String()+`/lane"`), "once an alias")
+	uassert.True(t, strings.HasPrefix(all[strings.Index(all, `,"born":`):], `,"born":`+born+`}`), "the block its first version was published at")
+	uassert.False(t, strings.Contains(all, "Day rude"), "none hidden")
+	uassert.False(t, strings.Contains(DayCandidates("", 20), `"official":true`), "never a course hole")
+	uassert.Equal(t, 1, strings.Count(DayCandidates(a.String(), 0), `"id":`), "a limit of 0: one key")
+	uassert.True(t, strings.Count(DayCandidates("", 1000), `"id":`) <= pageMax, "at most pageMax")
 }

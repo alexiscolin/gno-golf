@@ -9,7 +9,7 @@
 // the picker import.
 
 export { motion, setTime, at, disposeCourse, releaseShared, quality } from "./scene/materials";
-export { maxDpr, makeRenderer, weakGpu, makeScene, setLighting, courseBox, laneBox, applyRig, overviewRig, farRig, ORBIT, focusRig } from "./scene/camera";
+export { maxDpr, makeRenderer, weakGpu, makeScene, setLighting, courseBox, laneBox, applyRig, overviewRig, farRig, ORBIT, focusRig, followDist, FOLLOW_CLOSER } from "./scene/camera";
 export { buildHole, finishHole, buildExtras } from "./scene/course";
-export { GNOMES, gnomeById, makeBall, makePreview, headlamp } from "./scene/gnome";
+export { GNOMES, gnomeById, makeBall, makePreview, headlamp, knowGnome, setRivalGnome, loadWardrobe } from "./scene/gnome";
 export { makeSplash, makePuff, makeConfetti, cheer, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx";

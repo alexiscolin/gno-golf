@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import { REALM_PATH, pkgsPath, storePath } from "@/lib/chain";
 import { sound } from "@/lib/feel";
 import { optedOut, optOut } from "@/lib/analytics";
@@ -88,8 +89,10 @@ interface FrontScreenProps {
   back: string;
   onBack: () => void;
   onAbout: () => void;
-  eyebrow: string;
-  title: string;
+  /** the line over the title (none: the title alone) */
+  eyebrow?: string;
+  /** the title's words (and what stands by them, out of the flow: the shop's keeper) */
+  title: ReactNode;
   dare?: ReactNode;
   corner?: ReactNode;
   children?: ReactNode;
@@ -101,13 +104,21 @@ export function FrontScreen({ className, tint = "garden", inner = "", back, onBa
       <AboutButton onClick={onAbout} />
       {corner}
       <div className={`worlds__in ${inner}`.trim()}>
-        <div className="front__head">
-          <span className="eyebrow">{eyebrow}</span>
-          <h2 className="worlds__title">{title}</h2>
-          {dare}
-        </div>
+        <FrontHead eyebrow={eyebrow} title={title} dare={dare} />
         {children}
       </div>
+    </div>
+  );
+}
+
+/** A front screen's head: the pill, the outlined title, what stands under them (dare); h1 on a page of its own (the Builder's). */
+export function FrontHead({ eyebrow, title, dare, h1 = false }: { eyebrow?: string; title: ReactNode; dare?: ReactNode; h1?: boolean }) {
+  const H = h1 ? "h1" : "h2";
+  return (
+    <div className="front__head">
+      {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+      <H className="worlds__title">{title}</H>
+      {dare}
     </div>
   );
 }
@@ -189,7 +200,7 @@ export default function About({ onClose, onRules, web, support = null, counts = 
       <ul className="about__links">
         {links.map(([name, href, what]) => (
           <li key={name}>
-            <a className="btn btn--ghost" href={href} {...out}><b>{name} ↗</b><span>{what}</span></a>
+            <a className={buttonClass({})} href={href} {...out}><b>{name} ↗</b><span>{what}</span></a>
           </li>
         ))}
       </ul>

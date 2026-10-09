@@ -8,16 +8,18 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, flat, drawn, rbox, lanternGlow, share, ownFade, fadeLoop, type FadeItem, geoOf, gridGeo } from "./materials";
-import { animate, state } from "./state";
+import { animate, report, state } from "./state";
 import { inZone, mod, there, segDist, wallDist, smoothstep, boxOf, closest, terrain } from "../terrain";
 import { timeOf } from "./camera";
+import { hidesPlay } from "./sight";
 import { gnomelet, bunting, stone, smoke } from "./props";
 import { bakeLocal, look, weatherLooks, instances } from "./bake";
 import { seeded, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
 import { ud, type Hole, type Height } from "./data";
-import { GAP_Y, type Bar } from "./worlds";
+import { GAP_Y, type Bar, type Skins } from "./worlds";
 import type { Terrain } from "../terrain";
 import type { Extras, MutVec2, Post, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 /** Places reserved round the board (common.ts placer). */
 type Reserve = (x: number, z: number, r: number) => void;
@@ -2038,6 +2040,19 @@ function liftLines(s: Hole, night: boolean, reserve: Reserve) {
   return g;
 }
 
+// What stands beside a mountain piece, off the lane: its footprint as points
+// (across, toward the piece's zone) round where it stands. The serac's tower
+// (2.2 wide: a good step round it, as the course's own seracs, mountain15,
+// have always stood); the snow cannon (all of it, seen from above: its base,
+// its fan behind, its barrel out along the push)
+const TOWER_FOOT: readonly (readonly [number, number])[] = [[-1.3, 0], [1.3, 0], [0, -1.3], [0, 1.3], ...Array.from({ length: 11 * 9 }, (_, k) => [-1.3 + (k % 11) * 0.26, -1.05 + Math.floor(k / 11) * 0.2625] as const)];
+const CANNON_FOOT: readonly (readonly [number, number])[] = Array.from({ length: 6 * 8 }, (_, k) => [-0.6 + (k % 6) * 0.24, -0.6 + Math.floor(k / 6) * 0.25] as const); // (0.6 either side, from its fan 0.6 behind to its barrel's mouth 1.15 ahead)
+/** Whether a thing standing at (x, z), facing to (a unit vector), keeps off the lane: no point of its footprint on
+ *  the green, and its base (half-width base) on no wall. */
+function standsOff(t: Terrain, s: Hole, x: number, z: number, to: readonly [number, number], foot: readonly (readonly [number, number])[], base: number) {
+  return !s.walls.some((w) => segDist(x, z, w.a, w.b) < base) && foot.every(([a, b]) => !(!t.onGreen || t.onGreen(x + a * to[1] + b * to[0], z - a * to[0] + b * to[1])));
+}
+
 /**
  * The gust (a timed slope zone: it pushes only in its window of substeps) as
  * a snow cannon beside the ridge, blowing across it in bursts: when the gust
@@ -2048,12 +2063,28 @@ function liftLines(s: Hole, night: boolean, reserve: Reserve) {
 function snowCannon(z: Zone, t: Terrain, s: Hole) {
   const g = new THREE.Group();
   ud(g).live = true;
-  const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2;
+  const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const l = Math.hypot(z.vec[0], z.vec[1]) || 1, dx = z.vec[0] / l, dz = z.vec[1] / l;
-  // the cannon stands up-wind, just off the zone's edge, aimed along the push
-  const along = Math.abs(dz) > Math.abs(dx);
-  const px = along ? cx : dx > 0 ? x0 - 2 : x1 + 2, pz = along ? (dz > 0 ? z0 - 2 : z1 + 2) : (z0 + z1) / 2;
+  // the cannon stands up-wind of the zone, aimed along the push, and never on
+  // the lane: 2 off the zone's edge in its middle if that is clear; else
+  // further back, or off to a side (beside the lane, on the board or just off
+  // its edge), its jet bending onto the zone. With no such spot it is not
+  // drawn (and the Builder refuses the gust: its census says so)
+  const along = Math.abs(dz) > Math.abs(dx), back = along ? Math.sign(dz) || 1 : Math.sign(dx) || 1;
+  const edge = along ? (back > 0 ? z0 : z1) : back > 0 ? x0 : x1, side = along ? s.board.w : s.board.h;
+  const spot = (d: number, u: number): [number, number] => (along ? [cx + u, edge - back * d] : [edge - back * d, cz + u]);
+  let stand: { x: number; z: number; d: number; u: number } | null = null;
+  for (let d = 2; d <= 6 && !stand; d += 0.5)
+    for (let k = 0; k <= 2 * side && !stand; k++) {
+      const u = k % 2 ? -(k + 1) / 2 : k / 2, [x, zz] = spot(d, u);
+      if (x > -0.3 && zz > -0.3 && x < s.board.w + 0.3 && zz < s.board.h + 0.3 && standsOff(t, s, x, zz, [dx, dz], CANNON_FOOT, 0.6)) stand = { x, z: zz, d, u };
+    }
+  if (!stand) report(z, { by: "hidden", why: "room" });
+  const [px, pz] = stand ? [stand.x, stand.z] : spot(0.5, 0), off = stand?.d ?? 0.5;
+  // (from a side, its jet's way back onto the zone's middle, across the push)
+  const bend = (stand?.u ?? 0) * (along ? Math.sign(dz) : -Math.sign(dx));
   const cannon = new THREE.Group();
+  cannon.name = "snow cannon"; // (found by name in the tests: web/test/mountain-stands.test.ts)
   const legs = drawn(new THREE.CylinderGeometry(0.1, 0.14, 1.4, 6), flat(0x8a97a6));
   legs.position.y = 0.7;
   const barrel = drawn(new THREE.CylinderGeometry(0.55, 0.42, 1.5, 14, 1, true), flat(0xf2c14a, { side: THREE.DoubleSide }));
@@ -2068,7 +2099,7 @@ function snowCannon(z: Zone, t: Terrain, s: Hole) {
   bakeLocal(cannon);
   cannon.position.set(px, t.height(px, pz), pz);
   cannon.rotation.y = Math.atan2(dx, dz);
-  g.add(cannon);
+  if (stand) g.add(cannon);
   // the jet: snow streaming out of the barrel across the zone, one draw
   const N = 220, pos = new Float32Array(N * 3), seeds = new Float32Array(N * 3), jr = seeded("cannon" + z.min.join(","));
   for (let k = 0; k < N; k++) seeds.set([jr(), jr() - 0.5, jr()], k * 3);
@@ -2079,7 +2110,8 @@ function snowCannon(z: Zone, t: Terrain, s: Hole) {
   const jet = new THREE.Points(geo, mat);
   jet.frustumCulled = false;
   g.add(jet);
-  const reach = along ? z1 - z0 + 3 : x1 - x0 + 3, width = along ? x1 - x0 : z1 - z0;
+  // (the streaks along the zone, and a step past it; the jet out to its far side)
+  const run = (along ? z1 - z0 : x1 - x0) + 3, reach = run + off - 2, width = along ? x1 - x0 : z1 - z0;
   // the gust lane on the ground: where the zone crosses the lane (and no
   // drop is), chevrons pointing the push and streaks of blown snow — bright
   // while the gust is on, faint when it is off
@@ -2105,7 +2137,7 @@ function snowCannon(z: Zone, t: Terrain, s: Hole) {
   for (let k = 0; k < 14; k++) {
     const u = (k + 0.5) / 14, x = along ? x0 + (x1 - x0) * u : x0, zz = along ? z0 : z0 + (z1 - z0) * u;
     for (let v = 0; v < 1; v += 0.12) {
-      const p0: MutVec2 = [x + dx * v * reach, zz + dz * v * reach], p1: MutVec2 = [p0[0] + dx * 0.5, p0[1] + dz * 0.5];
+      const p0: MutVec2 = [x + dx * v * run, zz + dz * v * run], p1: MutVec2 = [p0[0] + dx * 0.5, p0[1] + dz * 0.5];
       if (!safe(...p0) || !safe(...p1)) continue;
       streakPos.push(p0[0], t.height(...p0) + 0.07, p0[1], p1[0], t.height(...p1) + 0.07, p1[1]);
     }
@@ -2128,7 +2160,8 @@ function snowCannon(z: Zone, t: Terrain, s: Hole) {
     for (let k = 0; k < N; k++) {
       const u0 = seeds[k * 3], sp = seeds[k * 3 + 1], h = seeds[k * 3 + 2];
       const u = (u0 + tt * 0.9) % 1, d = u * reach, w = sp * width * Math.min(1, 0.15 + u * 1.2);
-      const x = px + dx * d - dz * w, zz = pz + dz * d + dx * w;
+      const lat = w + bend * Math.min(1, d / off);
+      const x = px + dx * d - dz * lat, zz = pz + dz * d + dx * lat;
       pos[k * 3] = x;
       pos[k * 3 + 1] = y0 - 1.2 * u + h * 0.35 + 0.15; // out of the barrel, down to skim the ridge
       pos[k * 3 + 2] = zz;
@@ -2261,13 +2294,24 @@ function serac(z: Zone, t: Terrain, s: Hole) {
     g.add(chip);
   }
   // the serac: a leaning tower of ice off the lane, uphill of the spot (-z),
-  // or below it when the board leaves no room above; clear of the lane by a
-  // good step and inside the board, so it never stands in the decor round it
-  const clear = (zz: number) => zz > 1.3 && zz < s.board.h - 1.3 && [[-1.3, 0], [1.3, 0], [0, -1.3], [0, 1.3], [0, 0], [-1, -1], [1, 1], [-1, 1], [1, -1]].every(([a, b]) => !lane(cx + a, zz + b));
-  let tz: number | null = null;
-  for (const dir of [-1, 1]) for (let d = 0.5; d < 9 && tz == null; d += 0.25) if (clear(dir < 0 ? z0 - d : z1 + d)) tz = dir < 0 ? z0 - d : z1 + d;
-  if (tz == null) tz = z0 - 3;
+  // else to its left or right; never below it, on the camera's side, where
+  // it would hide the spot and the lane. Clear of the lane by a good step,
+  // and on the board or just off its edge (the decor keeps clear of that strip:
+  // nothing of it stands in the tower), never past the board's camera side.
+  // With no such spot only the fall is drawn (and the Builder refuses it: its
+  // census says so)
+  const inBoard = (x: number, zz: number) => x > -0.2 && x < s.board.w + 0.2 && zz > -0.2 && zz < s.board.h - 1.3;
+  let at: { x: number; z: number; to: readonly [number, number] } | null = null;
+  // (near it first, up to 9 away on each side; then as far as the board goes)
+  for (const [lo, hi] of [[0.5, 9], [9, s.board.w + s.board.h]])
+    for (const [ox, oz, to] of [[0, -1, [0, 1]], [-1, 0, [1, 0]], [1, 0, [-1, 0]]] as const)
+      for (let d = lo; d < hi && !at; d += 0.25) {
+        const x = ox ? (ox < 0 ? x0 - d : x1 + d) : cx, zz = oz ? z0 - d : cz;
+        if (inBoard(x, zz) && standsOff(t, s, x, zz, to, TOWER_FOOT, 1.1)) at = { x, z: zz, to };
+      }
+  if (!at) report(z, { by: "hidden", why: "room" });
   const tower = new THREE.Group();
+  tower.name = "serac tower";
   for (let k = 0; k < 3; k++) {
     const w = 2.2 - k * 0.45, h = 1.5 + rand() * 0.4;
     const b = drawn(rbox(w, h, w * 0.8, 0.15), ICE_SOLID);
@@ -2279,9 +2323,18 @@ function serac(z: Zone, t: Terrain, s: Hole) {
   cap.scale.set(1, 0.4, 0.8);
   cap.position.set(0, 4.4, 0.7);
   tower.add(cap);
-  tower.rotation.x = tz < cz ? 0.12 : -0.12; // leaning out over the path
-  if (tz > cz) tower.rotation.y = Math.PI;
-  g.add(onGround(tower, cx, tz, t));
+  tower.rotation.order = "YXZ"; // (its lean turned with it, toward the spot)
+  tower.rotation.x = 0.12;
+  if (at) (tower.rotation.y = Math.atan2(at.to[0], at.to[1])), g.add(onGround(tower, at.x, at.z, t));
+  // (in the Builder: refused where it would stand between the player's camera and the ball or the cup: sight.ts)
+  if (at && state.report && hidesPlay(tower, s, t)) report(z, { by: "hidden", why: "view" });
+  // and in play, on any screen, it fades out of the camera's way as the trees do (the canopy fade): watched at its
+  // middle and at its leaning top (worlds' pieceFade: course.ts fadeOf gathers it)
+  if (at) {
+    tower.updateMatrixWorld(true);
+    const mats = ownFade(tower);
+    ud(tower).fade = fadeLoop([[0, 1.5, 0.2], [0, 3.8, 0.7]].map(([x, y, zz]) => ({ at: tower.localToWorld(new THREE.Vector3(x, y, zz)), r: 1.4, mats })));
+  }
   // the fall: blocks dropping on the spot, and the shadow before them
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 28).scale(ax * 0.85, az * 0.85, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1d3550, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
   shadow.position.set(cx, t.height(cx, cz) + 0.06, cz);
@@ -2327,6 +2380,17 @@ function serac(z: Zone, t: Terrain, s: Hole) {
   return g;
 }
 
+/** The skins piece() draws from the piece alone (the builder's palette, worlds.ts Skins); a lift is its cable's (decor). */
+const skins: Skins = {
+  post: ["pine", "boulder", "snowman", "chalet", "skater"],
+  bar: ["net"],
+  surface: ["ice", "snowdrift"],
+  slope: ["kicker", "terrace", "downhill", "slope", "saddle crest", "bank"],
+  air: ["gust"],
+  hazard: ["cliff", "serac", "crevasse"],
+  tunnel: ["ice cave", "door"],
+};
+
 function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole) {
   const skin = item.skin || "";
   const rand = seeded("mpiece" + s.hole + JSON.stringify("c" in item ? item.c : "min" in item ? item.min : []));
@@ -2335,7 +2399,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
     const post = item as Post; // (kind says which)
     const [x, z] = post.c, r = post.r;
     const makers: Record<string, () => THREE.Group> = { pine: () => pinePost(r, rand), boulder: () => boulder(r, rand), snowman: () => snowmanPost(r), chalet: () => chaletPost(r, night), skater: () => skaterPost(r, rand, r > 0.8) };
-    const make = makers[skin];
+    const make = own(makers, skin);
     return make ? onGround(make(), x, z, t) : undefined;
   }
   if (kind === "wall") {
@@ -2560,4 +2624,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
   return undefined;
 }
 
-export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, liftPlan, liftChairs };
+// (a piece's own fade gathered with the canopy's: the serac's tower)
+const pieceFade = true;
+
+export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, skins, pieceFade, liftPlan, liftChairs };

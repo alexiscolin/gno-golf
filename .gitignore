@@ -8,6 +8,10 @@ media/*
 !media/promo/
 !media/lib/
 !media/og/
+# the gnome collection's renderer, its thumbnails and the Legendaries' turntables (npm run gnomes:thumbs)
+!media/gnomes/
+# the Builder palette's pictures' renderer (npm run builder:tiles; the pictures are web/public/builder/tiles/)
+!media/builder/
 # promo renders and the music file are rebuilt by media/promo/render.mjs
 media/promo/*.mp4
 media/promo/music/
@@ -21,7 +25,9 @@ gnohome/
 scripts/wasm/p/
 scripts/wasm/gnovm/
 scripts/wasm/sources.go
+scripts/wasm/sources_builder.go
 scripts/wasm/r/gnogolf/golf/golf.go
+scripts/wasm/r/gnogolf/golf/golf_builder.go
 
 # local tool settings
 .netlify/
@@ -29,3 +35,6 @@ media/promo/*-cover.jpg
 
 # internal notes, decisions by hand and the bot check cron: their own repo (gno-golf-private)
 private/
+
+# Legal drafts and the lawyer pack stay out of the public repo (kept privately)
+docs/superpowers/legal/

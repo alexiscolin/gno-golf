@@ -1,0 +1,321 @@
+/* The gnome shop's own pieces (components/gnomes/*), on the game's tokens,
+   controls, sheet and front screen (globals.css, title.css): only what the
+   game had no piece for. Loaded with the shop's chunk; nothing here touches
+   a screen of the game. The GUI spec's mockups (kit.css, "NEW") are the
+   reference. */
+
+/* the tiers: one colour and one shape each (the shape reads in grey too); never --chain's blue */
+:root {
+  --tier-common: #e8dfcc; --tier-rare: #7cc8f0; --tier-epic: #c6a4f5; --tier-legendary: #ffd75e;
+}
+/* (every gap, padding and margin of the shop's pieces on the game's spacing scale: globals.css --sp-*) */
+.shop, .gsheet { font-variant-numeric: tabular-nums; }
+
+/* a tier's chip: its shape and its name, on its colour */
+.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; --tier-bg: var(--tier-common); background: var(--tier-bg); }
+.tier svg { width: 14px; height: 14px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.tier--rare { --tier-bg: var(--tier-rare); }
+.tier--epic { --tier-bg: var(--tier-epic); }
+.tier--legendary { --tier-bg: var(--gold-grad); }
+.tier--earned { --tier-bg: var(--green-light); }
+
+/* a gnome's tile: his thumbnail on his tier's stage, framed in his tier's rim */
+.gtile { position: relative; display: block; aspect-ratio: 1; border-radius: 18px; border: var(--edge-bold); background: #f6ead2; overflow: hidden; }
+.gtile img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.gtile::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none; }
+.gtile--rare::before { box-shadow: inset 0 0 0 5px var(--tier-rare), inset 0 0 0 7px var(--ink); }
+.gtile--epic::before { box-shadow: inset 0 0 0 6px var(--tier-epic), inset 0 0 0 8px var(--ink); }
+.gtile--legendary { background: repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg); }
+.gtile--legendary::before { box-shadow: inset 0 0 0 7px var(--tier-legendary), inset 0 0 0 9px var(--ink); }
+.gtile--never img { filter: grayscale(1) brightness(1.15) opacity(.3); }
+.gtile--never { border-style: dashed; border-color: rgba(var(--ink-rgb), .35); background: rgba(var(--ink-rgb), .04); }
+
+/* the gallery: its width the cups', within the screen's room (never 100vw: a sideways scroll), its pieces on one
+   column; a front screen's head (the rival's: title.css .front--fit) but the screen scrolling from its top, the
+   head in the corner buttons' row, the gutters slim (the banner's room at the end, as the cups') */
+.screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { justify-content: flex-start; padding: 0 40px 48px; } /* (24 inside the page's frame, 16 in) */
+body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room); }
+@media (max-width: 600px) { .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { padding-inline: 16px; } } /* (the page's frame closer: globals.css) */
+.shop .worlds__in { width: min(1160px, 100%); display: grid; gap: var(--sp-4); justify-items: stretch; }
+.shop .front__head { justify-self: center; }
+/* a player's page's Race: centred at its own width, as every call to action of the game (the column stretches the rest) */
+.shop .worlds__in > .btn--cta { justify-self: center; }
+
+/* the sale's end: a date to know, flat, never a countdown */
+.closes { justify-self: center; display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 5px 14px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink-soft); text-align: center; }
+.closes b { color: var(--ink); white-space: nowrap; }
+
+/* the shop's slots (ShopFrame): the same height before and after their figures are read */
+.closes-slot { min-height: 34px; display: grid; justify-items: center; align-items: center; }
+.gcard__buy.gcard__buy--skel { background: rgba(var(--ink-rgb), .08); border-color: transparent; box-shadow: none; }
+.shop__pitch { margin: var(--sp-2) auto 0; max-width: 640px; text-align: center; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); } /* (small words in ink: the soft ink is under 4.5:1 on a front's ground) */
+/* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
+.gcard__buy { justify-self: stretch; margin: var(--sp-2) 0 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
+.wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
+
+/* the shop's head: the game's front head (its pill, its title at the rival's size, its line), level with the corner
+   buttons; then the sale's line and the toolbar, the gnomes above the fold */
+/* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf */
+/* room to breathe, the game's steps: 32 between the head, the card, the toolbar and the shelf, the card a step more
+   on each side (40); a phone a step tighter (24, the card 28) */
+.shop .worlds__in { padding-top: 34px; gap: var(--sp-6); }
+.shop .wcard { margin-block: var(--sp-1); }
+.shop .gbar { margin-top: var(--sp-2); } /* (40 over the toolbar, 32 under it: the toolbar the gallery's) */
+@media (max-width: 700px) { .shop .worlds__in { gap: var(--sp-5); } .shop .wcard { margin-block: var(--sp-1); } }
+.shop .front__head { margin: 0; }
+/* a phone: the title alone (title.css), between the corner buttons, a line clear of them */
+@media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } .shop .worlds__title { margin-inline: 56px; } }
+@media (max-width: 380px) { .shop .worlds__title { font-size: 30px; } } /* (a narrow phone: clear of the corner buttons it sits between) */
+/* the sale's card: the game's front card (title.css: paper, the inked edge, its radius and drop), centred at the
+   gallery's width, 720 at most, compact: the wave's Legendary on the left, its title with the state's chip at its
+   right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
+   (fixed tracks: the slot while it is read is the same room) */
+.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: calc(var(--sp-5) + var(--sp-1)); color: var(--ink); font-style: normal; text-align: left; } /* (28 round its words) */
+.wcard__legend { grid-area: legend; align-self: center; width: 48px; height: 48px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
+.wcard__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
+.wcard__title { grid-area: title; min-width: 0; font-size: 17px; font-weight: 800; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (the pitch line's words: its family, weight and upright style) */
+.wcard__count { grid-area: count; min-width: 0; font-size: 14px; font-weight: 600; font-style: normal; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wcard__who::before { content: " · "; }
+.wcard__who b { font-weight: 800; }
+.wcard__chip { grid-area: chip; justify-self: end; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 8px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.wcard__chip svg { width: 14px; height: 14px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
+.wcard__short { display: none; }
+.wcard--closed { grid-template-areas: "title title title" "count count count" "fw fw fw"; justify-items: center; text-align: center; }
+/* the fairway, from the tee to the flag, the ball at the share that found a player, 12 under the words (its track 36) */
+.fw { grid-area: fw; align-self: end; position: relative; width: 100%; height: 24px; margin-top: var(--sp-3); }
+.fw__lane { position: absolute; left: 0; right: 0; top: 2px; height: 20px; border: var(--edge); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 12px, #a3e6bf 12px 24px); }
+.fw__tee { position: absolute; left: 8px; top: 6px; width: 3px; height: 12px; border-radius: 2px; background: var(--paper); border: 1.5px solid var(--ink); }
+.fw__flag { position: absolute; right: 5px; top: -8px; width: 15px; height: 30px; overflow: visible; } /* (its cup on the lane, its flag over it) */
+.fw__cup { fill: var(--ink); }
+.fw__ball { position: absolute; top: 4px; left: calc(14px + var(--at) * (100% - 48px)); width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
+.fw__ball::after { content: ""; position: absolute; left: 2px; top: 3px; width: 3px; height: 3px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
+@keyframes fw-roll { from { left: 14px; transform: rotate(-600deg); } }
+@media (prefers-reduced-motion: reduce) { .fw__ball { animation: none; } }
+/* a phone: the count and the Legendary's words on two clean lines, the chip's words short */
+@media (max-width: 480px) {
+  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: 22px 36px 36px; column-gap: var(--sp-2); padding: calc(var(--sp-4) + var(--sp-1)); } /* (20 round it) */
+  .wcard__legend { width: 40px; height: 40px; }
+  .wcard__title { font-size: 15px; }
+  .wcard__count { font-size: 13px; line-height: 18px; }
+  .wcard__chip { gap: 4px; padding: 0 8px 0 6px; font-size: 11px; }
+  .wcard__chip svg { width: 12px; height: 12px; }
+  .wcard__count > span { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .wcard__who::before { content: none; }
+  .wcard__long { display: none; } .wcard__short { display: inline; }
+}
+/* a narrow phone: the card a step tighter, so the title and the chip share their line whole */
+@media (max-width: 380px) {
+  .wcard { grid-template-columns: 36px minmax(0, 1fr) auto; padding: var(--sp-3); }
+  .wcard__legend { width: 36px; height: 36px; }
+  .wcard__title { font-size: 14px; }
+  .wcard__chip { padding: 0 7px; } .wcard__chip svg { display: none; } /* (its words alone: the clock's room is the title's) */
+}
+
+/* one toolbar on the gallery's grid: which gnomes at its left edge, the tiers (their prices, once) in its centre, the
+   look, the search and more filters at its right edge, the two side groups one width (the tiers evenly between);
+   every control the small size (32), on one line; two lines narrower, the tiers under, 8 apart; a phone's two lines
+   one height, 36 (each line's height fixed: the slot while it is read is the same room) */
+.gbar { --side: 196px; display: grid; grid-template-columns: minmax(var(--side), 1fr) auto minmax(var(--side), 1fr); grid-template-areas: "views tiers end"; grid-template-rows: 32px; align-items: center; gap: var(--sp-2) var(--sp-4); }
+.gbar__views { grid-area: views; justify-self: start; min-width: var(--side); } .gbar__tiers { grid-area: tiers; } .gbar__end { grid-area: end; justify-self: end; display: flex; align-items: center; gap: var(--sp-2); }
+.gbar__views button { flex: 1; }
+/* every control the same height, on one line: the toolbar's rhythm */
+.gbar .seg button { min-height: 28px; font-size: 13px; } /* (in the segment's 2 px edge: 32 all told; the words of one size, on one baseline) */
+.gbar__views button { padding: 4px 12px; white-space: nowrap; }
+.gbar__tiers { display: flex; align-items: center; justify-content: center; gap: var(--sp-2); min-width: 0; }
+.tierbtn__unit { font-size: 11px; }
+/* a tier's chip as the shelf's filter (Button, small): its shape and colour its tier's, its name bold, its price
+   lighter; pressed, the one selected look (gold, globals.css), its shape kept, the others faded */
+.tierbtn { gap: 5px; padding: 0 10px 0 7px; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.tierbtn svg { width: 12px; height: 12px; }
+.tierbtn__price { margin-left: 2px; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; opacity: .75; }
+.tierbtn[aria-pressed="true"] { background: var(--gold); }
+.gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
+.gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
+.gbar__icon svg, .gsearch svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
+.gbar__more svg circle { fill: var(--paper); }
+/* the search open: a row of its own under the toolbar, the gallery's width (over nothing, the toolbar unmoved) */
+.gsearch { display: flex; align-items: center; gap: var(--sp-2); width: 100%; height: 44px; padding: 0 6px 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); }
+.gsearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
+.gsearch input::-webkit-search-cancel-button { display: none; }
+.gsearch:focus-within { outline: var(--ring); outline-offset: 2px; }
+.gsearch__close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.gsearch__close svg { width: 16px; height: 16px; }
+.gbar--skel { min-height: 32px; }
+/* under the widest: the tiers' unit said once by their label (GNOT), so the one line still fits */
+@media (max-width: 1179px) { .tierbtn__unit { display: none; } }
+/* narrower: the tiers on a line of their own, in the centre, 8 under the first */
+@media (max-width: 959px) {
+  .gbar, .gbar--skel { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "views end" "tiers tiers"; grid-template-rows: 32px 32px; min-height: 72px; }
+  .gbar__views { min-width: 0; }
+}
+/* a phone: which gnomes, the look and the search; then the tiers (a shape and a price each, the name said to a
+   screen reader) spread to more filters at the line's end; both lines 36 */
+@media (max-width: 700px) {
+  .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views look search" "tiers tiers tiers"; grid-template-rows: 36px 36px; column-gap: var(--sp-2); min-height: 80px; }
+  .gbar__end { display: contents; }
+  .gbar__find { grid-area: search; } .gbar__end > .seg--look { grid-area: look; }
+  .gbar__more { grid-area: tiers; justify-self: end; } /* (at the tiers' line's end) */
+  .gbar .btn { --h: 36px; }
+  .gbar .seg button, .gbar .gbar__end > .seg--look button { min-height: 32px; }
+  .gbar__views { justify-self: stretch; display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; }
+  .gbar__tiers { justify-self: stretch; justify-content: flex-start; gap: var(--sp-2); width: calc(100% - 36px - var(--sp-2)); }
+  .gbar__tiers .tierbtn { flex: 1; justify-content: center; }
+  .tierbtn__name { display: none; }
+  .tierbtn { padding: 0 6px 0 5px; }
+}
+
+/* more filters, unfolded under the toolbar */
+.gfilters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.gfilters__search { flex: 1 1 180px; min-width: 0; height: 44px; padding: 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); }
+/* the look switch (3D · On chain): small, in the toolbar on a phone too */
+.seg.seg--look { flex: none; width: auto; box-shadow: none; }
+.seg--look button { min-height: 40px; padding: 6px 11px; font-size: 13px; white-space: nowrap; }
+.gbar .seg--look button { min-height: 28px; padding-inline: 10px; }
+@media (max-width: 700px) { .gbar .seg--look button { padding-inline: 8px; font-size: 12px; } }
+
+/* the grid of cards: as many columns as fit, two on a phone */
+.gshelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); gap: var(--sp-5); } /* (a card wide enough for a long name and its number, with its room inside) */
+@media (max-width: 600px) { .gshelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); } }
+/* a card: a column as tall as its row (the row's cards one height), its name, its tier over its fact, its Buy at its foot */
+.gshelf > li { display: flex; }
+.gcard { display: flex; flex-direction: column; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
+.gcard:hover { transform: translateY(-3px); }
+/* the name on two lines at most, his number right after it (its room kept: two lines whatever the name, the blank
+   card's too) */
+.gcard__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 2.3em; margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; }
+.gcard__name small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+/* his tier over his fact, always (fixed rows: every card the same) */
+.gcard__foot { display: grid; grid-template-rows: 24px 18px; align-items: center; justify-items: start; gap: var(--sp-1); margin: 0 2px; }
+.gcard__foot:not(:last-child) { margin-bottom: var(--sp-2); } /* (8 more over Buy) */
+.gcard > :last-child { margin-top: auto; } /* (the last line at the card's foot) */
+@media (max-width: 600px) { .gcard { padding: var(--sp-2); } } /* (with its 3 px edge, 11 round a phone's card) */
+.gcard__fact { max-width: 100%; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcard--mine { background: var(--ink); color: var(--paper); }
+.gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
+.gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
+.gcard--skel { pointer-events: none; }
+.gcard--coming { cursor: default; box-shadow: none; border-style: dashed; }
+.gcard--coming:hover { transform: none; }
+.gcard--skel .gtile { background: rgba(var(--ink-rgb), .06); }
+.gshelf__more { justify-self: center; }
+.gempty { justify-self: center; text-align: center; color: var(--ink-soft); }
+
+/* secondary things wait behind a tap: a native <details>, a dashed link opening in place */
+.more { margin: 0; font-size: 14px; }
+.more > summary { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; cursor: pointer; list-style: none; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::after { content: "▾"; text-decoration: none; }
+.more[open] > summary::after { content: "▴"; }
+.more > :not(summary) { margin-top: 6px; color: var(--ink-soft); line-height: 1.45; }
+
+/* the trust strip: short facts under a buy button */
+.trust { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-1) var(--sp-4); margin: 0; padding: 0; list-style: none; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.trust li { text-align: center; } /* (a line that wraps on a phone stays centred under the first) */
+
+/* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
+.gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-5); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
+html:has(.gsheet) { overflow: hidden; }
+/* the shop's sheets open inside its screen (its stacking context, under the network banner, a later sibling): the
+   banner goes while one is open, as the corner buttons do (globals.css), never a chip over the sheet's Buy */
+body:has(.shop .sheet) .netbanner { visibility: hidden; }
+.gsheet > * { margin: 0 !important; }
+/* a gnome's sheet on one axis, centred: his picture, the look switch 16 under it, who he is (his tier and number on one
+   line, his name 8 under); then 24 between each group: his line, his price block, his traits, the share; then his
+   action in the footer */
+.gsheet__head { display: grid; justify-items: center; gap: var(--sp-4); text-align: center; }
+.gsheet__id { display: grid; justify-items: center; gap: var(--sp-2); width: 100%; text-align: center; }
+.gsheet__meta { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-2); }
+.gsheet .more { text-align: center; }
+.gsheet .more .review { text-align: left; }
+.gsheet__head .gtile { width: min(220px, 60vw); }
+.gsheet__head--small .gtile { width: 64px; border-radius: 14px; }
+.gsheet__head h2 { padding-inline: 40px; overflow-wrap: anywhere; }
+.gsheet__meta { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.gsheet__line { margin: 0; color: var(--ink) !important; text-align: center; text-wrap: pretty; }
+/* the price block: his price, the trust lines under it, 8 apart; the price stronger than the small print */
+.gsheet__offer { display: grid; justify-items: center; gap: var(--sp-2); }
+.gsheet .gsheet__price { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); text-align: center; }
+.gsheet .gsheet__price small { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+/* the share: its icons on the axis, no label */
+.gsheet .share { justify-self: center; padding: 6px 10px; }
+.gsheet .share__label { display: none; }
+/* the close in the corner, level with the picture's top (a phone: 12 in, the picture clear of it) */
+.gsheet .sheet__close { top: 22px; right: 22px; }
+@media (max-width: 600px) { .gsheet .sheet__close { top: 12px; right: 12px; } }
+.gsheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-4) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-3); text-align: center; }
+/* (its negative bottom margin is the sheet's last child's: with Traits and Share after it, it sits in the flow, never over them) */
+.gsheet__foot:not(:last-child) { margin-bottom: 0 !important; }
+.gsheet__foot .btn { margin: 0; width: 100%; }
+.gsheet__foot .btn--save { min-height: 52px; }
+.gsheet .real__fine, .gsheet__fine { margin: 0; font-size: 12px; color: var(--ink-soft); text-align: center; }
+/* a phone: 16 between the parts, 16 over and under the footer's rule, the picture clear of the close by 8 at least */
+@media (max-width: 600px) {
+  .gsheet.sheet__in { gap: var(--sp-4); }
+  .gsheet__foot { bottom: -22px; margin: 0 -18px -22px !important; padding: var(--sp-4) 18px 22px; }
+  .gsheet__head .gtile { width: min(200px, 52vw); }
+}
+
+/* the order, term by term: label left, term right; one column on a phone */
+.review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-3) var(--sp-4); margin: 0; padding: var(--sp-4) var(--sp-5); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; }
+.review dt { font-weight: 700; color: var(--ink-soft); }
+.review dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 600px) { .review { grid-template-columns: 1fr; gap: 0; font-size: 15px; } .review dd { margin-bottom: var(--sp-2); } }
+/* a consent: its own box, never pre-ticked; the order waits for both */
+.box { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; padding: var(--sp-4); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.4; cursor: pointer; }
+.box input { width: 22px; height: 22px; margin: 0; accent-color: var(--green); }
+.box:has(input:checked) { border-color: var(--green); background: #eaf4ee; }
+@media (max-width: 600px) { .box { font-size: 15px; } }
+.legal { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); text-align: center; }
+.legal a, .gsheet a { color: var(--green); }
+/* the receipt: printed, or saved as a PDF, alone */
+.receipt { display: grid; gap: var(--sp-3); padding: var(--sp-5); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--white); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.receipt h3 { margin: 0; font-size: 16px; }
+.receipt p { margin: 0 !important; color: var(--ink) !important; }
+@media print {
+  body * { visibility: hidden !important; }
+  .receipt, .receipt * { visibility: visible !important; }
+  .receipt { position: fixed; inset: 0; border: 0; }
+}
+/* the moment a gnome is yours: the tile pops in */
+.gsheet--done .gtile { animation: pop .5s var(--spring); }
+.gsheet__hop .gtile { animation: ghop .7s ease-in-out infinite alternate; }
+@keyframes ghop { to { transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { .gsheet--done .gtile, .gsheet__hop .gtile { animation: none; } }
+
+/* the picker: one row of the gnomes a player holds, under the game's stage, and one line */
+.owned { display: grid; gap: var(--sp-2); justify-items: center; width: min(360px, 100%); margin: var(--sp-2) auto 0; }
+.owned__line { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); text-align: center; }
+.owned__row { display: flex; gap: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-2); overflow-x: auto; overscroll-behavior: contain; scrollbar-width: none; border: 2px solid var(--gold); border-radius: var(--pill); background: rgba(var(--paper-rgb), .7); }
+.owned__row::-webkit-scrollbar { display: none; }
+.owned__face { flex: none; width: 44px; height: 44px; padding: 0; border: var(--edge); border-radius: 50%; overflow: hidden; background: #f6ead2; cursor: pointer; }
+.owned__face img { width: 100%; height: 100%; object-fit: cover; }
+.owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }
+
+/* ---------------------------------------------------------------- the collection on the game's screens (Promo.tsx) */
+/* the picker's Collection section, between the tile and the aim card (the GUI spec's A3), at least the aim card's
+   width: one slim row about a button high, its thumbnails, its line and its button on one middle line; the line
+   shortened at its end, never wrapped on a computer, two lines at most on a phone; the player's own gnomes, their
+   line over their faces, the whole collection under them */
+.gcollect { display: flex; align-items: center; gap: var(--sp-3); width: fit-content; min-width: max(var(--pick-w, 100%), 230px); max-width: 100%; margin: 0 auto var(--gap-l, 12px); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
+.gcollect:has(.owned) { flex-direction: column; align-items: stretch; width: max(var(--pick-w, 100%), 230px); }
+.gcollect .owned { min-width: 0; width: 100%; margin: 0; }
+.gcollect__all { align-self: center; font-size: 13px; }
+/* a stack of thumbnails: one size, one frame (the ink's edge round a ring of the tier's colour), on one ground */
+.gcollect__faces { flex: none; display: flex; }
+.gcollect__faces .gtile { --rim: var(--tier-common); width: 32px; border: 2px solid var(--ink); border-radius: 10px; background: #f6ead2; }
+.gcollect__faces .gtile::before { box-shadow: inset 0 0 0 2px var(--rim); }
+.gcollect__faces .gtile--rare { --rim: var(--tier-rare); } .gcollect__faces .gtile--epic { --rim: var(--tier-epic); } .gcollect__faces .gtile--legendary { --rim: var(--tier-legendary); }
+.gcollect__faces .gtile + .gtile { margin-left: -8px; }
+.gcollect__faces .gtile:nth-child(n + 5) { display: none; }
+.gcollect__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.gcollect__text b { font-weight: 800; }
+@media (max-width: 600px) {
+  .gcollect__faces .gtile:nth-child(n + 4) { display: none; }
+  .gcollect__text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+.gcollect--door { color: inherit; font: inherit; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
+.gcollect--door:hover { transform: translateY(-2px); }
+.gcollect__go { flex: none; pointer-events: none; }
+/* the finish card's one line, at its foot */
+.gpromo__line { margin: 12px 0 0; text-align: center; font-size: 14px; }

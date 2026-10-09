@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
 import { sight } from "../lib/scene/data.ts";
-import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nameRefusal, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink, byStanding, standingVs, courseCount, countWord, minesHint, readMs } from "../components/common.ts";
+import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nameRefusal, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink, byStanding, standingVs, courseCount, countWord, minesHint, readMs, authorFirst, authorMark } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -205,4 +205,14 @@ test("minesHint: a mines hole's signature by its slot or id, none off the mines"
 test("readMs: a line stays up long enough to read, longer as it grows", () => {
   assert.equal(readMs("Short."), 6000);
   assert.ok(readMs("x".repeat(95)) > readMs("x".repeat(60)));
+});
+
+test("the community's holes: those their author has holed first (in their order), then the rest; each marked once the chain says", () => {
+  const row = (id: string) => ({ id, name: id, official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "" });
+  const list = ["a", "b", "c", "d"].map(row), holed = new Map([["c", true], ["a", false], ["d", true]]);
+  assert.deepEqual(authorFirst(list, holed).map((h) => h.id), ["c", "d", "a", "b"]);
+  assert.deepEqual(list.map((h) => h.id), ["a", "b", "c", "d"], "the list itself unchanged");
+  assert.equal(authorMark(true), "Holed by its author");
+  assert.equal(authorMark(false), "Not yet holed by its author");
+  assert.equal(authorMark(undefined), "", "not read yet: nothing said");
 });

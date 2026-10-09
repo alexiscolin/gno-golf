@@ -17,7 +17,7 @@ import { weatherLooks, look, bakeLocal } from "./bake";
 import { animate } from "./state";
 import { seeded, GRASS, placer, shown, type Rand } from "./common";
 import { ud, md, type Hole, type Height } from "./data";
-import type { Bar } from "./worlds";
+import type { Bar, Skins } from "./worlds";
 import { VOID_ROWS, VOID_BANDS, VOID_FLOOR, voidEdges } from "./course";
 import { gnomeIn } from "./gnome";
 import { terrain, mod, boxOf, inZone, inSea, smoothstep, cupRadius, segDist, CELL, type Terrain } from "../terrain";
@@ -34,6 +34,7 @@ import * as pieces from "./mines-pieces";
 import * as rides from "./mines-rides";
 import { signs, pulseSigns } from "./mines-signs";
 import type { Extras, MutVec2, Post, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 // ------------------------------------------------------------ the cave
 //
@@ -786,8 +787,10 @@ function merge(list: THREE.BufferGeometry[]) {
   for (const q of flatList) n += q.attributes.position.count;
   const out = new THREE.BufferGeometry();
   for (const name of names) {
+    // eslint-disable-next-line no-restricted-syntax -- a geometry's own attribute name
     const size = flatList[0].attributes[name].itemSize, arr = new Float32Array(n * size);
     let o = 0;
+    // eslint-disable-next-line no-restricted-syntax -- a geometry's own attribute name
     for (const q of flatList) (arr.set(q.attributes[name].array, o), (o += q.attributes[name].array.length));
     out.setAttribute(name, new THREE.BufferAttribute(arr, size));
   }
@@ -2549,6 +2552,26 @@ const kerb = { color: MINES.timber, post: MINES.iron };
 /** Under ground: the cave's light, or the dark galleries'. */
 const time = (s: Hole) => (darkGallery(s) ? "gallery" : "cave");
 
+/**
+ * The skins piece() draws from the piece alone (the builder's palette,
+ * worlds.ts Skins): mines-pieces' posts and lone walls, mines-machines'
+ * machines (drawn while they run: timed), mines-zones' ground. The rides
+ * (mines-rides: a cage, a cart, a corkscrew...) and a stroke's set pieces
+ * (mines-pulses) are compositions; the void is the world's own.
+ */
+const skins: Skins = {
+  post: ["stalagmite", "prop", "buffer", "crystal bumper", "jewel bumper", "frozen fall", "bat"],
+  rail: ["rockface", "crystal", "crystal bumper", "grate", "rope", "railguard"],
+  bar: [
+    "rockface", "crystal", "crystal bumper", "grate", "rope", "railguard",
+    "stamp", "paddle", "pickaxe", "drill", "piston", "swing door", "safe door", "boulder", "cage door", "crystal gate", "tripwire", "stalactite",
+  ],
+  surface: ["rubble", "ore", "ballast", "drip pool", "ice", "gold", "causeway"],
+  slope: ["incline", "ledge bank", "kicker", "conveyor"],
+  air: ["vent", "booster", "magnet"],
+  hazard: ["lava", "shaft", "sump", "hot spring", "ore bin"],
+};
+
 function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole): THREE.Object3D | null | undefined {
   // the void is the world's: drawn by base (the chasm), edging (its rim) and the lane's own cut face
   if (kind === "zone" && (item as Zone).skin === "void") return new THREE.Group();
@@ -2571,7 +2594,7 @@ const walls = true, fallCam = true, ahead = 2, ghostLine = true, pieceFade = tru
 // the machines standing over the kerb, as drawn: the water wheel's paddles and rim, the cage's lattice, the doors' leaves
 // (a cage door to its lintel, 4.2: drawn up, the lattice hangs over the lane there, the camera sees over that too; a vault door's disc, 5.5)
 const TALL: Record<string, number> = { paddle: 4, "cage door": 4.2, "swing door": 2, "safe door": 2, "vault door": 5.5 };
-const wallHeight = (skin: string) => TALL[skin];
+const wallHeight = (skin: string) => own(TALL, skin);
 /** What a ball off the lane at (x, z) falls onto, as the pit is drawn there (its floor, pitFloor's pitAt and pitWet: its lake,
  *  its lava seam, dry floor), and the hazard whose ending it gets; undefined where no floor is drawn (the dark). */
 const pit = (s: Hole, x: number, z: number) => {
@@ -2582,4 +2605,4 @@ const pit = (s: Hole, x: number, z: number) => {
 };
 // the chase camera keeps clear of the pieces and over the cave's relief
 const camSolids = true, camFloor = (s: Hole) => caveOf(s).floor;
-export { base, edging, berms, decor, rough, green, kerb, time, baked, laneLook, lifted, piece, extras, walls, ahead, ghostLine, pieceFade, route, wallHeight, camSolids, camFloor, wearStep, ring, fallIn, fallCam, pit, open, track };
+export { base, edging, berms, decor, rough, green, kerb, time, baked, laneLook, lifted, piece, skins, extras, walls, ahead, ghostLine, pieceFade, route, wallHeight, camSolids, camFloor, wearStep, ring, fallIn, fallCam, pit, open, track };

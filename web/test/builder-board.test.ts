@@ -1,0 +1,279 @@
+// The board's edits (lib/builder/handles.ts, edit.ts, session.ts), pure: a
+// handle keeps its piece within its entry's ranges and on the grid, a drag
+// of a handle or of the tee or the cup stops where the hole would break (as
+// a piece's does), the draft stays framed, a drag is one step of history.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { host, lane, rail } from "./builder-fixture.ts";
+import { build } from "./scene-harness.ts";
+import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, errorsOf, newErrors, nextId, pieceLabel, placeNear, placePiece, removePiece, toWorld } from "../lib/builder/edit.ts";
+import { handlesOf, notTurned, setHandle, snap, turnPiece } from "../lib/builder/handles.ts";
+import { frame } from "../lib/builder/gg1.ts";
+import { makeSession, settle } from "../lib/builder/session.ts";
+import { centreOn, gridLines, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
+import { loadPalette } from "../lib/builder/palette.ts";
+import { validate } from "../lib/builder/pipeline.ts";
+import type { Draft, Piece, V } from "../lib/builder/draft.ts";
+
+const garden = await loadPalette("garden");
+const { census } = await import("../lib/builder/drawn.ts");
+const ctx = { host, palette: garden, census };
+const entry = (id: string) => garden.find((e) => e.id === id)!;
+const put = (id: string, e: string, at: [number, number], p: Parameters<typeof placePiece>[3] = {}) => placePiece(entry(e), id, at, p);
+const errors = (d: Draft) => validate(d, ctx).issues.filter((i) => i.severity === "error");
+void build;
+/** The board's own quarters (these pieces in no framed hole: the tee's grid is the board's). */
+const O: V = [0, 0];
+
+void test("snap: to the step asked, half a unit or a quarter, from the grid's origin (the tee)", () => {
+  assert.deepEqual(snap([3.3, 7.8], 0.5, O), [3.5, 8]);
+  assert.deepEqual(snap([3.3, 7.8], 0.25, O), [3.25, 7.75]);
+  assert.deepEqual(snap([-0.2, 0.26], 0.25, O), [-0.25, 0.25]);
+  assert.deepEqual(snap([3.3, 7.8], 0.25, [4.5, 13.7]), [3.25, 7.7], "a hole framed off the board's quarters: its own");
+});
+
+void test("handles: a post's centre and radius, a rail's or a bar's ends, a zone's corners, a tunnel's way out", () => {
+  assert.deepEqual(handlesOf(put("p", "*/post/rock", [5, 5])).map((h) => h.key), ["c", "r"]);
+  assert.deepEqual(handlesOf(put("b", "*/bar/plank", [5, 5])).map((h) => h.key), ["a", "b"]);
+  assert.deepEqual(handlesOf(put("t", "*/tunnel/cave", [5, 5])).map((h) => h.key), ["min", "max", "to"]);
+  const poly: Piece = { ...put("z", "*/hazard/water", [5, 5]), geometry: { t: "poly", pts: [[5, 5], [9, 5], [5, 9]] } };
+  assert.deepEqual(handlesOf(poly).map((h) => h.key), ["p0", "p1", "p2"]);
+});
+
+void test("the board's grid lines: every unit from the tee, every fifth from it darker (a hole framed by a post's rim off the board's units)", () => {
+  const lines = gridLines([0, 0], [12, 3], [4.5, 1.7]);
+  assert.deepEqual(lines.filter((l) => l.x !== undefined).map((l) => l.x), [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5]);
+  assert.deepEqual(lines.filter((l) => l.x !== undefined && l.major).map((l) => l.x), [4.5, 9.5]);
+  assert.deepEqual(lines.filter((l) => l.y !== undefined).map((l) => +l.y!.toFixed(6)), [0.7, 1.7, 2.7]);
+  assert.deepEqual(lines.filter((l) => l.y !== undefined && l.major).map((l) => +l.y!.toFixed(6)), [1.7]);
+});
+
+void test("setHandle: within the entry's range and on the grid", () => {
+  const rock = put("p", "*/post/rock", [5, 5]);
+  assert.equal((setHandle(rock, "r", [50, 5], entry("*/post/rock"), O).geometry as { r: number }).r, 4.5, "a radius stops at its entry's most");
+  assert.equal((setHandle(rock, "r", [5.1, 5], entry("*/post/rock"), O).geometry as { r: number }).r, 0.3, "and its least");
+  assert.deepEqual((setHandle(rock, "c", [7.3, 2.6], entry("*/post/rock"), O).geometry as { c: number[] }).c, [7.25, 2.5]);
+  const plank = put("b", "*/bar/plank", [5, 5]);
+  const long = setHandle(plank, "b", [90, 5], entry("*/bar/plank"), O).geometry as { a: number[]; b: number[] };
+  assert.deepEqual(long.b, [45, 5], "a bar's length stops at 40");
+  const diag = setHandle(plank, "b", [60, 60], entry("*/bar/plank"), O).geometry as { a: number[]; b: number[] };
+  const len = Math.hypot(diag.b[0] - 5, diag.b[1] - 5);
+  assert.ok(len <= 40 && len > 39.5 && diag.b.every((v) => v * 4 === Math.round(v * 4)), `${len}`);
+  const pond = put("w", "*/hazard/water", [5, 5]);
+  const g = setHandle(pond, "max", [5.5, 200], entry("*/hazard/water"), O).geometry as { min: number[]; max: number[] };
+  assert.deepEqual([g.max[0] - g.min[0], g.max[1] - g.min[1]], [1.5, 80], "each side within 1.5 to 80");
+});
+
+void test("turnPiece: a quarter turn about its middle, on the grid", () => {
+  const plank = put("b", "*/bar/plank", [5, 5], { size: 4 });
+  assert.deepEqual((turnPiece(plank, O).geometry), { t: "bar", a: [7, 3], b: [7, 7], thick: 0.5 });
+  const rock = put("p", "*/post/rock", [5, 5]);
+  assert.deepEqual(turnPiece(rock, O).geometry, rock.geometry, "a round thing: unchanged");
+  // what R and Turn say of a piece turning leaves the same: never a silent key
+  assert.equal(notTurned(rock, O), "A round piece looks the same turned: nothing to turn.");
+  assert.equal(notTurned(plank, O), "");
+});
+
+void test("nextId, copyPiece, removePiece: a fresh name; a copy where it may go, framed; a removal (proofs kept: their key says whether they still hold)", () => {
+  const d = lane("garden", [put("p1", "*/post/rock", [12, 9])]);
+  assert.equal(nextId(d), "p2");
+  const c = copyPiece(d, "p1", ctx);
+  assert.ok(c, "a copy found a place");
+  assert.equal(c.pieces.length, d.pieces.length + 1);
+  assert.deepEqual(errors(c), []);
+  const proved = { ...d, proofs: [{ key: "k", id: "x", kind: "", period: 1, shots: [], commits: [], strokes: 1, maxWork: 1 }] };
+  const r = removePiece(proved, "p1");
+  assert.deepEqual([r.pieces.some((p) => p.id === "p1"), r.proofs], [false, proved.proofs]);
+  assert.equal(copyPiece(d, "nope", ctx), null);
+});
+
+void test("clampHandle: a radius dragged into the rail stops short of it", () => {
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  const to = clampHandle(d, "p", "r", [12, 0], ctx);
+  const r = (to.pieces.find((p) => p.id === "p")!.geometry as { r: number }).r;
+  const c = (to.pieces.find((p) => p.id === "p")!.geometry as { c: number[] }).c;
+  assert.ok(r > 0.8 && c[1] - r > 1.5, `r ${r}`);
+  assert.deepEqual(errors(to), []);
+});
+
+void test("clampEnd: the cup dragged onto a post stops clear of it; the tee likewise", () => {
+  const d = lane("garden", [put("p", "*/post/rock", [20, 9])]);
+  const to = clampEnd(d, "pin", [21.5, 10.5], ctx);
+  assert.deepEqual(errors({ ...d, pin: to }), []);
+  assert.ok(to[0] > 21.5 + 0.8, `${to.join(", ")}`);
+  assert.deepEqual(clampEnd(d, "tee", [6, 6], ctx), [6, 6], "a free place: as dragged");
+});
+
+void test("a release or a copy asks a bounded number of checks: a long drag onto a blocked place, a copy with no room near", () => {
+  let fits = 0;
+  const counted = { ...host, fit: (...a: Parameters<typeof host.fit>) => (fits++, host.fit(...a)) };
+  const quick = { host: counted, palette: garden };
+  const d = lane("garden", [put("p", "*/post/stump", [4, 4])], 90, 20);
+  const r = dropMove(d, "p", [91.25, 5.5], quick, { ...quick, census: ctx.census }); // the lane's length, clear, then onto its far rail
+  assert.ok(!("why" in r));
+  assert.ok(fits <= 60, `a drag of 80 units: ${fits} checks`);
+  const boxed = lane("garden", [rail("a", [10, 4], [16, 4]), rail("b", [16, 4], [16, 8]), rail("c", [16, 8], [10, 8]), rail("e", [10, 8], [10, 4]), put("q", "*/post/rock", [12.5, 5.5], { size: 1.2 })], 30, 20);
+  fits = 0;
+  copyPiece({ ...boxed, pieces: boxed.pieces.map((p) => (p.id === "q" ? { ...p, geometry: { t: "post" as const, c: [13, 6] as [number, number], r: 4 } } : p)) }, "q", quick);
+  assert.ok(fits <= 70, `a copy with no room: ${fits} checks`);
+});
+
+void test("the keyboard: a piece named for a screen reader by what and where it is; the armed piece dropped at the nearest place to a point that holds", () => {
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock at (13.5, 6.5)");
+  const at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
+  const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden }, ctx);
+  assert.ok(placed && !("why" in placed) && placed.draft.pieces.length === d.pieces.length + 1, "placed");
+  assert.deepEqual(errors(placed.draft), [], "where the hole holds");
+  assert.equal(placed.id, nextId(d), "and named, to be selected");
+  const big = garden.find((e) => e.id === "*/hazard/water")!;
+  assert.equal(placeNear(lane("garden", [], 8, 6), big, [4, 3], { host, palette: garden }, ctx), null, "nowhere it holds: nothing");
+});
+
+void test("the keyboard's drop searches with the fast checks and judges only the place found with the census: no freeze where the middle is taken", async () => {
+  const { STARTERS } = await import("../lib/builder/starters.ts");
+  let drawn = 0;
+  const counted = { ...ctx, census: (...a: Parameters<typeof census>) => (drawn++, census(...a)) }, quick = { host, palette: garden };
+  for (const [world, kind] of [["garden", "dogleg"], ["garden", "signature"], ["island", "dogleg"]] as const) {
+    const d = STARTERS[world][kind], palette = await loadPalette(world), at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
+    for (const e of palette.filter((x) => x.kind === "post" || x.kind === "hazard").slice(0, 4)) {
+      drawn = 0;
+      placeNear(d, e, at, { ...quick, palette }, { ...counted, palette });
+      assert.ok(drawn <= 2, `${world} ${kind} ${e.id}: ${drawn} census checks`);
+    }
+  }
+});
+
+void test("an edit as the editor makes it pays one census: the draft's own errors known from its check, the edit's from its own", () => {
+  let drawn = 0;
+  const full = { ...ctx, census: (...a: Parameters<typeof census>) => (drawn++, census(...a)) };
+  let kept = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  validate(kept, full); // (the editor's check of the draft as kept)
+  drawn = 0;
+  for (const step of [0.25, 0.5, 0.75]) {
+    // a nudge (Editor tryEdit): the edit judged against the draft's errors, kept, then checked as kept
+    const next = { ...kept, pieces: kept.pieces.map((q) => (q.id === "p" ? { ...q, geometry: { ...q.geometry, c: [12 + step, 5] as [number, number] } } as Piece : q)) };
+    assert.deepEqual(newErrors(errorsOf(kept, full), next, full), []);
+    kept = frame(next);
+    validate(kept, full);
+  }
+  assert.equal(drawn, 3, "three edits, three censuses");
+});
+
+void test("dragCheck: a drag (or the armed ghost) is checked again only when its snapped place changes; the hole without the piece once a drag", () => {
+  let fits = 0;
+  const counted = { ...host, fit: (...a: Parameters<typeof host.fit>) => (fits++, host.fit(...a)) };
+  const quick = { host: counted, palette: garden };
+  const d = lane("garden", [put("p", "*/post/stump", [12, 5])]);
+  const check = dragCheck(d, quick), p = d.pieces.find((x) => x.id === "p")!;
+  assert.deepEqual(check.piece(p), []);
+  const first = fits;
+  assert.ok(first <= 2, "the hole without it, and with it");
+  check.piece({ ...p });
+  check.piece(JSON.parse(JSON.stringify(p)) as Piece);
+  assert.equal(fits, first, "the same place, however the piece was built: no check");
+  const onRail = { ...p, geometry: { t: "post" as const, c: [13.5, 1.5] as [number, number], r: 0.8 } };
+  assert.ok(check.piece(onRail).length > 0);
+  assert.equal(fits, first + 1, "a new place: one check, the baseline kept");
+  assert.deepEqual(check.end("pin", d.pin), []);
+  const atEnd = fits;
+  check.end("pin", [...d.pin]);
+  assert.equal(fits, atEnd, "the cup where it was: no check");
+  assert.ok(check.end("pin", [13.5, 6.5]).length > 0, "the cup onto the post");
+});
+
+void test("dropMove, dropHandle, dropEnd: a release kept where it holds (census and all), clamped short of where it does not, or refused with why", () => {
+  const quick = { host, palette: garden };
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  const free = dropMove(d, "p", [18, 9], quick, ctx);
+  assert.ok(!("why" in free) && errors(free).length === 0);
+  const onRail = dropMove(d, "p", [13.5, 1.5], quick, ctx);
+  assert.ok(!("why" in onRail), "short of the rail");
+  assert.ok((onRail.pieces.find((x) => x.id === "p")!.geometry as { c: number[] }).c[1] > 2);
+  const r = dropHandle(d, "p", "r", [13.5, 0], quick, ctx);
+  assert.ok(!("why" in r) && errors(r).length === 0);
+  const tee = dropEnd(d, "tee", [6, 7], quick, ctx);
+  assert.ok(!("why" in tee) && errors(tee).length === 0);
+  const cup = dropEnd(d, "pin", [13.5, 6.5], quick, ctx);
+  assert.ok(!("why" in cup) && errors(cup).length === 0, "the cup dragged onto the post stops clear of it");
+});
+
+void test("toWorld: a draft moved to another world only if it holds there, judged with that world's palette", async () => {
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5], { size: 2 })]);
+  const town = await loadPalette("town");
+  const ok = toWorld(d, "town", town, ctx);
+  assert.ok(!("why" in ok) && !("refused" in ok) && ok.world === "town");
+  const tight = town.map((e) => (e.id === "*/post/rock" ? { ...e, size: { ...e.size, max: 1 } } : e));
+  const no = toWorld(d, "town", tight, ctx);
+  assert.ok("why" in no && /radius is 2/.test(no.why), JSON.stringify(no));
+});
+
+void test("the board's view: a wheel zooms about the pointer, a pinch about the fingers' midpoint (and pans with it)", () => {
+  const v = { x: 10, y: 5, k: 20 }, under = (w: typeof v, p: [number, number]) => [w.x + p[0] / w.k, w.y + p[1] / w.k];
+  const z = zoomAt(v, [300, 200], 40);
+  assert.deepEqual(under(z, [300, 200]), under(v, [300, 200]), "the point under the pointer stays");
+  assert.equal(zoomAt(v, [0, 0], 1000).k, K_MAX);
+  const spread = pinch(v, [[100, 100], [300, 100]], [[50, 100], [350, 100]]);
+  assert.equal(spread.k, 30, "fingers half as far apart again: half as close again");
+  assert.deepEqual(under(spread, [200, 100]), under(v, [200, 100]), "the board under the midpoint stays under it, not the corner");
+  const moved = pinch(v, [[100, 100], [300, 100]], [[140, 130], [340, 130]]);
+  assert.equal(moved.k, 20);
+  assert.deepEqual(under(moved, [240, 130]), under(v, [200, 100]), "both fingers moved: the board follows");
+});
+
+void test("settle: a slider let go is checked once a change (a release, a key up and a blur after one change: one check; a tab onto it: none)", () => {
+  let checks = 0;
+  const s = settle(() => checks++);
+  s.done();
+  assert.equal(checks, 0, "nothing changed: no check");
+  s.changed();
+  s.changed();
+  s.done();
+  s.done();
+  s.done();
+  assert.equal(checks, 1);
+});
+
+void test("centreOn: Show me puts the piece in the middle of the board, at the scale it is seen at", () => {
+  const v = centreOn({ x: 0, y: 0, k: 20 }, [30, 12], { w: 800, h: 400 });
+  assert.deepEqual(v, { k: 20, x: 30 - 400 / 20, y: 12 - 200 / 20 });
+});
+
+void test("a session: an edit beside a drag (the name, the slug) is made on the draft as kept, never on the drag's unchecked preview", () => {
+  const d = lane("garden", []), s = makeSession(d);
+  const dragged = { ...d, pieces: [...d.pieces, rail("x", [3, 0], [3, 20])] }; // across the tee: a drag cut short by a second finger
+  s.preview(dragged);
+  s.edit((k) => ({ ...k, title: "Named" }));
+  assert.equal(s.kept().title, "Named");
+  assert.deepEqual(s.kept().pieces, d.pieces, "the preview dropped, not kept");
+  assert.equal(s.now(), s.kept());
+});
+
+void test("a session: a drag previews as it goes and is one step of history once let go", () => {
+  const d = lane("garden", []), s = makeSession(d);
+  const a = { ...d, pieces: [...d.pieces, rail("x", [10, 2], [10, 4])] }, b = { ...a, pieces: [...d.pieces, rail("x", [10, 2], [10, 6])] };
+  s.preview(a);
+  s.preview(b);
+  assert.equal(s.now(), b);
+  assert.equal(s.kept(), d, "what is kept: never a drag under way");
+  s.commit();
+  assert.equal(s.now(), b);
+  assert.equal(s.undo(), d, "one undo: back before the drag");
+  assert.equal(s.redo(), b);
+  s.preview(a);
+  s.cancel();
+  assert.equal(s.now(), b, "a drag let go off the board: nothing");
+  s.set(a);
+  assert.equal(s.undo(), b, "a click's edit: one step");
+});
+
+void test("a session: proofs carried over an edit amend the step it is, never one of their own", () => {
+  const d = lane("garden", []), s = makeSession(d);
+  const a = { ...d, pieces: [...d.pieces, rail("x", [10, 2], [10, 4])] };
+  s.set(a);
+  const carried = { ...a, proofs: [{ key: "k", id: "x", kind: "", period: 1, shots: ["0,1"], commits: [[0, 1]] as [number, number][], strokes: 1, maxWork: 1 }] };
+  s.amend(carried);
+  assert.equal(s.kept(), carried);
+  assert.equal(s.undo(), d, "one undo: back before the edit, its carried proofs with it");
+  assert.equal(s.redo(), carried, "redo: the edit, its proofs carried");
+});

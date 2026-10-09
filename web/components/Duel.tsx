@@ -3,6 +3,7 @@
 // A ghost duel's own pieces of the page (ADR-004): the dare on the picker and
 // the fine print on the win card. The race is the engine's (engine/rival.ts),
 // the words lib/duel.ts's; the score card and the win card are Golf.tsx's.
+import type { ReactNode } from "react";
 import { skyWord, type Duel } from "@/lib/duel";
 import type { Mode } from "@/lib/types";
 import { AIM_NAMES } from "@/components/common";
@@ -16,7 +17,8 @@ const differs = (sky: Sky): sky is { theirs: string; mine: string } => !!sky && 
 /** The picker's dare, armed: who is raced and the strokes to beat (the link's
  *  sticker) and the way to play solo on one line; under it, only what changes
  *  the race: an ace, a mixed aim, a weather that was not today's. */
-export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; sky: Sky; onDrop: () => void }) {
+// mark: what is said beside their name (their collector rank, ADR-011)
+export function DuelNote({ duel, mode, sky, onDrop, mark = null }: { duel: Duel; mode: Mode; sky: Sky; onDrop: () => void; mark?: ReactNode }) {
   const { ghost, name, self } = duel;
   const notes = [
     ghost.strokes === 1 && `${self ? "You" : name} aced it. Match it to tie.`,
@@ -26,7 +28,7 @@ export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; 
   return (
     <>
       <p>
-        <span className="dare">{self ? "Racing your best" : `Racing ${name}`} · {ghost.strokes} to beat</span>{" "}
+        <span className="dare">{self ? "Racing your best" : <>Racing {name}{mark}</>} · {ghost.strokes} to beat</span>{" "}
         <button className="linkish" onClick={onDrop}>Play solo</button>
       </p>
       {notes.length > 0 && <p className="real__fine">{notes.join(" ")}</p>}

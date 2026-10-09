@@ -127,7 +127,7 @@ func main(cur realm) {
 }
 
 // Gas:
-// 1574550898
+// 1574564479
 
 // Output:
 // g15cnntx0j5e7j0ff5r4t970wmx47lynkv5magnu/garden0/v1 g15cnntx0j5e7j0ff5r4t970wmx47lynkv5magnu/island3/v1

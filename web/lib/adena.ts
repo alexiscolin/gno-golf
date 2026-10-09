@@ -10,7 +10,7 @@
 // itself — the page sends decisions, never outcomes — so a recorded score is
 // one nobody can type in.
 
-import { RULES, isAddress, nameShape, errorKind, type Chain } from "./chain";
+import { RULES, isAddress, isSlug, nameShape, errorKind, type Chain } from "./chain";
 import { trackError } from "./analytics";
 import type { HoleState, Mode, Vec2, Zone } from "./types";
 
@@ -32,7 +32,8 @@ const rpcOf = (n: Network) => n.rpcUrl || n.rpc_url;
 /** A /vm.m_call message, as DoContract takes it. */
 interface Call {
   type: "/vm.m_call";
-  value: { caller: string; send: string; pkg_path: string; func: string; args: string[] };
+  /** max_deposit: the most the call may lock as storage deposit ("600000ugnot"), the chain's default if none */
+  value: { caller: string; send: string; pkg_path: string; func: string; args: string[]; max_deposit?: string };
 }
 /** A /bank.MsgSend message: coins from the player's account to another. */
 interface Send {
@@ -112,6 +113,10 @@ function refusal(res: AdenaRes | null | undefined) {
 
 // the same address written the same way: Adena compares RPCs as strings
 const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\/+$/, "");
+/** The node as a wallet reaches it: NEXT_PUBLIC_WALLET_RPC in the local playground's build (NEXT_PUBLIC_PLAYGROUND,
+ *  scripts/try-local.sh: the page reads its own /rpc, the wallet signs on the node's raw port), else the page's own
+ *  RPC. The site never takes it (next.config.mjs refuses both on Netlify): its wallet signs on the node it reads. */
+const walletNode = (rpc: string) => (process.env.NEXT_PUBLIC_PLAYGROUND === "1" && process.env.NEXT_PUBLIC_WALLET_RPC) || rpc;
 
 /**
  * Puts Adena on this page's chain (id and RPC), adding the network if it has
@@ -124,6 +129,7 @@ const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\
 async function ensureNetwork(a: Adena, { chainId, rpc, name = `gno.land (${chainId})` }: { chainId?: string | null; rpc: string; name?: string }) {
   // no chain id, no signature: Adena would sign on whatever network it has on
   if (!chainId) throw new Error("The chain's id is not known yet (is the node up?). Try again in a moment.");
+  rpc = walletNode(rpc);
   const active = async () => {
     try {
       const n = await a.GetNetwork?.();
@@ -186,6 +192,7 @@ const port = (u: string) => {
 export async function onOurNode(rpc: string | null | undefined) {
   const a = wallet();
   if (!a || !a.GetNetwork || !rpc) return null;
+  rpc = walletNode(rpc);
   try {
     const n = await a.GetNetwork();
     const url = n && n.data && rpcOf(n.data);
@@ -286,7 +293,14 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
 
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
-const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
+export const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
+// what is asked of the account to store bytes at price ugnot a byte (the
+// chain's: vm params), a tenth more: the chain takes what is really written
+export const depositFor = (bytes: number, price: number) => Math.ceil(bytes * price * 1.1);
+/** A figure (a deposit, a fee) up to the hundredth of a GNOT, in ugnot: never under what the wallet may be asked. */
+export const upToHundredth = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;
+/** That figure in GNOT, as a bill says it: 124900 → "0.13". */
+export const aboutGnot = (ugnot: number) => (upToHundredth(ugnot) / 1e6).toFixed(2);
 // the price asked when the chain's is not given: ugnot a gas
 export const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true: the work model already bounds the shots
@@ -296,8 +310,8 @@ export const PRICE = 0.001;
 // most, rain and a storm on the heaviest course holes (town/14, island/14:
 // 193M and 204M), the rest ~7M.
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
-const MAX_GAS = 1_900_000_000;
-const PER_CALL = 30e6;
+export const MAX_GAS = 1_900_000_000;
+export const PER_CALL = 30e6;
 // a round's last commit, the one that holes it, also keeps its finish in
 // store (its best, the board, the standing, the drain's share): some 30M to
 // 40M golf's work model leaves out (golf.gno storeGas)
@@ -410,8 +424,9 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   );
 }
 
-/** One transaction from the connected account: Adena simulates it and sets the final fee (gasWanted, at price: a starting point). */
-async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
+/** One transaction from the connected account: Adena simulates it and sets the final fee (gasWanted, at price: a starting point).
+ *  Exported for the calls of other realms built on it (lib/gnomes/tx.ts). */
+export async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   await ensureNetwork(a, { chainId, rpc });
@@ -421,7 +436,7 @@ async function send(messages: (Call | Send)[], gasWanted: number, price: number,
     gasWanted,
     memo,
     // this exact chain: id and RPC (Adena's own "dev" is another node)
-    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
+    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(walletNode(rpc)) } } : {}),
   });
   if (res.status !== "success") {
     const e: SendError = new Error(why(res, failed));
@@ -434,9 +449,29 @@ async function send(messages: (Call | Send)[], gasWanted: number, price: number,
   return res.data ?? null;
 }
 
-/** One transaction of plain calls from the connected account. */
-const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) =>
-  send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })), gasWanted, price, chainId, rpc, failed);
+/** One transaction of plain calls from the connected account (maxDeposit: each call's storage deposit capped, "600000ugnot"). */
+const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, maxDeposit = "") =>
+  send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args, ...(maxDeposit && { max_deposit: maxDeposit }) } })), gasWanted, price, chainId, rpc, failed);
+
+/** PublishMine's realm, slug, data (hex) and storage deposit, of the shapes the chain takes: what a publish checks, by Adena or by gnokey. */
+export const publishArgs = ({ realm, slug, hex, deposit }: { realm: string; slug: string; hex: string; deposit: number }) =>
+  PKG_PATH.test(realm) && isSlug(slug) && /^(?:[0-9a-f]{2})+$/.test(hex) && Number.isSafeInteger(deposit) && deposit >= 0;
+
+/**
+ * A hole published from the Builder: golf's PublishMine of slug, data (hex)
+ * and note, from the connected account, at the gas and the storage deposit
+ * the bill showed (lib/builder/publish.ts), the deposit capped at it. The
+ * note is any text: no shell sees it here. Refused before Adena opens for a
+ * slug, data or realm not of their shape.
+ */
+export function publishHole({ address, realm, slug, hex, note, gas, deposit, price = PRICE, chainId, rpc }: {
+  address: string; realm: string; slug: string; hex: string; note: string; gas: number; deposit: number; price?: number; chainId?: string | null; rpc: string;
+}) {
+  if (!publishArgs({ realm, slug, hex, deposit })) {
+    return Promise.reject(new Error("The hole was not published: its address or data is not one the chain takes."));
+  }
+  return calls(address, [[realm, "PublishMine", [slug, hex, note]]], Math.min(gas, MAX_GAS), price, chainId, rpc, "The hole was not published.", `${deposit}ugnot`);
+}
 
 // a bank send is a few hundred thousand gas: asked with room, Adena sets the final fee
 const TIP_GAS = 2_000_000;
@@ -504,17 +539,19 @@ interface SaveRound extends Work {
 // unchecked: a package path is one of a realm's characters, the chain's id and
 // RPC are theirs or a placeholder, and an argument is checked (or quoted) by
 // the plan it is in.
-const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+export const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+/** Where the save flow's gnokey panel (components/Gnokey.tsx) keeps the key's address, typed once: the Builder knows its author by it too. */
+export const GNOKEY_ADDR_KEY = "gnogolf.gnokey.addr";
 // an RPC as a command may carry it, "" for anything else
 const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
-function gnokeyOn(chainId: string | null | undefined, rpc: string) {
+export function gnokeyOn(chainId: string | null | undefined, rpc: string, key = "<your-key-name>") {
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
-  return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} <your-key-name>`;
+  return `-broadcast -chainid ${chain} -remote ${remoteOf(walletNode(rpc)) || "<rpc-url>"} ${key}`;
 }
-/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's. */
-const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string) =>
-  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} ${on}`;
+/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's; send: ugnot with it (0: none); maxDeposit: its storage deposit capped, in ugnot (none: uncapped). */
+export const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string, send = 0, maxDeposit?: number) =>
+  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")}${send ? ` -send ${send}ugnot` : ""} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas}${maxDeposit === undefined ? "" : ` -max-deposit ${maxDeposit}ugnot`} ${on}`;
 
 /**
  * The same save for gnokey: one plain `gnokey maketx call` per commit, the
@@ -596,7 +633,7 @@ export function gnokeyPaste(plan: readonly string[], who: string, first = "") {
 }
 
 /** Where a gnokey paste goes: this chain (its id and RPC), at its gas price. */
-interface GnokeyAt { price?: number; chainId?: string | null; rpc: string }
+export interface GnokeyAt { price?: number; chainId?: string | null; rpc: string }
 /**
  * A name taken with gnokey, as registerName does with Adena: Register, then
  * golf's Claim, which ranks the rounds saved before it. Two transactions

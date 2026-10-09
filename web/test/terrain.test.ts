@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mod, there, onAt, untilOn, smoothstep, angDiff, closest, boxOf, nearestOnPoly, segDist, wallDist,
-  segHit, rayCircle, inPoly, inset, inZone, inSea, sandIn, airy, terrain, CELL, plainSkins, cupRadius, CUP_R,
+  segHit, rayCircle, inPoly, inset, inZone, inSea, sandIn, airy, terrain, CELL, plainSkins, cupRadius, CUP_R, emptyZone,
 } from "../lib/terrain.ts";
 import type { HoleState, Vec2, Wall, Zone } from "../lib/types.ts";
 
@@ -360,4 +360,12 @@ void test("plainSkins draws a skin every object has plain, and leaves the others
   assert.equal(out.walls[1], k); // untouched pieces are the same objects
   assert.equal(out.name, "x");
   assert.equal(w.skin, "constructor"); // the answer read is not changed
+});
+
+void test("emptyZone: inverted or zero-size on either axis, or not a number", () => {
+  assert.equal(emptyZone({ min: [2, 2], max: [2, 5] }), true);
+  assert.equal(emptyZone({ min: [3, 2], max: [1, 5] }), true);
+  assert.equal(emptyZone({ min: [1, 2], max: [3, 2] }), true);
+  assert.equal(emptyZone({ min: [1, Number.NaN], max: [3, 5] }), true);
+  assert.equal(emptyZone({ min: [1, 2], max: [3, 5] }), false);
 });

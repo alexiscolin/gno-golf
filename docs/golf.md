@@ -390,6 +390,24 @@ A page of every community hole, every version of each, by id: all that
 {"version":1,"rows":[<a Holes row>, …],"next":"g1…/my-hole/v2"}
 ```
 
+#### `DayCandidates(after string, limit int) string`
+
+The community holes a hole of the day is picked from: each alias's current
+version, in alias order after the alias `after` (`""` from the first), as
+`Holes` lists it, with `born`, the block height its alias's first version
+was published at, however many came after (`0` when its first came from
+v1: long before). A hidden hole is not in
+it. A page walks `limit` aliases at most (1 to 100), a hidden one among
+them, so it may hold fewer rows; `next` is the alias to go on from, `""` at
+the end. The game reads it from the UTC day's point round to it and takes
+the first hole published before the day began that the Builder's rules
+pass: whatever is published, versioned or hidden that day, the others keep
+their order.
+
+```json
+{"version":1,"rows":[<a Holes row, with "born":1204>, …],"next":"g1…/my-hole"}
+```
+
 #### `Current(alias string) string`
 
 The id of the version an alias (`"garden/7"`, `"g1…/my-hole"`) plays now, or
@@ -917,6 +935,20 @@ Measured on the course holes; treat them as orders of magnitude:
   decoded hole is never stored.
   A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
   written only when it improves (a shorter best frees the longer one).
+- **A community publish** (`PublishMine` under golf/v2, its records in
+  store), measured by golf/v2's `z_builder_publish_*` filetests (each
+  publishes a warm-up hole first; store made the indexes' first leaves when it
+  was deployed, so the chain's very first publish stores only 139 bytes more
+  than another): a plain lane of 364 bytes of data stores 2,557 bytes and
+  spends 16.9M gas; an author new to golf adds 454 bytes (their row in the
+  authors' index); a later version stores 960 bytes less; the heaviest hole
+  v2 takes from the Builder's worlds (5,346 bytes of data: more and v2's work
+  check refuses it) stores 7,550 and spends 128M; a name and a note at their
+  longest, in four-byte runes, add 884 bytes and 52M (each rune cleaned and
+  checked for links). So a publish stores its data, its name and note and
+  about 2.2 KB more; the Builder asks for that at the chain's byte price, a
+  tenth more, and the gas fitted on these with a quarter more
+  (`web/lib/builder/publish.ts`).
 - **Reads** are free as queries, within the node's query gas limit.
 
 ## Updating after the deploy
@@ -951,7 +983,10 @@ score honest through it.
   once (Resume: nothing new runs), and give the role up for good (Renounce,
   never while paused: the rules can then never change). store's page says which rules are in force and
   what is proposed. Nothing is reset at a switch: the next rules read the data
-  on from where it is.
+  on from where it is. The earned gnomes' proof (r/<ns>/gnogolf/gnomes)
+  pauses at the switch, until its owner checks that the new rules keep
+  `bests`, `copies` and `holes` as golf/v2 writes them and calls
+  `AcceptRules` with their path (ADR-012).
 - **v1's records come over to v2 (onyx),** read on chain from v1 itself (its
   `HoleData`, `Versions`, `Ghost`, `Records`) in the transaction that writes
   them, so nobody can change one: `ImportHole` (the owner: a course hole keeps

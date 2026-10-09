@@ -5,8 +5,9 @@
 // Chrome), killed by PID. Node 22+ (the built-in WebSocket).
 //
 // The paths and addresses can be set from the environment: CHROME (the
-// binary), APP (the running client), RPC (the local chain), REALM (the golf
-// realm on it; else NEXT_PUBLIC_REALM, the client's).
+// binary), CHROME_ARGS (more flags, each starting --; a value may hold spaces), APP (the running
+// client), RPC (the local chain), REALM (the golf realm on it; else
+// NEXT_PUBLIC_REALM, the client's).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -55,7 +56,7 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   dir ||= fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-cdp-"));
   fs.mkdirSync(dir, { recursive: true });
   try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
-  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, "about:blank"], { stdio: "ignore", detached: true });
+  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, ...(process.env.CHROME_ARGS || "").split(/ +(?=--)/).filter(Boolean), "about:blank"], { stdio: "ignore", detached: true });
   const pid = /** @type {number} */ (p.pid);
   live.add(pid);
   const kill = () => { stop(pid); live.delete(pid); };
@@ -98,6 +99,22 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
   if (touch) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   return { send, ev, js, errors, kill: () => { try { ws.close(); } catch {} kill(); } };
+}
+
+/**
+ * Offline in the page, as a deploy that took the old files or a lost network would be: every script not loaded yet
+ * fails (a chunk a dev build names and a production build hashes, alike). now: from this moment, the scripts loaded
+ * so far still running; else from the next page loaded. back(): online again.
+ * @param {{ js: (expr: string) => Promise<any>, send: (method: string, params?: object) => Promise<any> }} b
+ */
+export async function offline(b, now = true) {
+  const source = `(() => { const seen = new Set(${now ? 'performance.getEntriesByType("resource").map((e) => e.name)' : "[]"}); window.__offline = true;
+    const off = (n) => window.__offline && n && n.tagName === "SCRIPT" && n.src && !seen.has(n.src) && (n.src = location.origin + "/__offline__.js");
+    for (const k of ["appendChild", "insertBefore"]) { const f = Node.prototype[k]; Node.prototype[k] = function (n, ...r) { off(n); return f.call(this, n, ...r); }; }
+    return true; })()`;
+  if (now) await b.js(source);
+  else await b.send("Page.addScriptToEvaluateOnNewDocument", { source });
+  return { back: () => b.js("window.__offline = false") };
 }
 
 /** Waits until the local chain answers (it restarts on hot reloads): up to tries × 5 s. */

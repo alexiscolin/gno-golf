@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import { BALL_R, CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn, smoothstep } from "../terrain";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf, waterTone, waterMat } from "./materials";
-import { animate, state } from "./state";
+import { animate, state, report } from "./state";
 import { stone, warp, badge, windmill } from "./props";
 import { MOUTHS, mouthAt } from "./pieces";
 import { seeded } from "./common";
-import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
+import { worldOf, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "./worlds";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { ud, type CourseTerrain as T, type Hole } from "./data";
 import type { Rand } from "./common";
 import type { Board, MutVec2, Post, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 /** What every zone drawing gets: its rectangle's size and its own random. */
 interface Opts {
@@ -214,14 +215,32 @@ const ZONE_DRAW: [(z: Zone) => boolean, ZoneDraw][] = [
   [(z) => z.kind === "tunnel", drawTunnel],
 ];
 
+/**
+ * The skins ZONE_DRAW draws from the zone alone, by kind (drawSurface's
+ * looks, drawTunnel's mouths beside MOUTHS), the plain form of each among
+ * them: what the hole builder offers in any world (lib/builder/palette.ts).
+ * The rest need a composition the course placed by hand (a seesaw's pair, a
+ * mill's sails, the castle's slide) or cut the lane (GAPS).
+ */
+export const DRAWN = {
+  surface: ["", "sand", "wetsand", "flowerbed", "soil", "bridge", "ice", "molehill"],
+  slope: ["moon bridge"],
+  hazard: ["", "water", "wave", "lagoon", "tidepool", "fountain", "canal"],
+  tunnel: ["", "warp"],
+} satisfies Skins;
+
 function zoneDetail(z: Zone, s: Hole, t: T) {
   const own = fromWorld(s, "zone", z, t);
-  if (own) return own;
+  if (own) return report(z, { by: "world", key: z.skin }), own;
   const g = new THREE.Group();
   const w = z.max[0] - z.min[0], h = z.max[1] - z.min[1];
   const rand = seeded("zone" + s.hole + String(z.min) + String(z.max));
   const hit = ZONE_DRAW.find(([test]) => test(z));
   if (!hit) return g;
+  // the plain surface, water and pipe draw any skin: their own look only for the skins declared (DRAWN, MOUTHS)
+  const plain = hit[1] === drawSurface || hit[1] === drawTunnel;
+  const known = !plain || (z.skin !== "" && ((DRAWN[z.kind as "surface" | "hazard" | "tunnel"] as readonly string[] | undefined)?.includes(z.skin) || Object.hasOwn(MOUTHS, z.skin)));
+  report(z, known ? { by: "table", key: z.skin } : { by: "fallback" });
   return hit[1](z, s, t, g, { w, h, rand });
 }
 
@@ -501,7 +520,7 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   const WATER: Record<string, number> = { sea: 0x4ea3cf, wave: 0x8fd0ee, lagoon: 0x5fd0cc, tidepool: 0x6fc3c9, fountain: 0x8fd0ee, canal: 0x4d8fb3, gap: 0x1f3d4a };
   // in the mountains a bunker is a patch of deep snow: same drag, white
   const snow = s.world === "mountain" && !water && !ice && !puddle && !bed && !deck && (z.skin === "sand" || !z.skin);
-  const color = snow ? 0xf3f7fa : water ? WATER[z.skin] ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xd4b77e : ice ? 0xbfe6f0 : 0xecd49c;
+  const color = snow ? 0xf3f7fa : water ? own(WATER, z.skin) ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xd4b77e : ice ? 0xbfe6f0 : 0xecd49c;
   const blob = organic(z, rand, s.board);
   // inside the drawn shape and on the green, with a margin: where detail may go
   const inSand = (x: number, zz: number) => {
@@ -522,14 +541,14 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   };
   // a garden pond is sunk into the ground (terrain.ts, pondWater), with its
   // banks; over one, a causeway is a boardwalk on posts
-  const sunk = water && !!POOLS[z.skin];
+  const sunk = water && !!own(POOLS, z.skin);
   if (deck && t.pond((z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2)) return boardwalk(z, s, t, g);
   if (sunk) {
     pondDetail(z, s, t, g, { w, h, rand });
     return g;
   }
   // sand (a bunker, a beach's wet sand; a snow bunker): its own natural patch
-  if (DISH[z.skin] && DISH[z.skin].depth > 0 && !water && !deck) {
+  if ((own(DISH, z.skin)?.depth ?? 0) > 0 && !water && !deck) {
     const walls = s.walls.filter((q) => !q.every);
     const inside = (x: number, zz: number, m = 0.15) => x > 0.4 && zz > 0.4 && x < s.board.w - 0.4 && zz < s.board.h - 0.4 && t.onGreen(x, zz) && sandIn(z, walls, x, zz) > m;
     g.add(sandPatch(z, walls, t, color, snow));
@@ -942,7 +961,7 @@ function sandPatch(z: Zone, walls: readonly Wall[], t: T, color: number, snow: b
       const gx = (t.height(x + 0.06, zz) - t.height(x - 0.06, zz)) / 0.12, gz = (t.height(x, zz + 0.06) - t.height(x, zz - 0.06)) / 0.12;
       const lit = Math.min(1.14, Math.max(0.8, 1 - 1.3 * (gx * Lx + gz * Lz) / Math.hypot(gx, 1, gz)));
       const rim = 1 - Math.min(1, Math.max(0, d / 0.16)), lip = Math.exp(-(((d - 0.2) / 0.1) ** 2));
-      const k = lit * (snow ? 1 + 0.06 * rim : 1 - 0.15 * rim * rim) * (1 + 0.05 * lip) * (1 - 0.08 * smooth01(d / DISH[z.skin].run));
+      const k = lit * (snow ? 1 + 0.06 * rim : 1 - 0.15 * rim * rim) * (1 + 0.05 * lip) * (1 - 0.08 * smooth01(d / own(DISH, z.skin)!.run));
       c.copy(base).multiplyScalar(k);
       // (alpha along the outline's distance, on a slow ramp: the cut between
       // two vertices falls where the outline is, not on the grid)
@@ -1127,7 +1146,7 @@ function drawTunnel(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
   const flat2 = (x: number, zz: number) => new THREE.Vector3(x, 0, zz);
   const dirIn = flat2(s.start[0] - cx, s.start[1] - cz).normalize();
   const dirOut = flat2(s.cup[0] - ox, s.cup[1] - oz).normalize();
-  if (MOUTHS[z.skin]) {
+  if (own(MOUTHS, z.skin)) {
     // an entrance that is a thing (a cave, a well, a door, a wreck), and
     // the same thing where the ball comes out; no pipe between
     const R = Math.max(0.6, Math.min(w, h) * 0.4);

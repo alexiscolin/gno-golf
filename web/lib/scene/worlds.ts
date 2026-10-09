@@ -58,6 +58,7 @@ import { GRASS } from "./common";
 import type { Terrain } from "../terrain";
 import type { Extras, Post, Timing, Wall, Zone } from "../types";
 import type { Hole, Height, Fade, Dress } from "./data";
+import { own } from "../own";
 
 /** What a world's decor is: an Object3D, a canopy fade and a weather dress on it. */
 type Decor = THREE.Object3D & { userData: { fade?: Fade | null; weather?: Dress | null } };
@@ -94,8 +95,14 @@ export interface Rough {
   mound?: number;
   plant?: (rand: () => number, s: Hole, x: number, z: number) => THREE.Object3D | null;
 }
+/** A piece as the hole builder places it: a long wall, a bar (four walls round a thin box), a post, or a zone of a kind (air: a slope of moving air). */
+export type Kind = "rail" | "bar" | "post" | "surface" | "slope" | "air" | "tunnel" | "hazard" | "loop";
+/** The skins drawn from the piece alone, by kind: what the builder's palette may offer (lib/builder/palette.ts). */
+export type Skins = Partial<Record<Kind, readonly string[]>>;
 /** A world module (see the list above). */
 interface World {
+  /** the skins it draws its own way from the piece alone (piece()), for the builder's palette */
+  skins?: Skins;
   base(s: Hole, box: THREE.Box3): THREE.Object3D;
   edging(s: Hole, box: THREE.Box3): THREE.Object3D;
   berms(s: Hole): { group: THREE.Object3D; height: Height };
@@ -142,17 +149,23 @@ const LOADERS: Record<string, () => Promise<World>> = {
   mines: () => import("./mines"),
 };
 const WORLDS: Record<string, World> = { garden };
+/** Every world the client draws: the garden, then those loaded when needed. */
+export const WORLD_NAMES: readonly string[] = ["garden", ...Object.keys(LOADERS)];
 const pending: Record<string, Promise<World>> = {};
 
 /** Loads a world's module (once; later calls return at once). */
 export function loadWorld(name: string | null | undefined): Promise<World> {
-  if (!name || WORLDS[name] || !LOADERS[name]) return Promise.resolve((name && WORLDS[name]) || garden);
+  const load = name ? own(LOADERS, name) : undefined;
+  if (!name || own(WORLDS, name) || !load) return Promise.resolve((name && own(WORLDS, name)) || garden);
   // a failed load (offline, a deploy mid-flight) is forgotten, so the next
   // call tries again instead of failing forever
-  return (pending[name] ||= LOADERS[name]().then((m) => (WORLDS[name] = m)).catch((e: unknown) => { delete pending[name]; throw e; }));
+  // eslint-disable-next-line no-restricted-syntax -- a world the loaders have (own above)
+  return (pending[name] ||= load().then((m) => (WORLDS[name] = m)).catch((e: unknown) => { delete pending[name]; throw e; }));
 }
 
-export const worldOf = (s: Pick<Hole, "world">): World => WORLDS[s.world] || garden;
+export const worldOf = (s: Pick<Hole, "world">): World => own(WORLDS, s.world) || garden;
+/** The world whose module worldOf gives for s: its own once loaded, else the garden it falls back to. */
+export const drawnBy = (s: Pick<Hole, "world">): string => (own(WORLDS, s.world) ? s.world : "garden");
 
 /**
  * A world's own drawing of an on-lane piece, if it has one: worldOf(s).piece

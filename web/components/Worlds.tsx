@@ -9,6 +9,8 @@ import { CLIP, Green, canHover, cupStill, stillsReady, warmClips } from "@/compo
 import { FrontScreen } from "@/components/About";
 import { Button, VsPar } from "@/components/ui";
 import { plural } from "@/components/common";
+import type { Chain } from "@/lib/chain";
+import Community from "@/components/Community";
 import "@/app/title.css";
 
 // The world screen, between the game's choice (Modes.tsx) and the course: one
@@ -218,6 +220,8 @@ interface WorldsProps {
   restoring?: boolean;
   community?: readonly HoleRow[];
   onCommunity?: (id: string) => void;
+  /** the chain: each community hole judged by the Builder's rules before it is listed, its map, its players, whether its author has holed it */
+  chain?: Pick<Chain, "bests" | "blockTime" | "dayCandidates" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn"> | null;
   /** the course's records to beat, under the cups */
   podium?: ReactNode;
   /** a cup's next hole to play, said on its card once begun */
@@ -228,7 +232,7 @@ interface WorldsProps {
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
 let shownOnce = false;
 
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, podium, racing, next = () => undefined }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, chain = null, podium, racing, next = () => undefined }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -241,8 +245,6 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
     void Promise.race([stillsReady(), new Promise((r) => setTimeout(r, 300))]).then(() => ((shownOnce = true), live && setReady(true)));
     return () => void (live = false);
   }, [ready]);
-  const PAGE = 24;
-  const [shown, setShown] = useState(PAGE); // community holes listed, a page more on each "Show more"
   const played = WORLDS.filter((w) => stats[w.id] && stats[w.id].done);
   const loading = !Object.keys(counts).length; // (the chain's list not in yet: every cup at 0)
   const clear = (what: string, run: () => void) => {
@@ -260,17 +262,17 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
       {resets && (
         <div className="resets__menu" role="menu">
           {onRestore && (
-            <Button role="menuitem" className="btn--s resets__restore" disabled={restoring} aria-busy={restoring} onClick={() => (sound("blip"), onRestore())}>
+            <Button role="menuitem" size="s" className="resets__restore" disabled={restoring} aria-busy={restoring} onClick={() => (sound("blip"), onRestore())}>
               {restoring ? "Reading the chain…" : "Get my saved holes back"}
             </Button>
           )}
           {played.map((w) => (
-            <Button key={w.id} role="menuitem" className={"btn--s" + (wipe === w.id ? " btn--danger" : "")} onClick={() => clear(w.id, () => onReset(w.id))}>
+            <Button key={w.id} role="menuitem" size="s" className={wipe === w.id ? "btn--danger" : ""} onClick={() => clear(w.id, () => onReset(w.id))}>
               {wipe === w.id ? "Sure? Tap again" : w.name}
             </Button>
           ))}
           {played.length > 0 && (
-            <Button role="menuitem" className={"btn--s" + (wipe === "all" ? " btn--danger" : "")} onClick={() => clear("all", onResetAll)}>
+            <Button role="menuitem" size="s" className={wipe === "all" ? "btn--danger" : ""} onClick={() => clear("all", onResetAll)}>
               {wipe === "all" ? "Sure? Badges go too" : "Every cup"}
             </Button>
           )}
@@ -331,23 +333,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         })}
       </ul>
       {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
-      {community.length > 0 && (
-        <section className="community" aria-label="Community holes">
-          <h3>Community holes <small>not ranked</small></h3>
-          <ul>
-            {community.slice(0, shown).map((h) => (
-              <li key={h.id}>
-                <button className="linkish" onClick={() => (sound("select"), onCommunity(h.id))}>{h.name}</button>
-              </li>
-            ))}
-          </ul>
-          {community.length > shown && (
-            <button className="linkish" onClick={() => setShown((n) => n + PAGE)}>
-              Show more ({community.length - shown} left)
-            </button>
-          )}
-        </section>
-      )}
+      {community.length > 0 && <Community community={community} chain={chain} onPlay={onCommunity} />}
     </FrontScreen>
   );
 }

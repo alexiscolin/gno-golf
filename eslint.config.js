@@ -31,6 +31,20 @@ export default tseslint.config(
     },
   },
   {
+    // the scene draws what a hole's author wrote: a skin is any string, so a
+    // table is never indexed by one (table[skin] answers "constructor" too)
+    files: ["web/lib/scene/**/*.ts", "web/lib/engine/**/*.ts", "web/lib/terrain.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", {
+        selector: "MemberExpression[computed=true][property.type='MemberExpression'][property.property.name=/^(skin|world)$/]",
+        message: "A skin comes from the chain: look it up with own(table, skin) (web/lib/own.ts).",
+      }, {
+        selector: "MemberExpression[computed=true][property.type='Identifier'][property.name=/^(skin|key|name)$/]",
+        message: "A skin comes from the chain: look it up with own(table, skin) (web/lib/own.ts).",
+      }],
+    },
+  },
+  {
     // the unit tests (npm test): their own tsconfig, and node:test's test()
     // returns a promise the runner awaits itself
     files: ["web/test/*.ts"],
@@ -49,7 +63,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["web/*.mjs", "media/promo/*.mjs", "media/camera/*.mjs", "media/lib/*.mjs", "media/og/*.mjs", "scripts/*.mjs"],
+    files: ["web/*.mjs", "media/promo/*.mjs", "media/camera/*.mjs", "media/lib/*.mjs", "media/og/*.mjs", "media/gnomes/*.mjs", "scripts/*.mjs"],
     languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: globals.node },
     rules: {
       "no-undef": "error",

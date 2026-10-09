@@ -13,7 +13,7 @@ export const SITE = ((PREVIEW && process.env.DEPLOY_PRIME_URL) || process.env.NE
  *  page's own site, or on this machine the public one (SITE), never a
  *  local dev address. */
 export function siteURL(link = "") {
-  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
+  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/(h|build)\/.*$/, "/") : ""; // a hole's page (app/h) and the Builder (app/build) link from the site's root
   const origin = typeof window !== "undefined" && isLoopback(window.location.hostname) ? SITE : here.replace(/\/$/, "");
   return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
 }

@@ -28,7 +28,7 @@ export type Height = (x: number, z: number) => number;
 /** A function of the scene's time in seconds, run each frame. */
 export type Tick = (time: number) => void;
 /** A canopy fading what stands between the eye and the ball. */
-export type Fade = (eye: THREE.Vector3, ball: THREE.Vector3) => void;
+export type Fade = (eye: THREE.Vector3, ball: THREE.Vector3, cup?: THREE.Vector3 | null) => void;
 /** A decor dressed for the weather (see weatherLooks). */
 export type Dress = (w: WeatherNow | null) => void;
 
@@ -175,6 +175,8 @@ export interface CourseData extends ObjData {
   ticks: Tick[];
   tick: Tick;
   smokes: THREE.Object3D[] | null;
+  /** the world whose module drew it (worlds.ts drawnBy): the hole's own, or the garden it fell back to */
+  scenery: string;
 }
 export interface Course extends THREE.Group {
   userData: CourseData;
@@ -187,6 +189,8 @@ export interface Gnome extends THREE.Group {
     body: THREE.Object3D; eyes: THREE.Object3D[]; shade: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; reach: number; mid: number;
     /** where a headlamp clips on (the body's space), its glow once lit, and whether it is a clip-on (gnome.ts headlamp) */
     lampAt: THREE.Vector3; lamp?: THREE.Object3D; clip?: boolean;
+    /** what moves on him with time (a Legendary's piece, lava's glow): the preview and the game call it with their clock, in ms */
+    tick?: Tick;
   };
 }
 

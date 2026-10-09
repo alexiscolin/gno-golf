@@ -193,11 +193,37 @@ export interface Holes extends Versioned {
   holes: readonly HoleRow[];
 }
 
+/** A hole of the day's candidate (DayCandidates): its Holes row, and the block its alias was first published at (0: long before). */
+export interface DayRow extends HoleRow {
+  born: number;
+}
+
+/** DayCandidates(after, limit): a page of them in alias order, none hidden, and the alias to go on from ("" at the end). */
+export interface DayCandidates extends Versioned {
+  rows: readonly DayRow[];
+  next: string;
+}
+
+/** Versions(alias): a community hole's versions, oldest shown first ("" slot and none for an alias with none). */
+export interface Versions extends Versioned {
+  slot: string;
+  versions: readonly { id: string; v: number; height: number; by: string; sha: string; note: string; next: string }[];
+}
+
 export interface StrokesRow {
   player: string;
   /** their gno.land name, as the boards give it (Leaderboard, CourseLeaderboard, HoleLeaderboard); none from the other reads or an older realm */
   name?: string;
   strokes: number;
+}
+
+/** A round saved on a hole (chain.ts savedOn): a player's best there in a mode, its strokes and its weather's period. */
+export interface Saved {
+  id: string;
+  mode: Mode;
+  player: string;
+  strokes: number;
+  period: number;
 }
 
 /** A course standing: its best on each hole counted, summed, and those holes' pars (strokes − par: its score against par, which ranks it after its holes). */

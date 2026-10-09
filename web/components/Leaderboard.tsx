@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import type { Snapshot } from "@/lib/engine";
 import { isAddress, wait, type Chain } from "@/lib/chain";
 import type { Bests, HoleRow, Mode, StandingRow, StrokesRow } from "@/lib/types";
@@ -22,6 +22,8 @@ import { SkyIcon } from "@/components/Weather";
 import { Frame } from "@/components/Worlds";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Skin } from "@/lib/scene/gnome";
+import { SHOP, onWear, wearVersion } from "@/lib/gnomes/door";
+import { Collector, askWorn } from "@/components/gnomes/Door";
 
 // The leaderboards (the Players sheet: this hole, the course, friends), the records to beat
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -191,7 +193,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
           {h.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
+              <span className="lb__who">{label(r.player)}<Collector chain={chain} player={r.player} />{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{strokesWord(r.strokes)}{ahead(h, i) && " · ahead of you"}</span>
               <strong><VsPar vs={r.strokes - ((hole && hole.par) || parHere(s))} /></strong>
               <RaceButton player={r.player} name={label(r.player)} me={me} here onClick={onRace} gold={ahead(h, i)} />
@@ -207,7 +209,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
           {c.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}</span>
+              <span className="lb__who">{label(r.player)}<Collector chain={chain} player={r.player} /></span>
               <span className="lb__holes">{holesWord(r.holes)}{ahead(c, i) && " · ahead of you"}</span>
               <strong><VsPar vs={standingVs(r)} /></strong>
             </li>
@@ -648,7 +650,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
         <ol className="lb__mine">
           <li className="me">
             <span className="lb__rank">{mine.rank}</span>
-            <span className="lb__who">You</span>
+            <span className="lb__who">You<Collector chain={chain} player={me} /></span>
             {score(mine)}
           </li>
         </ol>
@@ -864,7 +866,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed,
           <span aria-hidden="true">nym-</span>
           <input value={stem} onChange={(e) => (setErr(null), setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim()))} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
         </label>
-        {!typed && account && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
+        {!typed && account && <Button variant="chain" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
       </span>
       <small className={bad ? "nameform__err" : !stem || hint || why === undefined ? "" : "nameform__ok"} aria-live="polite">
         {typed && !stem
@@ -965,13 +967,14 @@ export function useWho(chain: Chain | null, addr: string, me?: string | null) {
 /** A ranked player as the boards show them (useWho), their address under their name in full. */
 function Who({ chain, addr, me, link, title = "See this round on gno.land" }: { chain: Chain | null; addr: string; me?: string | null; link?: string; title?: string }) {
   const { label, name } = useWho(chain, addr, me);
+  // (their collector rank after the name, on its line: ADR-011)
   const body = name || addr === me ? (
     <span className="who">
-      <span className="who__name">{label}</span>
+      <span className="who__line"><span className="who__name">{label}</span><Collector chain={chain} player={addr} /></span>
       <small>{shortAddr(addr)}</small>
     </span>
   ) : (
-    label
+    <>{label}<Collector chain={chain} player={addr} /></>
   );
   return link && link !== "#" ? (
     <a href={link} target="_blank" rel="noopener noreferrer" title={title}>
@@ -1067,16 +1070,25 @@ const StickerGhost = ({ at = 0 }: { at?: number }) => <div className="sticker po
 // go: what a tagged card's tap starts, said on it (Race, by default: "Their holes" lists their ghosts)
 export function Sticker({ player, at = 0, tag, sub, chain, me, gnome, onClick, say, go = "Race" }: { player: string; at?: number; tag?: string; sub: string; chain: Chain | null; me?: string | null; gnome: string; onClick?: () => void; say?: string; go?: string }) {
   const { label } = useWho(chain, player, me), mine = player === me;
+  useWorn(chain, mine ? "" : player);
   const body = (<>
     <Face skin={mine ? gnomeById(gnome) : rivalSkin(player, gnome)} />
     {tag ? <span className="sticker__tag">{tag}</span> : at > 0 && <Place at={at} />}
-    <span className="sticker__who">{label}</span>
+    <span className="sticker__who"><Collector chain={chain} player={player} />{label}</span>
     <span className="sticker__sub">{sub}</span>
     {tag && onClick && !say && <span className="sticker__go" aria-hidden="true">{go} ▸</span>}
   </>);
   return onClick
     ? <button className="sticker" aria-label={`${say ? `${label}: ${say}` : mine ? "Race your best" : go === "Race" ? `Race ${label}'s ghost` : `${label}: ${go.toLowerCase()}`}: ${tag || `#${at}`}, ${sub}`} onClick={onClick}>{body}</button>
     : <div className="sticker">{body}</div>;
+}
+/** A board's face wears the gnome its player wears for everyone (SHOP): asked with the page's other faces in
+ *  one read (wear.ts askWorn), drawn again once it is known. */
+function useWorn(chain: Chain | null, player: string) {
+  useSyncExternalStore(onWear, wearVersion, wearVersion);
+  useEffect(() => {
+    if (SHOP && chain && player) askWorn(chain, player);
+  }, [chain, player]);
 }
 const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 /** A gnome's face, flat and inked (the logo's), on a disc in his hat's colour, lighter. */

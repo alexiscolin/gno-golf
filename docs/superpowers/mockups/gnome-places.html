@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the gnomes show · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- The game's own screens, captured from the running game, untouched: on each, the one thing the
+     collection adds, ringed in gold and tagged "added". Nothing of today's game is removed or resized:
+     the finish card, its clip and its share, the HUD, the cards, the buttons stay as they are. One state. -->
+<style>
+  body { background: #e9e2d2; padding: var(--sp-5); }
+  .places { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(640px, 100%), 1fr)); gap: var(--sp-5); max-width: 1400px; margin: 0 auto; }
+  .place { display: grid; gap: var(--sp-2); align-content: start; }
+  .place h2 { margin: 0; font-size: 18px; }
+  .place p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--ink); }
+  /* a capture at its own size (1440 × 900), scaled to the column: the additions placed in its pixels */
+  .cap { position: relative; width: 100%; aspect-ratio: 1440 / 900; border: var(--edge-bold); border-radius: 14px; overflow: hidden; container-type: inline-size; }
+  .cap > div { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; background: center / cover; }
+  .add { position: absolute; }
+  .add::after { content: "added"; position: absolute; top: -26px; right: -10px; padding: 1px 10px; border: 2px solid var(--ink); border-radius: var(--pill); background: var(--gold); font-size: 15px; font-weight: 800; color: var(--ink); }
+  .ring { position: absolute; inset: -10px; border: 4px dashed var(--gold); border-radius: 14px; pointer-events: none; }
+  .link { font-size: 13px; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; white-space: nowrap; }
+  .ghost { width: 120px; opacity: .55; filter: saturate(.7); }
+  .tag { white-space: nowrap; }
+  .gtag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border: 2px solid var(--ink); border-radius: var(--pill); background: rgba(var(--paper-rgb), .95); font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 0 var(--ink); }
+  .gtag i { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink); background: #d3e8c8 url(img/g03.png) 50% 22% / 180%; }
+  .lpill { display: inline-flex; align-items: center; gap: 3px; padding: 0 8px; border: 1.5px solid var(--ink); border-radius: var(--pill); background: var(--gold-grad); font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .lpill svg { width: 10px; height: 10px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+  .same { margin: 0; padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .3); border-radius: 14px; font-size: 15px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="places" id="app"></div>
+<script src="kit.js"></script>
+<script>
+  const { TIER_ICON } = Kit;
+  const add = (left, top, html) => `<span class="add" style="left:${left}px;top:${top}px">${html}<span class="ring"></span></span>`;
+  document.getElementById("app").innerHTML = `
+    <section class="place"><h2>The cups: one link</h2>
+      <div class="cap"><div style="background-image:url(img/game-cups.jpg)">${add(944, 250, `<span class="link">Gnomes →</span>`)}</div></div>
+      <p>"Gnomes →" joins Badges and All players in the links row. Nothing else on the screen moves.</p></section>
+
+    <section class="place"><h2>A duel: the rival's ghost wears their gnome</h2>
+      <div class="cap"><div style="background-image:url(img/game-play.jpg)">${add(600, 380, `<img class="ghost" src="img/g03.png" alt="">`)}${add(548, 330, `<span class="gtag"><i></i>nym-moustache943 · Thistle</span>`)}</div></div>
+      <p>The ghost wears the gnome its player shows. A tap on its tag, between shots, opens that gnome. The HUD is as today.</p></section>
+
+    <section class="place"><h2>The boards: one pill</h2>
+      <div class="cap"><div style="background-image:url(img/game-boards.jpg)">${add(690, 474, `<span class="lpill">${TIER_ICON.legendary}The Miller</span>`)}</div></div>
+      <p>A Legendary's player gets his name in a small gold pill after theirs. A row's face is the gnome that player shows; a tap opens their gnomes.</p></section>
+
+    <section class="place"><h2>Unchanged</h2>
+      <p class="same">The finish card, its clip, its share buttons and its save row stay exactly as they are; the clip simply wears the gnome you play. The title, the HUD's cards and the menu do not change.</p></section>`;
+  // each capture drawn at its own 1440 px, scaled to its column
+  const fit = () => document.querySelectorAll(".cap > div").forEach((d) => (d.style.transform = `scale(${d.parentElement.clientWidth / 1440})`));
+  fit(); addEventListener("resize", fit);
+</script>
+</body>
+</html>

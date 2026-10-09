@@ -14,7 +14,7 @@ import { seeded, ISLAND, GRASS, placer, type Rand } from "./common";
 import { zoneDetail } from "./zones";
 import { ud, type Hole, type Height, type TubePath } from "./data";
 import type { FadeItem } from "./materials";
-import type { Bar, Rough } from "./worlds";
+import type { Bar, Rough, Skins } from "./worlds";
 import type { Terrain } from "../terrain";
 import type { Post, Vec2, Zone } from "../types";
 
@@ -2115,6 +2115,14 @@ function cave(z: Zone, t: Terrain) {
   }
   return g;
 }
+
+/** The skins piece() draws from the piece alone (the builder's palette, worlds.ts Skins). */
+export const skins: Skins = {
+  post: ["palm", "coral", "outcrop", "buoy", "crab", "driftwood"],
+  bar: ["driftwood", "rowing boat"],
+  hazard: ["tidepool", "lagoon", "wave"],
+  tunnel: ["shipwreck", "cave", "blowhole"],
+};
 
 export function piece(kind: "post", item: Post, t: Terrain, s: Hole): THREE.Object3D | null;
 export function piece(kind: "wall", item: Bar, t: Terrain, s: Hole): THREE.Object3D | null;

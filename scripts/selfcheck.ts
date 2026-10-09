@@ -13,8 +13,10 @@ import fs from "node:fs";
 import "../web/test/setup.mjs";
 
 const { RULES } = await import("../web/lib/chain.ts");
-const { SKIES } = await import("../web/lib/card.ts");
+const { SKIES, UNLOCKS } = await import("../web/lib/card.ts");
+const { GNOMES } = await import("../web/lib/scene/gnome.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
+const { KICKS, MAX_BOUNCE, MAX_MOVE, MAX_PAR, MIN_RAMP, MIN_SHOT_WORK, WEATHER } = await import("../web/lib/builder/rules.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -124,6 +126,9 @@ check("golf.gno work model", () => {
   // the pulses' set-up, as the engine's snapshot gives it (setup) and adena.ts adds it to each shot and takes it off the cap
   assert.ok(has(golf, "w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost"), "newWork(): the pulses' set-up changed");
   assert.ok(has(golf, "c -= w.setup / workPerUnit"), "next(): the set-up off the cap changed");
+  // the builder's work gauges (web/lib/builder/checks.ts SHOT_FLOOR, STORM_FLOOR) are these sums less the hole's part
+  assert.ok(has(golf, "return workPerShot + walls*workPerWall + (physics.MaxWork+physics.MaxWorkStep)*workPerUnit"), "shotBound() changed");
+  assert.ok(has(golf, "workPerShot + w.walls*workPerWall + w.setup + (physics.MaxWorkStep+minShotWork)*workPerUnit"), "worstGas() changed");
   assert.ok(has(golf, "c += w.setup"), "add(): the set-up per shot changed");
   // what HoleState says of it, which boardWork reads (the formula above its fallback)
   assert.ok(has(realm("state.gno"), 'w := newWork(h, nil) sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))'), "HoleState's work changed");
@@ -160,6 +165,88 @@ check("weather.gno period", () => {
   assert.equal(RULES.periodMs, constOf(weather, "PeriodSeconds") * 1000, "PeriodSeconds");
   // a round saves in its period or the next one (Golf.tsx saveBy: period + 2)
   assert.ok(has(weather, "if period != now && period != now-1 {"), "playablePeriod: the periods a round saves in changed");
+});
+
+// ---------------------------------------------------------------- the gnomes realm
+// Every count is written once (ADR-007): the catalogue's data
+// (data/gnomes/series.json) and the realm's config.gno say the same supply,
+// prices and caps, every tier's (a Legendary is sold at a fixed price too);
+// the earned gnomes are UNLOCKS' and GNOMES'.
+const gnomesDir = new URL("../gno.land/r/gnogolf/gnomes/", import.meta.url);
+const gnomes = (f: string) => fs.readFileSync(new URL(f, gnomesDir), "utf8");
+/** A Go array literal of numbers, `name = [len(tiers)]int64{1, 2, 3}`, as numbers. */
+const arrayOf = (src: string, name: string) => {
+  const m = new RegExp(`\\b${name}\\s*=\\s*\\[[^\\]]*\\]int64\\{([^}]*)\\}`).exec(src);
+  assert.ok(m, `${name} not found`);
+  return m[1].split(",").map((x) => Number(x.trim().replace(/_/g, "")));
+};
+/** A Go []string literal, `name = []string{"a", "b"}`, possibly over lines. */
+const stringsOf = (src: string, name: string) => {
+  const m = new RegExp(`\\b${name}\\s*=\\s*\\[\\]string\\{([^}]*)\\}`).exec(src);
+  assert.ok(m, `${name} not found`);
+  return [...m[1].matchAll(/"([^"]*)"/g)].map((x) => x[1]);
+};
+/** What these checks read of data/gnomes/series.json. */
+type Sale = Record<"common" | "rare" | "epic" | "legendary", number>;
+interface SeriesFile {
+  earned: { first: number };
+  series: {
+    id: string;
+    supply: Record<string, number>;
+    sale: { prices: Sale; lifetimeCaps: Sale; playerWindowCaps: Sale; playerWindowHours: number };
+  }[];
+}
+const seriesFile = new URL("../data/gnomes/series.json", import.meta.url);
+check("gnomes config.gno: data/gnomes/series.json", () => {
+  if (!fs.existsSync(seriesFile)) return console.log("     (skipped: no data/gnomes/series.json in this checkout yet)");
+  const config = gnomes("config.gno"), earned = gnomes("earned.gno");
+  const series = JSON.parse(fs.readFileSync(seriesFile, "utf8")) as SeriesFile;
+  const genesis = series.series.find((s) => s.id === "genesis");
+  assert.ok(genesis, "no genesis in series.json");
+  const TIERS = ["common", "rare", "epic", "legendary"] as const;
+  const realmTiers = [...config.matchAll(/^\t\{"(\w+)", ([\d_]+)\},/gm)].map((m) => [m[1], Number(m[2].replace(/_/g, ""))] as const);
+  assert.deepEqual(realmTiers.map(([n]) => n), [...TIERS], "tiers");
+  assert.deepEqual(arrayOf(config, "genesisSupply"), TIERS.map((t) => genesis.supply[t]), "genesisSupply: supply");
+  const sale = genesis.sale, G = 1_000_000;
+  assert.deepEqual(realmTiers.map(([, p]) => p), TIERS.map((t) => sale.prices[t] * G), "prices");
+  assert.deepEqual(arrayOf(config, "lifetimeCap"), TIERS.map((t) => sale.lifetimeCaps[t]), "lifetimeCap");
+  assert.deepEqual(arrayOf(config, "playerCap"), TIERS.map((t) => sale.playerWindowCaps[t]), "playerCap");
+  assert.ok(sale.playerWindowHours <= constOf(config, "maxHours"), "maxHours");
+  assert.equal(series.earned.first, constOf(earned, "firstEarned"), "earned.first: firstEarned");
+});
+// the designer's codec, once it is in this checkout
+const codecFile = new URL("../web/lib/gnomes/codec.ts", import.meta.url);
+/** What these checks use of the codec. */
+interface Codec { encode(t: object): string; PLAIN: object }
+const codec = fs.existsSync(codecFile) ? ((await import("../web/lib/gnomes/codec.ts")) as Codec) : null;
+check("gnomes earned.gno: UNLOCKS and GNOMES", () => {
+  const earned = gnomes("earned.gno");
+  const kinds = Object.keys(UNLOCKS);
+  assert.deepEqual(stringsOf(earned, "earnedKinds"), kinds, "earnedKinds: UNLOCKS' order");
+  assert.deepEqual(stringsOf(earned, "earnedNeeds"), kinds.map((k) => (UNLOCKS as Record<string, { need: string }>)[k].need), "earnedNeeds: UNLOCKS' need");
+  assert.deepEqual(stringsOf(earned, "earnedNames"), kinds.map((k) => GNOMES.find((g) => g.unlock === k)?.name), "earnedNames: GNOMES' names");
+  if (!codec) return console.log("     (skipped the traits: no web/lib/gnomes/codec.ts in this checkout yet)");
+  const m = /return "(010000)" \+ [^+]+\+ [^+]+\+ "([0-9a-f]+)"/.exec(earned);
+  assert.ok(m, "earnedTraits not found");
+  kinds.forEach((_, i) => {
+    const k = (i + 1).toString(16).padStart(2, "0");
+    assert.equal(m[1] + k + m[2], codec.encode({ ...codec.PLAIN, accessories: [], tier: "earned", kind: i + 1 }), `earnedTraits(${i + 1}): codec.ts`);
+  });
+});
+// the hole builder's palette (web/lib/builder/rules.ts): the skins that are
+// physics, and the bounce a passive piece plays at most, as step.gno has them
+check("the physics the builder's palette is bound by", () => {
+  const step = fs.readFileSync(new URL("../gno.land/p/gnogolf/physics/step.gno", import.meta.url), "utf8");
+  const course = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/course.gno", import.meta.url), "utf8");
+  assert.ok(has(step, `return ${KICKS.map((k) => `strings.Contains(skin, "${k}")`).join(" || ")}`), "physics.Kicks: the skins that kick changed");
+  assert.equal(MAX_BOUNCE, constOf(step, "MaxBounce"), "MaxBounce");
+  assert.equal(MIN_RAMP, constOf(step, "MinRamp"), "MinRamp");
+  assert.equal(MAX_MOVE, constOf(step, "MaxMove"), "MaxMove");
+  for (const w of WEATHER) assert.ok(course.includes(`"${w}"`), `course: no weather skin "${w}"`);
+  const data = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/data.gno", import.meta.url), "utf8");
+  assert.ok(has(data, `if h.Strokes > ${MAX_PAR} {`), "course.Decode: the most par changed");
+  const golf = fs.readFileSync(new URL("../gno.land/r/gnogolf/golf/golf.gno", import.meta.url), "utf8");
+  assert.ok(has(golf, "const minShotWork = 4 * physics.MaxWork / 5") && MIN_SHOT_WORK === (4 * RULES.maxWork) / 5, "golf's minShotWork changed");
 });
 
 if (failed) {

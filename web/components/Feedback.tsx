@@ -3,6 +3,7 @@
 // asked: a reply goes through a GitHub issue (its link counted as any, by host).
 import { useState } from "react";
 import { Button, Segmented, Sheet } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import { sound } from "@/lib/feel";
 import { canFeedback, feedback, feedbackLocal } from "@/lib/analytics";
 import { ISSUES } from "@/lib/site";
@@ -35,13 +36,13 @@ export default function Feedback({ where, onClose }: { where: Record<string, str
         <>
           <h2>It did not go through</h2>
           <p>Something on this page (a blocker, the network) kept it from leaving. Tell us on GitHub instead, it takes a minute.</p>
-          <a className="btn btn--main" href={ISSUES} target="_blank" rel="noopener noreferrer">Open an issue ↗</a>
+          <a className={buttonClass({ variant: "primary" })} href={ISSUES} target="_blank" rel="noopener noreferrer">Open an issue ↗</a>
         </>
       ) : !canFeedback() ? (
         <>
           <h2>Tell us how it goes</h2>
           <p>This page sends nothing (visits not measured). Tell us on GitHub instead: what you liked, what broke, what to add.</p>
-          <a className="btn btn--main" href={ISSUES} target="_blank" rel="noopener noreferrer">Open an issue ↗</a>
+          <a className={buttonClass({ variant: "primary" })} href={ISSUES} target="_blank" rel="noopener noreferrer">Open an issue ↗</a>
         </>
       ) : (
         <form className="feedback__form" onSubmit={(e) => (e.preventDefault(), rating && send())}>

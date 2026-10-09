@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC, BYTE_PRICE,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -99,6 +99,13 @@ test("isAddress accepts only a lowercase g1-bech32 address", () => {
   assert.equal(isAddress(ADDR1.toUpperCase()), false);
   assert.equal(isAddress(ADDR1.slice(0, -1)), false); // one char short
   assert.equal(isAddress(123), false);
+});
+
+test("isSlug: golf's validSlug, 1 to 32 lower-case letters, digits and dashes; the one rule every caller reads", () => {
+  for (const ok of ["a", "mole-run", "a1-", "x".repeat(32)]) assert.equal(isSlug(ok), true, ok);
+  for (const bad of ["", "x".repeat(33), "Mole", "a b", "a_b", "$(x)", "a/b", 7, null]) assert.equal(isSlug(bad), false, String(bad));
+  assert.equal(isHoleId(`${ADDR1}/${"x".repeat(32)}`), true, "a hole id's slug is the same rule");
+  assert.equal(isHoleId(`${ADDR1}/${"x".repeat(33)}`), false);
 });
 
 test("isHoleId accepts a realm path, a course slot (and its version), a community hole", () => {
@@ -201,10 +208,11 @@ test("storagePrice parses the vm param", async () => {
   assert.equal(await chain.storagePrice(), 100);
 });
 
-test("storagePrice defaults to 100 when the reply doesn't match, instead of throwing", async () => {
+test("storagePrice defaults to the one fallback, BYTE_PRICE (100), when the reply doesn't match, instead of throwing", async () => {
   const chain = makeChain();
   setFetch(() => okReply(JSON.stringify("garbage")));
-  assert.equal(await chain.storagePrice(), 100);
+  assert.equal(BYTE_PRICE, 100);
+  assert.equal(await chain.storagePrice(), BYTE_PRICE);
 });
 
 test("balance reads ugnot out of the coin string", async () => {
@@ -344,6 +352,20 @@ test("state reads one hole's geometry", async () => {
   assert.equal((await chain.state("garden/1")).hole, "garden/1");
 });
 
+test("versions reads an alias's versions; a reply not shaped so is refused", async () => {
+  const chain = makeChain(), alias = `${ADDR1}/mole-run`;
+  const v = { id: `${alias}/v1`, v: 1, height: 9, by: ADDR1, sha: "ab", note: "", next: "" };
+  setFetch((url) => {
+    assert.ok(decoded(url).expr.includes(`Versions("${alias}")`));
+    return qevalReply({ version: 1, slot: alias, versions: [v] });
+  });
+  assert.deepEqual((await chain.versions(alias)).versions.map((x) => x.v), [1]);
+  setFetch(() => qevalReply({ version: 1, slot: "", versions: [] }));
+  assert.deepEqual((await chain.versions(alias)).versions, [], "none yet");
+  setFetch(() => qevalReply({ version: 1, slot: alias, versions: [{ ...v, v: "1" }] }));
+  await assert.rejects(chain.versions(alias), (e) => errorKind(e) === "chain");
+});
+
 test("state refuses a reply missing a required field", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply({ ...STATE_REPLY, cup: undefined }));
@@ -468,6 +490,65 @@ test("extras: read once per hole version and stroke (the look-ahead and the next
   assert.equal(asked.length, tried + 1, "asked again once, then kept");
 });
 
+test("holeData: a version's data read once a visit (it never changes), an alias's each time, a failure asked again", async () => {
+  const chain = makeChain();
+  const asked: string[] = [];
+  let down = false;
+  setFetch((url) => {
+    asked.push(decoded(url).expr.replace(/^.*HoleData/, "HoleData"));
+    if (down) throw new Error("node down");
+    return strReply("ab01");
+  });
+  const v1 = `${ADDR1}/lane/v1`, alias = `${ADDR1}/lane`;
+  await Promise.all([chain.holeData(v1), chain.holeData(v1)]);
+  assert.equal(await chain.holeData(v1), "ab01");
+  assert.deepEqual(asked, [`HoleData("${v1}")`], "once, however many ask (the list, the meter, the load)");
+  await chain.holeData(alias);
+  await chain.holeData(alias);
+  assert.equal(asked.length, 3, "an alias names the next version once one is published: read each time");
+  await chain.holeData(`${ADDR1}/v3`);
+  await chain.holeData(`${ADDR1}/v3`);
+  assert.equal(asked.length, 3 + 2, "an alias whose slug looks like a version (\"v3\"): an alias, read each time");
+  down = true;
+  await assert.rejects(chain.holeData(`${ADDR1}/lane/v2`));
+  const tried = asked.length;
+  down = false;
+  await chain.holeData(`${ADDR1}/lane/v2`);
+  await chain.holeData(`${ADDR1}/lane/v2`);
+  assert.equal(asked.length, tried + 1, "a failed read is not kept: asked again once, then kept");
+});
+
+test("blockTime: a block's time (ms) from its header; a node that does not have it, or does not answer, is down", async () => {
+  const chain = makeChain();
+  setFetch((url) => (assert.match(url, /\/blockchain\?minHeight=7&maxHeight=7$/), { result: { block_metas: [{ block_id: { hash: "h7" }, header: { height: "7", time: "2026-10-07T06:43:54.238331Z" } }] } }));
+  assert.equal(await chain.blockTime(7), Date.parse("2026-10-07T06:43:54.238Z"));
+  setFetch(() => ({ result: { block_metas: [] } }));
+  await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
+  setFetch(() => { throw new Error("node down"); });
+  await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
+});
+
+test("genesis: the chain's first block's hash, read once (what tells a chain reseeded under the same id apart), a failure asked again", async () => {
+  const chain = makeChain();
+  let reads = 0, down = true;
+  setFetch((url) => (reads++, assert.match(url, /\/blockchain\?minHeight=1&maxHeight=1$/), down ? { result: { block_metas: [] } } : { result: { block_metas: [{ block_id: { hash: "9oXA=" }, header: { height: "1", time: "2026-10-07T06:43:54Z" } }] } }));
+  await assert.rejects(chain.genesis(), (e: unknown) => errorKind(e) === "down");
+  down = false;
+  assert.equal(await chain.genesis(), "9oXA=");
+  assert.equal(await chain.genesis(), "9oXA=");
+  assert.equal(reads, 2);
+});
+
+test("dayCandidates: DayCandidates' page as asked (after, limit), each row a hole with its alias and born; another shape refused", async () => {
+  const chain = makeChain();
+  const row = { id: `${ADDR1}/lane/v2`, name: "Lane", official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "", slot: `${ADDR1}/lane`, born: 7 };
+  let reply: unknown = { version: 1, rows: [row], next: `${ADDR1}/lane` };
+  setFetch((url) => (assert.equal(decoded(url).expr.replace(/^.*DayCandidates/, "DayCandidates"), `DayCandidates("g1x", 25)`), qevalReply(reply)));
+  assert.deepEqual(await chain.dayCandidates("g1x", 25), reply);
+  reply = { version: 1, rows: [{ ...row, born: "7" }], next: "" };
+  await assert.rejects(chain.dayCandidates("g1x", 25));
+});
+
 // ------------------------------------------------------------ boards, and the mode guard
 test("leaderboard defaults to assisted mode, and normalizes anything that isn't 'pro'", async () => {
   const chain = makeChain();
@@ -550,6 +631,24 @@ test("owner reads the realm's owner as an address, and refuses anything else", a
   assert.equal(await chain.owner(), ADDR1);
   setFetch(() => rawReply(`("not an address" .uverse.address)`));
   await assert.rejects(chain.owner());
+});
+
+test("publishing and successor read the realm's state for a publish; anything else is refused", async () => {
+  const chain = makeChain();
+  setFetch((url) => (decoded(url).expr.includes("Publishing()") ? rawReply("(true bool)") : strReply("")));
+  assert.equal(await chain.publishing(), true);
+  assert.equal(await chain.successor(), "", "none set");
+  setFetch(() => rawReply("(false bool)"));
+  assert.equal(await chain.publishing(), false);
+  setFetch(() => rawReply("(maybe bool)"));
+  await assert.rejects(chain.publishing());
+  setFetch(() => strReply("gno.land/r/x/golf/v3"));
+  assert.equal(await chain.successor(), "gno.land/r/x/golf/v3");
+  setFetch((url) => (assert.ok(decoded(url).expr.includes(`Current("${ADDR1}/lane")`)), strReply(`${ADDR1}/lane/v2`)));
+  assert.equal(await chain.current(`${ADDR1}/lane`), `${ADDR1}/lane/v2`);
+  // the records' realm beside the rules: who writes there now ("" paused), as render.gno's moved() reads it
+  setFetch((url) => (assert.match(decoded(url).expr, /gno\.land\/r\/gnogolf\/store\.Writer\(\)/), strReply(chain.realm)));
+  assert.equal(await chain.writer(), chain.realm);
 });
 
 test("holeLeaderboard pages one hole's board", async () => {
@@ -915,4 +1014,55 @@ test("txResult: what a transaction's calls returned, by its hash in base64 or he
   await assert.rejects(chain.txResult("nope"), /Not a transaction hash/);
   setFetch(() => ({ __status: 500 }));
   await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "down");
+});
+
+test("holesOf: one read of an author's own holes, newest first, each row strictly read; none for a bad address, no network call", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.deepEqual(await chain.holesOf("not-an-address"), []);
+  const row = (slug: string, o: Record<string, unknown> = {}) => JSON.stringify({ id: `${ADDR1}/${slug}/v1`, name: "Dogleg", official: false, plays: 4, best: 2, proBest: 0, par: 3, world: "garden", order: 0, next: "", slot: `${ADDR1}/${slug}`, ...o });
+  const lines = [
+    row("dogleg"),
+    row("odd", { id: `${ADDR2}/odd/v1` }), // another author's: never theirs
+    row("odd", { plays: "4" }), // a number not a number
+    row("odd", { official: true }), // a course hole is no author's
+    row("odd", { name: 3 }),
+    row("odd", { slot: `${ADDR1}/other` }), // a slot not its id's
+    "{not json",
+  ];
+  setFetch((url) => {
+    const e = decoded(url).expr;
+    assert.ok(e.includes(`byAuthor.ReverseIterate("${ADDR1} ", "${ADDR1}!"`) && e.includes("holeRow(e)") && !e.includes("\n"), "the author's rows, one line");
+    return strReply(lines.join("\n") + "\n");
+  });
+  assert.deepEqual(await chain.holesOf(ADDR1), [JSON.parse(row("dogleg"))]);
+});
+
+test("savedOn: one read of the rounds saved on holes (each player's best a mode, never a copy), every field strictly read; the holes with more said", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.deepEqual(await chain.savedOn([]), { rows: [], more: new Set() });
+  const id = `${ADDR1}/dogleg/v1`;
+  const lines = [
+    `${id} assisted ${ADDR2} 3 5969251`,
+    `${id} pro ${ADDR3} 2 7`,
+    `${id} fast ${ADDR2} 3 1`, // no such mode
+    `${id} pro not-an-address 2 1`,
+    `${id} pro ${ADDR2} 61 1`, // past the rules
+    `${id} pro ${ADDR2} 02 1`,
+    `${id} pro ${ADDR2} 2 x`,
+    `${id} pro ${ADDR2} 2 1 x`, // a field more
+    `${ADDR2}/not-asked/v1 pro ${ADDR2} 2 1`,
+    `more ${id}`,
+    `more ${ADDR2}/not-asked/v1`,
+  ];
+  setFetch((url) => {
+    const e = decoded(url).expr;
+    assert.ok(e.includes(`[]string{"${id}"}`) && e.includes("!e.copies(m).Has(p)") && !e.includes("\n"), "the holes asked, never a copy, one line");
+    return strReply(lines.join("\n") + "\n");
+  });
+  assert.deepEqual(await chain.savedOn([id]), {
+    rows: [{ id, mode: "assisted", player: ADDR2, strokes: 3, period: 5969251 }, { id, mode: "pro", player: ADDR3, strokes: 2, period: 7 }],
+    more: new Set([id]),
+  });
 });

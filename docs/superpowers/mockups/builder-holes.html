@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Holes by players · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- The Builder's front: your holes, the community's. One button a card.
+     states: ?state=mine (default) | community | empty -->
+<style>
+  .holes { width: min(1080px, 100%); margin: 0 auto; display: grid; gap: var(--sp-5); }
+  .holes__bar { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; justify-content: space-between; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: var(--sp-5); }
+  .hcard { display: grid; grid-template-rows: auto auto auto 1fr; gap: var(--sp-2); padding: var(--sp-2) var(--sp-2) var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); min-width: 0; }
+  .hcard--draft { background: transparent; border-style: dashed; box-shadow: none; }
+  .hcard__map { position: relative; height: 140px; border: var(--edge); border-radius: 14px; overflow: hidden; background: #5c9a78; }
+  .hcard:nth-child(4n+2) .map { transform: scaleX(-1); } .hcard:nth-child(4n+3) .map { transform: scaleY(-1); } .hcard:nth-child(4n) .map { transform: rotate(180deg); }
+  .hcard h3 { margin: 0 var(--sp-2); font-size: 19px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hcard__sub { margin: 0 var(--sp-2); font-size: 15px; font-weight: 600; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hcard__row { display: flex; gap: var(--sp-3); align-items: center; align-self: end; margin: 0 var(--sp-2); }
+  .hcard__row .btn { min-height: 40px; }
+  .holed { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: 13px; font-weight: 700; color: var(--green); }
+  .blank { display: grid; justify-items: center; gap: var(--sp-4); padding: var(--sp-7) var(--sp-5); text-align: center; }
+  .blank h2 { margin: 0; }
+  @media (max-width: 600px) { .holes__bar .btn--cta { display: none; } }
+</style>
+</head>
+<body>
+<main class="front tint--garden" id="app"></main>
+<script src="kit.js"></script>
+<script src="builder.js"></script>
+<script>
+  const { ICON, state, corners, netbanner } = Kit;
+  const { holeSVG } = Builder;
+  const s = state("mine");
+  const map = `<div class="hcard__map">${holeSVG({ small: true })}</div>`;
+  const holed = `<span class="holed">✓ Holed by its author</span>`;
+  const mine = [
+    `<article class="hcard">${map}<h3>Mole Run</h3><p class="hcard__sub">Garden · par 5 · 23 players</p><div class="hcard__row"><button class="btn btn--gold btn--s">${ICON.play} Play</button><button class="linkish">Edit</button></div></article>`,
+    `<article class="hcard">${map}<h3>Crab Walk</h3><p class="hcard__sub">Island · par 3 · not holed by you yet</p><div class="hcard__row"><button class="btn btn--gold btn--s">${ICON.play} Play it for real</button><button class="linkish">Edit</button></div></article>`,
+    `<article class="hcard hcard--draft">${map}<h3>Tram Stop</h3><p class="hcard__sub">Draft · 2 of 3 weathers holed</p><div class="hcard__row"><button class="btn btn--main btn--s">Open</button></div></article>`,
+  ];
+  const community = [["Mole Run", "nym-twee", "Garden", 5, true], ["The Long Ice", "nym-pebble77", "Mountain", 4, true], ["Tide Pools", "nym-zxxma042", "Island", 4, true], ["Bakery Bend", "nym-itsok123", "Mushroom Town", 3, true], ["Crab Walk", "nym-twee", "Island", 3, false], ["Hedge Maze of the Very Long Name", "nym-gnorman", "Garden", 7, false]]
+    .map(([n, by, w, par, h]) => `<article class="hcard">${map}<h3>${n}</h3><p class="hcard__sub">by ${by} · ${w} · par ${par}</p>
+      <div class="hcard__row">${h ? `<button class="btn btn--gold btn--s">Race the author</button>${holed}` : `<button class="btn btn--ghost btn--s">${ICON.play} Play</button>`}</div></article>`);
+  const body = s === "empty"
+    ? `<div class="blank"><h2>No hole of yours yet</h2><button class="btn btn--gold btn--cta">Draw a hole</button></div>`
+    : `<div class="grid">${(s === "community" ? community : mine).join("")}</div>`;
+  document.getElementById("app").innerHTML = `
+    ${corners("Back to the game")}
+    <div class="holes">
+      <header class="front__head"><span class="eyebrow--pill">The Builder</span><h1 class="display inked">${s === "community" ? "Holes by players" : "Your holes"}</h1></header>
+      <div class="holes__bar">
+        <div class="seg" role="tablist" aria-label="Whose holes"><button role="tab" aria-selected="${s !== "community"}" class="${s !== "community" ? "on" : ""}">Yours</button><button role="tab" aria-selected="${s === "community"}" class="${s === "community" ? "on" : ""}">Community</button></div>
+        ${s === "mine" ? `<button class="btn btn--gold btn--cta">+ New hole</button>` : ""}
+      </div>
+      ${body}
+    </div>
+    ${netbanner()}`;
+</script>
+</body>
+</html>

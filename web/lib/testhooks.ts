@@ -5,3 +5,8 @@ const TEST_HOOKS = process.env.NODE_ENV !== "production" || process.env.NEXT_PUB
 
 /** A page opened with ?camlog, where the hooks answer (search: the page's query, its current one by default). */
 export const camlog = (search = typeof location !== "undefined" ? location.search : "") => TEST_HOOKS && /[?&]camlog/.test(search);
+/** The shop's region gate where the hooks answer, read as Netlify answers it with no Netlify: a blocked country's
+ *  (/geo-blocked.json) on a page opened with ?geo=blocked, else an open one's (/geo-open.json); null where they do
+ *  not answer (the host's own /geo.json). */
+export const geoAs = (search = typeof location !== "undefined" ? location.search : ""): "blocked" | "open" | null =>
+  !TEST_HOOKS ? null : /[?&]geo=blocked(&|$)/.test(search) ? "blocked" : "open";

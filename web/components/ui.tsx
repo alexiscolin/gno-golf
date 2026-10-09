@@ -4,24 +4,30 @@
 // game is one of these, so they all hover, press, focus and disable alike.
 // Their look is in globals.css under "shared controls".
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 import { vsPar } from "@/lib/card";
 import { vsParWords } from "@/components/common";
+import { buttonClass, type ButtonLook } from "@/components/button";
 
-/**
- * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
- * front's call to action: a duel's Race), "chip" (a HUD card that is a button).
- */
-const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", gold: "btn--gold", chip: "btn--chip" };
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: keyof typeof VARIANTS;
+/** A button (its variants and sizes: button.ts); keycap: its key, in a cap after the words (never taller than the button). */
+interface ButtonProps extends ComponentProps<"button">, ButtonLook {
+  keycap?: ReactNode;
 }
-export function Button({ variant = "secondary", className = "", children, ...props }: ButtonProps) {
-  const v = VARIANTS[variant] || "btn--ghost";
+export function Button({ variant, size, keycap, className = "", children, ...props }: ButtonProps) {
   return (
-    <button className={`btn ${v} ${className}`.trim()} {...props}>
+    <button className={buttonClass({ variant, size }, className)} {...props}>
       {children}
+      {keycap != null && <kbd className="btn__key">{keycap}</kbd>}
     </button>
+  );
+}
+
+/** What only shows in a row of buttons (the Builder's difficulty meter): their height and edge, flat (it is not pressed). size as Button's. */
+export function Chip({ size = "l", className = "", children, ...props }: HTMLAttributes<HTMLSpanElement> & { size?: ButtonLook["size"] }) {
+  return (
+    <span className={["chip", size === "l" ? "" : `chip--${size}`, className].filter(Boolean).join(" ")} {...props}>
+      {children}
+    </span>
   );
 }
 
@@ -212,3 +218,11 @@ export function Dialog({ onClose = null, as: Tag = "div", children, ...props }: 
     </Tag>
   );
 }
+
+/** A die, inked (title.css .rival__dice): a pick at random, a name rolled. */
+export const Dice = () => (
+  <svg viewBox="0 0 24 24" className="rival__dice" aria-hidden="true">
+    <rect x="2" y="2" width="20" height="20" rx="5" />
+    {[[7.5, 7.5], [16.5, 7.5], [12, 12], [7.5, 16.5], [16.5, 16.5]].map(([x, y]) => <circle key={x * 99 + y} cx={x} cy={y} r="2" />)}
+  </svg>
+);

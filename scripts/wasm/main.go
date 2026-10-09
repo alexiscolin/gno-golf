@@ -9,6 +9,8 @@
 //	from(n, x, y, m, stroke, period)   SimulateFrom; arg: id (n), then the shot (m)
 //	round(n, period)                   SimulateRoundAt, less its clock; arg: id (n), then the shots
 //	sources()                          {path: sha256} of the .gno files it is built from
+//
+// builder.wasm has these and the hole builder's own (main_builder.go).
 package main
 
 import (
