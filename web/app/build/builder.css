@@ -464,7 +464,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 
 /* the first run's hints: three short notes by the palette, Play and the steps, gone at the first drag */
 .bhints { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
-.bhints--help { pointer-events: auto; z-index: var(--z-sheet); background: var(--dim); } /* the "?": dimmed round it, as a sheet's */
 .bhint { position: absolute; display: flex; align-items: center; gap: var(--sp-2); max-width: 260px; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); font-size: 15px; font-weight: 700; color: var(--ink); }
 .bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--gold); font-size: 13px; }
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Play's at the board's top right, under the
@@ -472,16 +471,15 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
 .bhint--test { right: calc(var(--col-w) + 3 * var(--sp-4)); top: 160px; }
 .bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
-/* the "?": one panel in the window's middle, its backdrop pressed puts it away, the three hints then the world's pieces (each tile's picture, name and what it
-   does) and every key on one screen, Close pinned at its foot; it scrolls in itself only in a short window */
-.bhints__centre { position: absolute; inset: 0; padding: var(--sp-4); display: flex; justify-content: center; align-items: center; }
-.bgloss { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 100%; width: min(640px, 100%); overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); pointer-events: auto; }
+/* the "?": the game's sheet (ui.tsx Sheet: its dim, its X), wider: the three hints then the world's pieces (each tile's picture,
+   name and what it does) and every key on one screen; it scrolls in itself only in a short window */
+.bgloss { display: flex; flex-direction: column; gap: var(--sp-2); width: min(640px, 100%); max-width: none; max-height: 100%; overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); }
 .bgloss__hints { display: grid; gap: var(--sp-1); }
+.bgloss p { margin: 0; font-size: 15px; line-height: normal; color: var(--ink); } /* (not the sheet's grey prose) */
 .bhint--in { position: static; max-width: none; padding: 0; border: 0; box-shadow: none; background: none; }
-.bgloss__keys { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 600; line-height: 1.7; color: var(--ink); }
+.bgloss .bgloss__keys { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 600; line-height: 1.7; color: var(--ink); }
 .bgloss__keys kbd { font: inherit; font-weight: 800; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
 .board--pan, .board--pan * { cursor: grab !important; }
-.bgloss__close { align-self: flex-end; position: sticky; bottom: 0; margin: 0; }
 .bgloss h2 { margin: var(--sp-2) 0 0; font-size: 15px; }
 .bgloss ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--sp-2) var(--sp-3); }
 .bgloss__piece { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }

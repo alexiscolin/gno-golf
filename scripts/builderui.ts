@@ -258,10 +258,12 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const g = (await box(c, ".bgloss"))!;
   assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);
   assert.ok(await c.js<boolean>(`(() => { const e = document.querySelector(".bgloss"); return e.scrollHeight <= e.clientHeight + 1; })()`), "the glossary on one screen, not scrolled");
-  assert.equal(await c.js(`document.activeElement?.classList.contains("bgloss__close")`), true, "the focus on Close");
-  await c.js(`document.querySelector(".bgloss__close").click()`);
+  const v = (await box(c, ".sheet"))!;
+  assert.ok(Math.abs((g.l + g.r) / 2 - (v.l + v.r) / 2) < 2 && Math.abs((g.t + g.b) / 2 - (v.t + v.b) / 2) < 2, `the glossary in the window's middle: ${JSON.stringify(g)}`);
+  assert.ok(v.l === 0 && v.t === 0 && v.r === 1280 && v.b === 800, `the dim over the whole window: ${JSON.stringify(v)}`);
+  await c.js(`document.querySelector(".sheet__close").click()`);
   await sleep(300);
-  assert.equal(await c.js(`document.querySelectorAll(".bgloss, .bhint").length`), 0, "gone with Close");
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss, .bhint").length`), 0, "gone with its X");
   console.log("first run: ok");
   c.kill();
 }
@@ -477,7 +479,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   // ?: every key, in the glossary
   await key("?", "Slash");
   assert.ok(await c.js<boolean>(`["Space", "F", "V", "Q", "Esc", "⌫"].every((k) => document.querySelector(".bgloss__keys")?.textContent.includes(k))`), "?: the glossary with every key");
-  await c.js(`document.querySelector(".bgloss__close").click()`);
+  await c.js(`document.querySelector(".sheet__close").click()`);
   await sleep(300);
   // Space held, a drag over a piece pans (the piece stays)
   const tee = () => centre(c, "[data-end='tee'] circle");
@@ -579,16 +581,21 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.ok(await c.js<boolean>(`!!document.querySelector(".insp__hint")`), "a piece selected: how to move it, said");
   assert.equal(await c.js(`localStorage.getItem("${SEEN}drag")`), "1", "seen as it shows");
   await press("Escape", "Escape");
-  // "?": Close focused as it opens; the focus moved on, a render of the editor (V tilts the board) leaves it there
-  await c.js(`document.querySelector(".board").focus()`);
+  // "?": the game's sheet over the editor (its dim, its X); a key pressed in it is its own, never the editor's (1 arms no
+  // piece behind it); Escape, then the dim pressed, put it away
+  const armed = `document.querySelectorAll(".palette [aria-pressed=true]").length`;
+  await press("Escape", "Escape");
+  assert.equal(await c.js(armed), 0, "nothing in hand");
   await press("?", "Slash");
-  assert.equal(await c.js(`document.activeElement?.classList.contains("bgloss__close")`), true, "?: Close focused as it opens");
-  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").focus()`);
-  await press("v", "KeyV");
-  await press("v", "KeyV");
-  assert.equal(await c.js(`document.activeElement?.getAttribute("aria-label") ?? ""`), "Back to your holes (the draft is kept)", "the editor drew again: the focus not taken back to Close");
-  await c.js(`document.querySelector(".bgloss__close").click()`);
+  assert.ok(await c.js<boolean>(`!!document.activeElement?.closest(".sheet .bgloss")`), "?: the focus in the sheet as it opens");
+  await press("1", "Digit1");
+  assert.equal(await c.js(armed), 0, "?: 1 pressed in the sheet arms no piece behind it");
+  await press("Escape", "Escape");
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "?: gone with Escape");
+  await press("?", "Slash");
+  await c.js(`document.querySelector(".sheet").click()`);
   await sleep(300);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "?: gone with the dim pressed");
   // zoomed out (the wheel, round the tee) and in: the ball by the tee is the ball's to press, the tee the tee's
   for (const [n, dy] of [[0, 0], [6, 300], [12, -300]] as const) {
     const [ox, oy] = await centre(c, "[data-end='tee'] circle");

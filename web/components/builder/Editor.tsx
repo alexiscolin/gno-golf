@@ -312,7 +312,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     const key = (e: KeyboardEvent) => {
       if (playing) return; // (in play, the keys are the game's)
       const t = e.target as HTMLElement;
-      if (t.closest("input, select, textarea, [contenteditable], dialog")) return; // (a dialog's keys are its own)
+      if (t.closest("input, select, textarea, [contenteditable], dialog, [role=dialog], [role=alertdialog]")) return; // (a dialog's keys are its own)
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === "Alt") return setFine(true);
       // Space: held, a drag pans (a button keeps its Space unless the pointer is on the board)
