@@ -50,7 +50,7 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   const tiles = (ts: readonly Tile[]) => <div className="ptiles">{ts.map((t) => <Piece key={t.key} t={t} world={world} now={lookOf(t, chosen)} armed={armed} off={off} onArm={arm} />)}</div>;
   return (
     <aside className="col palette" aria-label={`${cap(theWorld(world))}'s pieces`}>
-      <div className="palette__world">{name} pieces</div>
+      <div className="col__head">{name} pieces</div>
       {tiles(first)}
       <Folding fold="more" title="More pieces">
         {more.map((g) => (

@@ -406,6 +406,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
           <div className="bside">
             {gl && <div className="col col--still"><PlayerView eye={eye} large={large} onLarge={setLarge} /></div>}
             <aside className="col" aria-label="The selected piece">
+              <div className="col__head">Piece settings</div>
               <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={blinking} onPlay={() => setBlinking((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove}
                 onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />
             </aside>

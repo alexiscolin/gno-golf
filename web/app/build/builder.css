@@ -75,7 +75,8 @@
 /* the palette: the world's pieces by what they do, under the world's colour; each piece one row, the game's own picture of
    it beside its name and what it does, its looks (a piece of several) under it; groups that fold */
 .palette { gap: var(--sp-4); }
-.palette__world { display: flex; align-items: center; gap: var(--sp-2); margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0; padding: var(--sp-2) var(--sp-4); border-radius: 18px 18px 0 0; background: var(--ink); box-shadow: inset 0 -6px 0 var(--c2, var(--green)); color: var(--paper); font-size: 15px; font-weight: 700; }
+/* a panel's head (the palette's, the player's view's, the piece's settings'): ink, the world's colour its edge */
+.col__head { display: flex; align-items: center; gap: var(--sp-2); margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0; padding: var(--sp-2) var(--sp-4); border-radius: 18px 18px 0 0; background: var(--ink); box-shadow: inset 0 -6px 0 var(--c2, var(--green)); color: var(--paper); font-size: 15px; font-weight: 700; }
 .palette__group { display: grid; gap: var(--sp-3); }
 .palette__group + .palette__group { margin-top: var(--sp-5); }
 .palette__group > summary { cursor: pointer; width: max-content; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
@@ -134,7 +135,8 @@
 /* the checks, docked: two lines (the next step and the meter's guess; the gauges), the things to fix between them when there are */
 .checks { display: grid; gap: 6px; padding: 6px var(--sp-4); border: var(--edge); border-radius: 16px; background: var(--paper); min-width: 0; }
 /* all well: nothing to say, the board has the height (its live regions kept in the page, unseen) */
-.checks--quiet { height: 0; padding: 0; border: 0; overflow: hidden; margin-top: calc(-1 * var(--sp-3)); }
+.checks--quiet { height: 0; padding: 0; border: 0; overflow: hidden; }
+.centre:has(> .checks--quiet) { row-gap: 0; } /* (no gap left under the board: its foot on the columns' line) */
 .checks[aria-busy="true"] .gauges { opacity: .6; }
 /* a limit reached, in a sentence (empty: no room taken) */
 .checks__near { margin: 0; font-size: 13px; font-weight: 700; color: var(--hat-ink); }

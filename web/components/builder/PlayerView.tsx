@@ -29,7 +29,7 @@ export default function PlayerView({ eye, large, onLarge }: { eye: Eye; large: b
 
   return (
     <section className="pview" aria-labelledby="pview-head">
-      <h3 id="pview-head">What the player sees</h3>
+      <div className="col__head" id="pview-head">What the player sees</div>
       <button type="button" className="preview pview__pic" onClick={() => onLarge(true)} title="The hole from the tee, as a player sees it (P: large)" aria-label="The hole from the tee, as a player sees it: show it large (P)">
         <canvas ref={small} />
       </button>

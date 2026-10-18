@@ -682,6 +682,12 @@ export default function Golf() {
   };
   const unlockedRef = useRef<(id: string) => boolean>(() => true);
 
+  // a link to the menu (the Builder's and the shop's Back) opens on it from the first frame: the menu needs no
+  // course read, so the title never shows while the game loads behind it
+  useEffect(() => {
+    if (cfg?.screen === "modes") setScreen("modes");
+  }, [cfg]);
+
   useEffect(() => {
     if (!cfg || !canvas.current) return;
     const el = canvas.current;
