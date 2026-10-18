@@ -46,20 +46,29 @@ course), which `scripts/selfcheck.ts` holds to `data/gnomes/series.json`
 (with the prices and caps: every count is written once). A
 later drop is one more call of any size, never new code. A series is
 checked whole and never changed. It is kept as one string read in place by
-bisection (as gnofly's table), not as structs. The traits are the designer's
-encoding, version first, opaque to the realm: the client reads them, the
-realm keeps and returns them. A token's id is its row's id, and its row is
+bisection (as gnofly's table), not as structs. A name is 1 to 48 bytes of
+valid UTF-8: letters (a-z, A-Z, the accented Latin ones), digits, spaces
+and - ' . alone (`plainName`; the audit's L2: a name with "](" swapped the
+portrait on gnoweb for an image from elsewhere, and a bidi override or
+bytes not UTF-8 got in): the page escapes it as Markdown all the same, and
+the JSON writes a byte that is not UTF-8 as U+FFFD (`p/gnogolf/jsonq`). The
+traits are the designer's encoding, version first, printable ASCII, opaque
+to the realm: the client reads them, the realm keeps and returns them. A token's id is its row's id, and its row is
 its record: no copy is made per token. Which ids were ever sold is a bitmap
 (a bit an id), so a burned gnome is never sold again.
 
 **The sale comes in waves.** `AddWave(first, last, start, playerHours)` puts
-a range of ids on sale from a start, at the prices of the day. Its first
+a range of ids on sale from a start, at the prices of the day; the start is
+from a day before now to a year after, in unix seconds (the audit's M1: a
+start in milliseconds held every genesis close after it, for good). Its first
 hours sell only to wallets with a record in store (a standing in either mode
 in `totals`, which v1's records were copied into), at most 3 commons, 2
 rares, 1 epic and 1 legendary each per wave; then anyone, under the lifetime
-caps (10, 5, 2, 1: one Legendary a wallet, ever). A wave is never changed
-nor withdrawn: its ids stay on sale at its prices, and `SetPrice` moves only
-the waves published after it. Prices start at golf's own numbers: 36 GNOT
+caps (10, 5, 2, 1: one Legendary a wallet, ever). A wave is never changed,
+and withdrawn only before it opens, with no sale (`CancelWave(first)`, its
+ids then free for another wave; a window is counted under its wave's first
+id, so the waves after it keep theirs): once on sale its ids stay on sale
+at its prices, and `SetPrice` moves only the waves published after it. Prices start at golf's own numbers: 36 GNOT
 a Common, the par of nine holes; 72 a Rare, the par of a course; 336 an
 Epic, the dimples on a golf ball; 1,296 a Legendary, eighteen holes times
 par 72 (59,424 GNOT if all 720 sell). Nothing is ever discounted by the
@@ -67,15 +76,18 @@ realm. A Legendary is bought as any
 gnome, at its wave's price, by the first who buys it: there is no auction,
 no escrow, no bid to refund.
 
-**The genesis sale can close on a date.** None is set at deploy, and the
-sale runs on until the owner sets one (the user's decision of 2026-10-07):
-`SetCloseAt(at)`, owner only, once the genesis is published. A date in the
+**The genesis sale closes on a date.** None is set at deploy, and the
+genesis is not sold until the owner sets one (the audit's L1, 2026-10-18;
+the user's decision of 2026-10-07 had left it optional): `SetMintOpen(true)`
+and `AddWave` of a genesis id are refused before it, so a buyer always
+knows when the sale ends. `SetCloseAt(at)`, owner only, once the genesis is
+published. A date in the
 future, which can later be brought forward, never pushed back, by this
 owner or the next; once one is set, no genesis wave may start at or after
 it, which nobody could buy from, from either side: `AddWave` refuses such
 a start, and `SetCloseAt` a date at or before a genesis wave yet to open
-(a wave is never withdrawn, so a close cannot come before one the owner
-has announced). From its block on, the
+(a close cannot come before a wave the owner has announced; `CancelWave`
+withdraws one yet to open first). From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
 them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
@@ -111,8 +123,10 @@ its first page. Free:
 nothing may be sent; once per player and kind; ids from 1,000,001, above any
 catalogue's (64 series of 1,000). An earned gnome cannot be transferred or
 approved (the ledger extension vetoes it); it can be burned, and its kind
-minted again under a new id. `Proof(kind, player)` says, free, what a mint
-would find. Its traits are the designer's codec's for the kind, byte for
+minted again under a new id. Its own switch, `SetEarnedOpen(open)`, open at
+deploy, stops `MintEarned` for a fault in the proof without pausing the
+sale (the audit's L3; `EarnedOpen`, `Collection`'s `earnedOpen`).
+`Proof(kind, player)` says, free, what a mint would find. Its traits are the designer's codec's for the kind, byte for
 byte (selfcheck.ts).
 
 **Burn is the holder's.** `Burn(id)` clears what the ledger's hook cannot
@@ -133,8 +147,11 @@ moves no money. The treasury can be, and should be, an address whose key is
 not the owner's hot key: a gnokey multisig (`gnokey add --multisig`, which
 signs `AcceptTreasury` with its threshold of keys) or a hardware wallet's
 address (a Ledger through gnokey or Adena). `SetMintOpen` stops every sale
-at once (not `MintEarned`, which sells nothing). Whether the role
-may be renounced is not decided: there is no `Renounce`.
+at once (not `MintEarned`, which sells nothing: `SetEarnedOpen` stops it).
+Whether the role may be renounced is not decided: there is no `Renounce`.
+**Before mainnet the owner's key should be a multisig too** (a gnokey
+multisig, as the treasury's): one key holds every setting and the catalogue
+(the audit's L4, not built: a deploy matter, no code).
 
 **New rules are the owner's to accept for the proof (ADR-012).** The
 earned gnomes' proof reads store's rows only while store's writer is the
@@ -268,12 +285,16 @@ while on sale, an earned kind, a player).
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
-| AddWave, SetCloseAt | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it, and the date never comes to or before a genesis wave yet to open | `TestAWaveStartsBeforeTheCloseOnceOneIsSet`, `TestTheCloseNeverComesBeforeAGenesisWaveYetToOpen` |
+| SetMintOpen, AddWave | the genesis sold with no closing date | refused until one is set | `TestTheGenesisSellsOnlyOnceItsCloseIsSet` |
+| AddWave, SetCloseAt | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it, and the date never comes to or before a genesis wave yet to open | `TestTheGenesisSellsOnlyOnceItsCloseIsSet`, `TestTheCloseNeverComesBeforeAGenesisWaveYetToOpen` |
+| AddWave | a start in milliseconds or far off, holding every close after it; the window's end overflowing | a day back to a year ahead | `TestAWaveStartsWithinADayBackAndAYearAhead` |
+| CancelWave | a wave under way or with a sale withdrawn; by another; a later wave's window reset by the shift | before its start only, owner only; windows under the wave's first id | `TestAWaveYetToOpenCanBeCancelled`, `TestAWindowSurvivesAWaveCancelledBeforeIt` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |
 | MintEarned | rows of new rules, or a format the proof does not know; a cup past one page | refused, never a false proof | `TestNewRulesRefuseTheMint`, `TestARowNotAsGolfWritesItRefuses`, `TestACupTooLargeForThePageRefuses` |
 | MintEarned | paid; twice for a kind | free only; once per player and kind | `TestAProvenKindIsMintedFreeOnce` |
+| MintEarned | a fault in the proof minting on | its own switch, the owner's | `TestEarnedGnomesHaveTheirOwnSwitch` |
 | TransferFrom, Approve | an earned gnome sold or moved, by its player or an operator | vetoed by the ledger extension; approval refused | `TestAnEarnedGnomeIsBoundToItsPlayer`, `TestAnOperatorCannotMoveAnEarnedGnome` |
 | Burn | another's gnome burned, by anyone or an operator | the holder only | `TestABurnIsTheHoldersAndForGood` |
 | owner calls | anyone else; a realm the owner calls; no owner | immediate caller only | `TestAnEmptyOwnerHoldsNoPower`, `TestARealmTheOwnerCallsIsNotTheOwner`, `TestTheOwnerHandsOverInTwoSteps` |
@@ -289,18 +310,19 @@ while on sale, an earned kind, a player).
 | AddWave | overlaps; too many | checked; 64 waves | `TestAWaveIsCheckedWhole`, `TestTheWavesAreBounded` |
 | reads | a query made unbounded | bounded pages and lists | `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
 | Worn | a gnome shown that the player no longer owns; the best-first index left behind by a transfer or a burn | equipped only while owned; the holder's row moved by the ledger's hook and Burn | `TestEquipShowsAnotherGnomeToEveryone`, `TestAnEarnedGnomeIsWornLast` |
-| TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
+| AddSeries, Render, TokenURI, TokenMetadata | a link, an image, markup or JSON in a name; a bidi override, an invisible rune, bytes not UTF-8 | letters, digits, spaces and - ' . only; escaped all the same (Markdown, XML, JSON with U+FFFD) | `TestANameIsLettersAndPlainMarks`, `TestTraitsArePrintableASCII`, `TestANameOnThePageIsMarkdownEscaped`, `TestANameCannotInjectMarkup`, `TestMetadataQuotesTheName`, jsonq's `TestInvalidUTF8GoesOutAsTheReplacementRune` |
 | TokenMetadata | an earned gnome's link to a page the static site never builds (one per earned id) | its kind's page, `g/<kind>/` | `TestAnEarnedTokensMetadataNamesItsKind` |
 
 Reentrancy: the only calls out are to the banker, which runs no code, and
 store's reads, which write nothing; each send comes after the state is
 written. Overflow: a Buy's sum is at most 5 times the highest price
-SetPrice takes. Not tested, and not built: `Renounce` (open), so no
+SetPrice takes; a wave's window ends at most a year and 168 hours ahead. Not tested, and not built: `Renounce` (open), so no
 `OwnershipRenounced`; the close is a date in block time, so it holds
 whatever becomes of the owner. Not built either: the spec's `SetRoyaltyBps`
 and its `RoyaltySet`: the royalty is a constant (5%, config.gno). The
 setters' events are the spec's names (`CloseAtSet`, `SiteURLSet`, …),
-`z_setter_events` holding the two.
+`z_setter_events` holding `CloseAtSet`, `WaveAdded`, `WaveCancelled`,
+`SiteURLSet` and `EarnedOpen`.
 
 ## Consequences
 
