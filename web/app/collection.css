@@ -13,7 +13,7 @@
 .crank--full { height: 22px; padding: 0 10px 0 5px; font-size: 12px; gap: 5px; margin: 0; vertical-align: middle; }
 .crank--full svg { width: 14px; height: 14px; }
 /* a phone, or a card: the shape alone (its name for a reader and on hover) */
-@media (max-width: 600px) { .crank:not(.crank--full) .crank__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } .crank:not(.crank--full) { padding: 0 2px; gap: 0; } }
+@media (max-width: 600px) { .crank:not(.crank--full) .crank__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } .crank:not(.crank--full) { padding: 0 2px; gap: 0; } }
 .sticker__who .crank, .rival__name .crank, .duel__row .crank { padding: 0 2px; gap: 0; }
 .sticker__who .crank__word, .rival__name .crank__word, .duel__row .crank__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .sticker__who .crank, .duel__row .crank { margin: 0 4px 0 0; }

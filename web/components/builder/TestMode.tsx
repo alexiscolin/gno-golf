@@ -317,7 +317,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   return (
     <main className={`tmode${party ? " tmode--party" : ""}`}>
       {party && <div className="bconfetti" aria-hidden="true">{BITS.map((b, i) => <i key={i} style={{ left: `${b.x}%`, background: b.color, animationDelay: `${b.delay}ms`, ["--drift" as string]: `${b.drift}px`, ["--turn" as string]: `${b.turn}deg` }} />)}</div>}
-      <div ref={stage} className="tmode__stage" />
+      <div ref={stage} />
       {/* the game's own HUD (Golf.tsx's hud--top): the strokes and the time, the weather now, the weathers to hole beside; Back to Build */}
       <header className="hud hud--top">
         <div className="card card--score tmode__score" aria-live="polite" aria-atomic="true">

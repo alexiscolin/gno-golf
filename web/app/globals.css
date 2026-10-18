@@ -2426,7 +2426,9 @@ body:has(.screen) .pending { top: 60px; transform: translate(-50%, -50%); }
    buttons, and of the network banner at the end */
 @media (max-width: 700px), (max-height: 640px), (max-aspect-ratio: 1/1) {
   .screen.worlds { place-items: start center; align-content: start; padding: 0; }
-  .worlds__in { padding: 96px 0 72px; }
+  .worlds__in { padding: 96px 16px 72px; } /* (the frame's gutter, in from its line; a screen that fits its window: its own, title.css .front--fit) */
+  .front--fit .worlds__in { padding-inline: 0; }
+  .worlds--v2 .worlds__in { width: 100%; }
 }
 /* a tablet on its side: the fact pills wrap onto "Tap to start" */
 @media (max-width: 1100px) and (min-aspect-ratio: 1/1) { .screen--title .title__facts { display: none; } }
