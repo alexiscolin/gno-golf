@@ -7,7 +7,7 @@
 // first visit only (templates.ts HINTS_KEY). Asked for again (the header's
 // "?"), a glossary of the world's pieces comes under them, on one screen:
 // each palette tile's picture, its name and what it does (tiles.ts), and
-// every key; Close or Escape puts it away.
+// every key; Close, Escape or the dim round it puts it away.
 import { useEffect, useRef } from "react";
 import { allTiles, pictureOf } from "@/lib/builder/tiles";
 import { cap, theWorld } from "@/lib/builder/rules";
@@ -37,7 +37,7 @@ export default function Hints({ onDone, glossary = null }: {
   const tiles = allTiles(glossary.palette);
   return (
     <div className="bhints bhints--help" role="note" aria-label="How it works, and the pieces" onKeyDown={(e) => e.key === "Escape" && onDone()}>
-      <div className="bhints__centre">
+      <div className="bhints__centre" onClick={(e) => e.target === e.currentTarget && onDone()}>
         <section className="bgloss" aria-label={`How it works, and ${theWorld(glossary.world)}'s pieces`}>
           <div className="bgloss__hints">{hints(true)}</div>
           <h2>{cap(theWorld(glossary.world))}&apos;s pieces</h2>
