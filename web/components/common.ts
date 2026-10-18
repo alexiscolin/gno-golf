@@ -124,6 +124,17 @@ export function useCopied(ms = 1800) {
   return [copied, copy] as const;
 }
 
+/** A value said a moment: set, it is back to none ms after the last set (its timer goes with the component). */
+export function useFlash<T>(ms: number, none: T) {
+  const [v, setV] = useState<T>(none);
+  useEffect(() => {
+    if (v === none) return;
+    const t = setTimeout(() => setV(none), ms);
+    return () => clearTimeout(t);
+  }, [v, none, ms]);
+  return [v, setV] as const;
+}
+
 /** "stroke" or "strokes", as n says (the word alone, where the number is set apart). */
 export const plural = (word: string, n: number) => word + (n === 1 ? "" : "s");
 const counted = (word: string) => (n: number) => `${n} ${plural(word, n)}`;

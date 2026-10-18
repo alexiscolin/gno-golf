@@ -19,7 +19,7 @@ import { Button } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
 import { aboutGnot, connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
-import { BYTE_PRICE, makeChain, wait } from "@/lib/chain";
+import { BYTE_PRICE, isSlug, makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
 import { endpoints, playLink } from "@/lib/builder/holes";
 import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
@@ -37,18 +37,21 @@ import Preview from "./Preview";
 import { beatLine, cardLines, holeShare, saveFile as download, shareCard } from "./share";
 import { MAX_NOTE } from "@/lib/builder/draft";
 import { worldName } from "@/lib/builder/rules";
+import { typedSlug } from "@/lib/builder/templates";
 
 /** How long the chain is read for the new version after a signature (it lands within a few blocks). */
 const LAND_MS = 90_000;
 
-export default function Publish({ host, draft, author, onDraft, onRetest, onDone }: {
+export default function Publish({ host, draft, author, onDraft, onRetest, onBuild, onDone }: {
   host: BuilderHost;
   draft: Draft;
   author: string;
-  /** the note changed: kept in the draft (it moves no ball) */
+  /** the note or the address changed: kept in the draft (the note moves no ball; another address, another weather: played again) */
   onDraft: (d: Draft) => void;
-  /** back to the test (a newer version elsewhere: new weather) */
+  /** back to play it again (a newer version elsewhere, another address: new weather) */
   onRetest: () => void;
+  /** back to Build only (the hole no longer holds: its errors to fix, nothing played unasked) */
+  onBuild: () => void;
   onDone: (id: string) => void;
 }) {
   const { rpc, web } = useMemo(() => endpoints(window.location.search), []);
@@ -95,7 +98,10 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   }, [chain, alias, host, tries]);
   useEffect(() => void proofKey(draft, host).then((k) => live.current && setKey(k)), [draft, host]);
   useEffect(() => {
-    const untested = "The rounds that proved it no longer play out the same on its final data: play it again.";
+    // (another address: its rounds were played under the one before, its weather another)
+    const untested = draft.proofs.some((p) => p.key === key && p.id.split("/")[1] !== draft.slug)
+      ? "The rounds that proved it were played under another address: play it again under this one."
+      : "The rounds that proved it no longer play out the same on its final data: play it again.";
     if (!hex || !key || !proved) return setReadings((r) => ({ ...r, hole: key && !proved ? untested : undefined }));
     setReadings((r) => ({ ...r, hole: undefined }));
     const judged = loadPalette(draft.world).then((palette) => holeHolds({ ...draft, title: name }, hex, key, proved, { host, palette, census }));
@@ -184,7 +190,14 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           <p className="pub__forever">Your hole, its name and its note are public and stay on the chain for good: nothing published can be deleted, by you or by anyone. The site&apos;s owner can hide a hole from the lists and from this site. <a href={ISSUES} target="_blank" rel="noreferrer">Report a hole</a></p>
           {/* the name read here (the header edits it), the address it follows */}
           <div className="pub__field"><span>Name</span><b aria-invalid={step.at === "name"}>{name || "–"}</b>{name !== draft.title && <small>Kept as: {name}</small>}</div>
-          <div className="pub__field"><span>Address</span><code title={id || undefined}>{(id || `${alias}/v…`).replace(/^g1\w+/, (a) => shortAddr(a))}</code></div>
+          {/* its address: the name's own until it is proved, set by hand here (another address, another weather: played again);
+              a version after the first says it is one */}
+          <label className="pub__field">
+            <span>Address</span>
+            <span className="pub__addr"><code title={author}>{shortAddr(author)}/</code><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
+              disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><code>/v{id ? v : "…"}</code></span>
+            {v > 1 && <small>A new version of your hole at this address: change it for a hole of its own.</small>}
+          </label>
           {/* the par, explained by the rounds that proved it */}
           {par && <div className="pub__field"><span>Par</span><code>{draft.par}</code><small>{par}{strokes ? ` · ${beatLine(strokes)}` : ""}</small></div>}
           <label className="pub__field">
@@ -221,7 +234,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           {why && <p className="pub__bad" role="alert">{why}</p>}
         </div>
         <div className="pub__foot">
-          {step.at === "newer" || step.at === "hole" ? <Button variant="gold" className="btn--wide" onClick={onRetest}>{step.at === "hole" && !/^The rounds/.test(step.why) ? "Back to Build" : "Play it again (free)"}</Button>
+          {step.at === "newer" || step.at === "hole" ? (step.at === "hole" && !/^The rounds/.test(step.why) ? <Button variant="gold" className="btn--wide" onClick={onBuild}>Back to Build</Button>
+            : <Button variant="gold" className="btn--wide" onClick={onRetest}>Play it again (free)</Button>)
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
                 : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${aboutGnot(b.most)} GNOT`}</Button>

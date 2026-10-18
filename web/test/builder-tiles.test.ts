@@ -9,7 +9,7 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { armedByKey, armOn, foldOpen, GROUPS, lookOf, looksShown, pictureOf, saveFold, tileOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { allTiles, armedByKey, armOn, foldOpen, GROUPS, lookOf, looksShown, pictureOf, saveFold, tileOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
 import { entryName, TILES } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
@@ -82,6 +82,11 @@ void test("each piece's looks, in the Inspector: every look of a piece of severa
   assert.equal(looksShown(named("garden", "Obstacle")).length, 6, "the garden's obstacle: its six looks");
   assert.deepEqual(looksShown(named("mountain", "Ice")), [], "the ice: one look, none under it");
   assert.equal(tileOf(palettes.get("garden")!, "no/such/entry"), null);
+  for (const w of palettes.keys()) {
+    const p = palettes.get(w)!, { first, more, others } = tilesOf(p);
+    assert.deepEqual(allTiles(p).map((t) => t.key), [...first, ...more.flatMap((g) => g.tiles)].map((t) => t.key), `${w}: every tile of its own, in order`);
+    assert.equal(allTiles(p, true).length, allTiles(p).length + others.length, `${w}: the other worlds' after them`);
+  }
 });
 
 void test("1 to 5 arm the first five pieces, each in its look as chosen (its first until then); past five, nothing", () => {

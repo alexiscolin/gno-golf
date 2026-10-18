@@ -15,9 +15,10 @@
 // → 4"), and a ghost ball runs the meter's line after a drop.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { useFlash } from "@/components/common";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, whereOf, clampMove } from "@/lib/builder/edit";
-import { brokenLine, gauges, meterFace, NO_GL, offAtLimit, pieceGauges, testGate } from "@/lib/builder/editor";
+import { brokenLine, CHECKING, gauges, meterFace, NO_GL, offAtLimit, pieceGauges, playWhenAsked, sameShape, testGate } from "@/lib/builder/editor";
 import { stageRenderer } from "@/lib/builder/stage";
 import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
@@ -35,7 +36,7 @@ import type { Hole } from "@/lib/scene/data";
 import Board from "./Board";
 import Checks from "./Checks";
 import Header from "./Header";
-import Inspector, { MOD } from "./Inspector";
+import Inspector, { MOD, useOnce } from "./Inspector";
 import Palette from "./Palette";
 import { refusalOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
@@ -44,7 +45,7 @@ import Hints from "./Hints";
 import TestMode from "./TestMode";
 import PlayerView from "./PlayerView";
 import type { Eye } from "./Scene";
-import { keyAction, markSeen, seen } from "@/lib/builder/keys";
+import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
 import { armedByKey } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
@@ -84,6 +85,11 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const [, bump] = useState(0);
   const [again, setAgain] = useState(false); // the hints asked for again (the header's "?")
   const draft = session.now(), kept = session.kept();
+  // the hole as kept, as checked: the same object while only its proofs or par change (a round holed in play is no
+  // reason to validate, census and meter it again mid-game); every check, key and meter answer is of it
+  const shapeOf = useRef(kept);
+  if (!sameShape(shapeOf.current, kept)) shapeOf.current = kept;
+  const shape = shapeOf.current;
   const [palette, setPalette] = useState<readonly PaletteEntry[] | null>(null);
   // the world the palette is of (a switch hands it over with the draft: nothing unmounts to load it again)
   const paletteWorld = useRef("");
@@ -118,18 +124,20 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const [shots, setShots] = useState<QuickShot[]>([]);
   const [aim, setAim] = useState<QuickShot | null>(null);
   const [lineOn, setLineOn] = useState(false);
-  // the meter's par last measured (a change said a moment by the chip: "par 3 → 4"), a drop waiting for the ghost ball's run, the run
-  const lastPar = useRef(0), [parBump, setParBump] = useState(""), landed = useRef(false);
-  const [roll, setRoll] = useState<{ path: V[][]; n: number } | null>(null);
-  // the keys line at the board's foot, a browser's first visit only; the player's view large (P)
-  const [keysLine] = useState(() => !seen("keys")), [large, setLarge] = useState(false);
-  useEffect(() => markSeen("keys"), []);
+  // the meter's par last measured (a change said a moment by the chip: "par 3 → 4"); a drop that held, waiting for the
+  // ghost ball's run on the hole it made ("next": the change it makes, bound as it is kept; any other change since drops
+  // it); the run, a moment
+  const lastPar = useRef(0), [parBump, setParBump] = useFlash(1800, ""), landed = useRef<Draft | "next" | null>(null);
+  const [roll, setRoll] = useFlash<{ path: V[][]; n: number } | null>(1300, null);
+  // the keys line at the board's foot, a browser's first visit only (and the rest of it); the player's view large (P)
+  const keysLine = useOnce("keys"), [large, setLarge] = useState(false);
   // how the board is looked at: V tilts it, Q turns it a quarter (the 3D board; the 2D one too)
   const [look, setLook] = useState<Look>(FLAT);
   // a timed piece's blinking played, in the inspector and on the board (its pause holds both)
   const [blinking, setBlinking] = useState(true);
   // Play (T): the hole as kept, its canonical bytes and proof key, played over the editor (kept open: the same zoom, selection and history after)
-  const [playing, setPlaying] = useState<{ hex: string; key: string } | null>(null), [want, setWant] = useState(playFirst);
+  // (the author it opened with: one Adena shares late never swaps a game under way; the address given in play does)
+  const [playing, setPlaying] = useState<{ hex: string; key: string; author: string | null } | null>(null), [want, setWant] = useState(playFirst);
   // the last try's round that holed (no address yet), left on the board as a dotted trail (played again as the hole changes)
   const [trail, setTrail] = useState<QuickShot[]>([]), [tried, setTried] = useState<readonly string[] | null>(null);
   // the player's view (PlayerView.tsx), painted by the board's 3D scene
@@ -157,16 +165,16 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const quick: ValidateOptions | null = useMemo(() => palette && { host, palette, slug: draft.slug || undefined }, [host, palette, draft.slug]);
   const full: ValidateOptions | null = useMemo(() => quick && { ...quick, census }, [quick]);
 
-  // the whole pipeline on the draft as kept (a drag's own checks are the board's), 150 ms after the last change; the 3D from its canonical bytes
+  // the whole pipeline on the hole as kept (a drag's own checks are the board's), 150 ms after the last change; the 3D from its canonical bytes
   useEffect(() => {
     if (!full) return;
     const t = setTimeout(() => {
-      const v = validate(kept, full); // (its state, read for the census, is what the preview draws)
-      setChecked({ of: kept, v, state: v.state ?? null });
-      void proofKey(kept, host).then((k) => setKey({ of: kept, key: k }));
+      const v = validate(shape, full); // (its state, read for the census, is what the preview draws)
+      setChecked({ of: shape, v, state: v.state ?? null });
+      void proofKey(shape, host).then((k) => setKey({ of: shape, key: k }));
     }, CHECK_MS);
     return () => clearTimeout(t);
-  }, [kept, full, host]);
+  }, [shape, full, host]);
 
   // each step kept in the browser
   useEffect(() => onSave(kept), [kept, onSave]);
@@ -176,12 +184,12 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     const m = (meter.current = makeMeter((of, e) => setEst({ of, e })));
     return () => m?.stop();
   }, []);
-  const clean = !!checked && checked.of === kept && !checked.v.issues.some((i) => i.severity === "error");
+  const clean = !!checked && checked.of === shape && !checked.v.issues.some((i) => i.severity === "error");
   useEffect(() => {
     if (!clean) return;
-    const t = setTimeout(() => meter.current?.ask(kept), METER_MS);
+    const t = setTimeout(() => meter.current?.ask(shape), METER_MS);
     return () => clearTimeout(t);
-  }, [clean, kept]);
+  }, [clean, shape]);
   const guess = clean && est?.e ? est.e : null;
   // the quick shots on the hole as shown (a drag's too: they replay live), the one being pulled last
   const shotsPlayed = useMemo(() => quickShots(host, draft, aim ? [...shots, aim] : shots) ?? [], [host, draft, shots, aim]);
@@ -195,31 +203,22 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     if (shotsShown.at(-1)?.holed) sound("cup");
   }, [shots, aim, shotsShown]);
   // the meter's answer for the hole as kept: a change of par said a moment by the chip, with a chime (up: lower, harder);
-  // after a drop that held, the ghost ball runs its line
+  // after a drop that held, the ghost ball runs its line (the answer for the hole the drop made, never a later one's)
+  useEffect(() => void (landed.current = landed.current === "next" ? shape : null), [shape]);
   useEffect(() => {
-    if (est?.of !== kept) return;
+    if (est?.of !== shape) return;
     const par = est.e?.par ?? 0, was = lastPar.current;
     lastPar.current = par || was;
     if (par && was && par !== was) (setParBump(`par ${was} → ${par}`), sound("chime", par > was ? 0 : 4));
-    if (landed.current && est.e?.path.length) setRoll((r) => ({ path: est.e!.path, n: (r?.n ?? 0) + 1 }));
-    landed.current = false;
-  }, [est, kept]);
-  useEffect(() => {
-    if (!parBump) return;
-    const t = setTimeout(() => setParBump(""), 1800);
-    return () => clearTimeout(t);
-  }, [parBump]);
-  useEffect(() => {
-    if (!roll) return;
-    const t = setTimeout(() => setRoll(null), 1300);
-    return () => clearTimeout(t);
-  }, [roll]);
+    if (landed.current === shape && est.e?.path.length) setRoll((r) => ({ path: est.e!.path, n: (r?.n ?? 0) + 1 }));
+    landed.current = null;
+  }, [est, shape, setParBump, setRoll]);
 
   // a new key for the hole as kept: the author's rounds of the hole before replayed on its bytes, off the main
   // thread; those that still hole in their strokes are its proofs (the step amended, never one of its own), the
   // others said; the weathers the edit dropped said once in a toast, an undo away from kept
   useEffect(() => {
-    const k = key?.of === kept ? key.key : null, prev = prevKey.current;
+    const k = key?.of === shape ? key.key : null, prev = prevKey.current;
     if (!k || k === prev) return;
     prevKey.current = k;
     const sayDropped = (proofs: Draft["proofs"]) => {
@@ -240,7 +239,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
       setRounds({ key: k, kept: c?.proofs.map((p) => p.kind) ?? [], broken: c?.broken.map((b) => b.why) ?? [] });
       sayDropped(proofs);
     });
-  }, [key, kept, author, host, session]);
+  }, [key, kept, shape, author, host, session]);
 
   const set = (d: Draft) => (session.set(frame(d)), refresh());
   const preview = (d: Draft) => (session.preview(d), refresh());
@@ -353,19 +352,22 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     return () => (window.removeEventListener("keydown", key), window.removeEventListener("keyup", up), window.removeEventListener("blur", away));
   });
 
-  const v = checked?.v, fresh = checked?.of === kept;
+  const v = checked?.v, fresh = checked?.of === shape;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = v ? atFault(v, kept.pieces.map((p) => p.id)) : new Set<string>(); // (both of an overlap, each piece an error meets)
   const gl = !!stageRenderer();
   const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   // Play: the hole as kept, checked with no error, named, its proofs carried over and its key known
-  const playOff = testGate(kept, checked, gl) || (carrying === kept || key?.of !== kept || !key.key ? "Checking…" : "");
+  const playOff = testGate(shape, checked, gl) || (carrying === kept || key?.of !== shape || !key.key ? CHECKING : "");
   function play() {
     const hex = !playOff && key?.key ? canonicalHex(kept, host) : null;
-    if (hex != null) (setArmed(null), setAim(null), setTried(null), setPlaying({ hex, key: key!.key! }), onHinted());
+    if (hex != null) (setArmed(null), setAim(null), setTried(null), setPlaying({ hex, key: key!.key!, author }), onHinted());
   }
-  // back from Publish to play it again: as soon as the hole is checked
-  useEffect(() => void (want && !playOff && (setWant(false), play())), [want, playOff]); // eslint-disable-line react-hooks/exhaustive-deps -- (play: the render's own)
+  // back from Publish to play it again: as soon as the hole is checked; dropped if it cannot start (never opened later, unasked)
+  useEffect(() => {
+    const now = playWhenAsked(want, playOff);
+    if (now !== "wait") (setWant(false), now === "play" && play());
+  }, [want, playOff]); // eslint-disable-line react-hooks/exhaustive-deps -- (play: the render's own)
   // proved as it is now: Publish open and lit (proofs keep while the hole is the same: an undo brings them back)
   const proved = !playOff && !!author && !!provedAs(kept.proofs, kept.world, key!.key!, author, kept.slug);
   // a round of play's proof, kept in the draft as kept (the step amended: an undo before it drops it with the edit)
@@ -377,9 +379,9 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} world={draft.world} worlds={WORLDS} step="edit"
-        steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== "Checking…" ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Sink it in every weather first", done: false } }}
+        steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Sink it in every weather first", done: false } }}
         action={{ text: "Play", key: "T", off: playOff, onClick: play }}
-        meter={meterFace(clean, est, kept)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
+        meter={meterFace(clean, est, shape)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onWorld={world} onStep={(s) => (s === "play" ? play() : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)}
         onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, dice)))), setDice((n) => n + 1), refresh())} />
@@ -391,13 +393,13 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
             {opened && errors.length > 0 && <p className="bbroken" role="status">{opened}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !blinking, keep: blinking && piece?.clock.k === "substep", eye }}
-              keys={keysLine} onLanded={() => void (landed.current = true)} roll={roll}
+              keys={keysLine} onLanded={() => void (landed.current = "next")} roll={roll}
               ball={{
                 played: shotsShown, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? shotsPlayed.at(-1) ?? null : null,
-                line: lineOn && guess && est?.of === kept && draft === kept ? { path: guess.path, heat: guess.heat } : null,
+                line: lineOn && guess && est?.of === shape && draft === kept ? { path: guess.path, heat: guess.heat } : null,
                 onAim: setAim, onShot: (q) => (sound("putt"), setAim(null), setShots((s) => [...s, q].slice(-SHOTS_KEPT))),
               }} />
-            <Checks broken={brokenLine({ errors: errors.length, proved, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
+            <Checks broken={brokenLine({ errors: errors.length, proved, rounds: rounds && key?.of === shape && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
           <aside className="col" aria-label="The selected piece">
@@ -417,7 +419,8 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
       {playing && (
         <div className={`tbench tbench--play tint--${draft.world}`}>
           {/* (a new game once the address is given: its rounds the author's from then on) */}
-          <TestMode key={author ?? ""} host={host} draft={kept} hex={playing.hex} proofKey={playing.key} author={author} guess={guess?.par ?? 0} onAuthor={onAuthor}
+          <TestMode key={playing.author ?? ""} host={host} draft={kept} hex={playing.hex} proofKey={playing.key} author={playing.author} guess={guess?.par ?? 0}
+            onAuthor={(a) => (setPlaying((p) => p && { ...p, author: a }), onAuthor(a))}
             onProof={prove} onPar={setPar} tried={tried} onRound={(r) => (setTried(r), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), onPublish(session.kept()))} />
         </div>
       )}

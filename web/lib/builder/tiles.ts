@@ -64,11 +64,14 @@ export const lookOf = (t: Tile, chosen: Readonly<Record<string, string>>): Palet
 /** The looks a piece offers (the Inspector's, for the piece selected): every one of a piece of several, in its order; none for a piece of one. */
 export const looksShown = (t: Tile): readonly PaletteEntry[] => (t.looks.length > 1 ? t.looks : []);
 
-/** The tile an entry is a look of (the world's own, or another world's), null for none. */
-export function tileOf(palette: readonly PaletteEntry[], id: string): Tile | null {
+/** Every tile of the palette in its order: the world's first five, then each group's (the glossary's); with others, the other worlds' after them. */
+export function allTiles(palette: readonly PaletteEntry[], withOthers = false): Tile[] {
   const { first, more, others } = tilesOf(palette);
-  return [...first, ...more.flatMap((g) => g.tiles), ...others].find((t) => t.looks.some((e) => e.id === id)) ?? null;
+  return [...first, ...more.flatMap((g) => g.tiles), ...(withOthers ? others : [])];
 }
+
+/** The tile an entry is a look of (the world's own, or another world's), null for none. */
+export const tileOf = (palette: readonly PaletteEntry[], id: string): Tile | null => allTiles(palette, true).find((t) => t.looks.some((e) => e.id === id)) ?? null;
 
 /**
  * What a piece of the palette pressed arms: a pointer's press arms it,

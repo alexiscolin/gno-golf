@@ -33,6 +33,25 @@ export function brokenLine({ errors, proved, rounds }: { errors: number; proved:
 /** Why Play is off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */
 export const NO_GL = "Playing needs 3D (WebGL), which this browser has turned off";
 
+/** Why Play waits while the hole is checked (or its proofs carried over): never a lock, the header keeps what it showed. */
+export const CHECKING = "Checking…";
+
+/**
+ * Whether two drafts are the same hole to check: the same in all but the
+ * rounds that proved it and the par they set (a proof saved in play amends
+ * the draft, and moves no ball). The editor checks, measures and keys the
+ * hole by its shape: a round holed is no reason to validate, census and
+ * meter it again mid-game (the par guess blinking, Play "Checking…").
+ */
+export function sameShape(a: Draft, b: Draft): boolean {
+  return a === b || (Object.keys(a) as (keyof Draft)[]).every((k) => k === "proofs" || k === "par" || a[k] === b[k]);
+}
+
+/** Play asked for at once (back from Publish to play it again): played once the hole is checked, dropped when it cannot start (it never opens later, unasked, once the errors are fixed). */
+export function playWhenAsked(want: boolean, off: string): "play" | "drop" | "wait" {
+  return !want || off === CHECKING ? "wait" : off ? "drop" : "play";
+}
+
 /**
  * Why Play is off ("" it is on), from the last check: only a check of the
  * draft as kept now counts (an undo or a step since, and it is checking again).
@@ -41,7 +60,7 @@ export const NO_GL = "Playing needs 3D (WebGL), which this browser has turned of
  */
 export function testGate(kept: Draft, checked: { of: Draft; v: Validated } | null, gl = true): string {
   if (!gl) return NO_GL;
-  if (!checked || checked.of !== kept) return "Checking…";
+  if (!checked || checked.of !== kept) return CHECKING;
   const errors = checked.v.issues.filter((i) => i.severity === "error").length;
   return errors ? `Fix ${errors} first` : !kept.pieces.length ? "Place a piece first" : !kept.slug ? "Name it first" : "";
 }

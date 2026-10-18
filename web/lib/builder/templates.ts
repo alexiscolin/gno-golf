@@ -55,8 +55,21 @@ export function firstRun(drafts: readonly Draft[], hinted: boolean): Draft | nul
   return drafts.length || hinted ? null : startsIn("garden").find((s) => s.name === "dogleg")?.draft ?? null;
 }
 
-/** An address made from a name: lower case, a dash between words, at most 32 ("hole" if nothing is left). */
-export const slugOf = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 32).replace(/-+$/, "") || "hole";
+/**
+ * An address made from a name: lower case, a dash between words, at most 32.
+ * A name with nothing of a-z0-9 in it (another script, emoji) is "hole-" and
+ * six of its own hash's letters: every such hole an address of its own, never
+ * a new version of another (the author's "hole"); "hole" for no name at all.
+ */
+export const slugOf = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 32).replace(/-+$/, "") || (title.trim() ? `hole-${hashOf(title.trim())}` : "hole");
+/** Six base-36 letters of a text's FNV-1a hash (a name's own, the same each time). */
+function hashOf(text: string): string {
+  let h = 0x811c9dc5;
+  for (const c of text) h = Math.imul(h ^ c.codePointAt(0)!, 0x01000193) >>> 0;
+  return h.toString(36).padStart(6, "0").slice(-6);
+}
+/** An address typed by hand (Publish's): what the chain takes, a dash for anything else, at most 32. */
+export const typedSlug = (typed: string) => typed.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 32);
 
 /**
  * The hole renamed: its address follows its name (slugOf) while it is the

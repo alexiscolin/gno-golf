@@ -44,6 +44,15 @@ export function seen(what: Once): boolean {
 export function markSeen(what: Once) {
   try { localStorage.setItem(onceKey(what), "1"); } catch {}
 }
+/** The helps shown on this visit (this page's load): they stay until it ends, an editor opened again or not. */
+const shownNow = new Set<Once>();
+/** Whether a one-time help shows: not seen on an earlier visit, or shown already on this one. */
+export const showOnce = (what: Once) => shownNow.has(what) || !seen(what);
+/** A one-time help actually shown (not merely its place mounted): seen from the next visit on, kept for this one. */
+export function shownOnce(what: Once) {
+  shownNow.add(what);
+  markSeen(what);
+}
 
 /** What a press asks for in play: play again from the tee (R, Backspace), the overview camera and back (V), back to Build (Escape); null for none. */
 export type PlayKey = "restart" | "view" | "leave" | null;

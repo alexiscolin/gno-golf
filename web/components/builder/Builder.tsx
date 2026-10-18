@@ -14,7 +14,7 @@ import "@/app/build/phone.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { DRAFT_PREFIX, dropDraft, keptText, loadDrafts, newKey, saveDraft, saveOver, type Draft, type Kept } from "@/lib/builder/draft";
-import { endpoints, knownAuthor, remixId } from "@/lib/builder/holes";
+import { endpoints, keepAuthor, knownAuthor, remixId } from "@/lib/builder/holes";
 import { remixFrom } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
 import { makeChain } from "@/lib/chain";
@@ -64,10 +64,11 @@ export default function Builder() {
     const first = remix ? null : firstRun(list.map((k) => k.draft), hinted);
     setDrafts(list);
     if (first) add(first), setHints(true);
-    // the address kept, else Adena's account if it already shares one with the site (no popup)
+    // the address kept, else Adena's account if it already shares one with the site (no popup), kept as a typed one is
+    // (unless one was given meanwhile); a game under way keeps the author it opened with (Editor: from its next Play)
     const kept = knownAuthor();
     setAuthor(kept);
-    if (!kept) void current().then((a) => a && setAuthor((was) => was ?? a.address));
+    if (!kept) void current().then((a) => a && !knownAuthor() && (keepAuthor(a.address), setAuthor((was) => was ?? a.address)));
     void loadBuilder().then((h) => {
       setHost(h);
       if (!remix) return;
@@ -135,7 +136,7 @@ export default function Builder() {
             steps={{ edit: { locked: "", done: true }, play: { locked: "", done: true }, publish: { locked: "", done: false } }}
             action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))}
             onStep={(s) => s !== "publish" && edit(s === "play")} onBack={() => edit()} />
-          <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onDone={() => {}} />
+          <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onBuild={() => edit()} onDone={() => {}} />
           {unkeptNote}
         </div>
       );

@@ -22,7 +22,7 @@ import { refusalOf } from "@/lib/builder/explain";
 import { detailsOpen, saveDetailsOpen } from "@/lib/prefs";
 import { notTurned } from "@/lib/builder/handles";
 import { looksShown, pictureOf, tileOf } from "@/lib/builder/tiles";
-import { markSeen, seen } from "@/lib/builder/keys";
+import { showOnce, shownOnce, type Once } from "@/lib/builder/keys";
 
 const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
 const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth" } as const;
@@ -66,14 +66,25 @@ function Cycle({ t, unit, playing, onPlay }: { t: Pulse; unit: string; playing: 
 const SPEEDS: readonly (readonly [Speed, string])[] = [["slow", "Slow"], ["medium", "Medium"], ["fast", "Fast"]];
 const OPENS: readonly (readonly [Open, string])[] = [["most", "Most"], ["half", "Half"], ["little", "Little"]];
 
-export default function Inspector({ draft, piece, quick, full, playing = true, onPlay = () => {}, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete, onChoose = () => {} }: {
+/**
+ * A one-time help (keys.ts): shown on a browser's first visit to it, marked
+ * seen once it is actually shown (when: its place has it on screen), and
+ * kept for the rest of the visit, an editor opened again or not.
+ */
+export function useOnce(what: Once, when = true): boolean {
+  const [on] = useState(() => showOnce(what));
+  useEffect(() => void (on && when && shownOnce(what)), [on, when, what]);
+  return on;
+}
+
+export default function Inspector({ draft, piece, quick, full, playing, onPlay, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete, onChoose }: {
   draft: Draft;
   piece: Piece | null;
   quick: ValidateOptions;
   full: ValidateOptions;
   /** a timed piece's blinking played (here and on the board), and its play/pause */
-  playing?: boolean;
-  onPlay?: () => void;
+  playing: boolean;
+  onPlay: () => void;
   onPreview: (d: Draft) => void;
   onCommit: () => void;
   onCancel: () => void;
@@ -84,11 +95,10 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
   onCopy: () => void;
   onDelete: () => void;
   /** a look chosen for the piece: the one the next of its tile takes (the editor's) */
-  onChoose?: (tile: string, entry: string) => void;
+  onChoose: (tile: string, entry: string) => void;
 }) {
-  // Details open unless the player folded them this visit (prefs.ts); how to move a piece said on a browser's first visit
-  const [open] = useState(detailsOpen), [drag] = useState(() => !seen("drag"));
-  useEffect(() => markSeen("drag"), []);
+  // Details open unless the player folded them this visit (prefs.ts); how to move a piece said on a browser's first visit (seen once a piece is selected: it shows then)
+  const [open] = useState(detailsOpen), drag = useOnce("drag", !!piece);
   if (!piece) return <p className="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>;
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
@@ -104,11 +114,12 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
     if (why.length) return onSay(refusalOf(why[0]));
     onPreview(next);
   };
-  // a one-click change (a way, a clock): made if the hole holds, census and all
-  const setDraft = (next: Draft) => {
+  // a one-click change (a way, a clock, a look): made if the hole holds, census and all (whether it was)
+  const setDraft = (next: Draft): boolean => {
     const why = newErrors(errorsOf(draft, full), next, full);
-    if (why.length) return onSay(refusalOf(why[0]));
+    if (why.length) return (onSay(refusalOf(why[0])), false);
     onSet(next);
+    return true;
   };
   // let go: kept if it holds with the census too
   const done = () => {
@@ -116,13 +127,13 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
     if (why.length) return (onCancel(), onSay(refusalOf(why[0])));
     onCommit();
   };
-  // its looks (a piece of several), the one it has pressed: chosen, the piece takes it where it stands if the hole holds
+  // its looks (a piece of several), the one it has pressed: the piece takes it where it stands if the hole holds, and
+  // only then is it the look chosen (the next of its tile takes it); refused, the palette keeps the one before
   const tile = tileOf(quick.palette, p.entry), looks = tile ? looksShown(tile) : [];
   const look = (to: PaletteEntry) => {
     const next = withLook(p, to, ent);
     if (!next) return onSay(`${entryName(to)} cannot take this piece's shape.`);
-    onChoose(tile!.key, to.id);
-    if (to.id !== ent.id) setDraft({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? next : q)) });
+    if (to.id === ent.id || setDraft({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? next : q)) })) onChoose(tile!.key, to.id);
   };
   const c = p.clock;
   const t: Pulse | null = c.k === "substep" ? c : c.k === "stroke" ? draft.pulses[c.pulse] ?? null : null;

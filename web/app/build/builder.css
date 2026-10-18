@@ -351,7 +351,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bconfetti i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; animation: bfall 1.6s cubic-bezier(.3, .6, .5, 1) both; }
 @keyframes bfall { to { transform: translate(var(--drift), 70vh) rotate(var(--turn)); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .tmode--party .tmode__chip--done { animation: none; } .bconfetti { display: none; } }
-.tmode__notes { position: absolute; top: 108px; left: 50%; transform: translateX(-50%); z-index: 1; display: grid; justify-items: center; gap: var(--sp-3); width: min(640px, calc(100% - 2 * var(--sp-3))); pointer-events: none; }
+/* under the HUD, one column: the strip (left), then the notes (centred) under it; the strip faded leaves the column (the notes move up) */
+.tmode__side { position: absolute; top: 104px; left: 0; right: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); pointer-events: none; }
+.tmode__notes { display: grid; justify-items: center; gap: var(--sp-3); width: min(640px, calc(100% - 2 * var(--sp-3))); pointer-events: none; }
 .tmode__why, .tmode__note { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-size: 15px; font-weight: 700; text-align: center; }
 .tmode__note { border-color: rgba(var(--ink-rgb), .3); color: var(--ink); background: rgba(var(--paper-rgb), .96); font-weight: 600; }
 /* holed: the game's hole-finished card (globals.css .banner--win), a test's few words and its three ways on */
@@ -367,9 +369,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__won .banner__in .tmode__small { margin: 10px 0 0; font-size: 14px; }
 /* before the first shot: the step's line and what to know, one strip under the HUD's cards (clear of the lane's middle),
    faded out once a shot is struck */
-.tmode__strip { position: absolute; top: 104px; left: var(--sp-4); z-index: 1; display: grid; gap: var(--sp-1); width: min(560px, calc(100% - 2 * var(--sp-4))); padding: var(--sp-2) var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: rgba(var(--paper-rgb), .96); color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.35; pointer-events: none; transition: opacity .6s ease, visibility 0s linear .6s; }
+.tmode__strip { align-self: flex-start; margin-left: var(--sp-4); display: grid; gap: var(--sp-1); width: min(560px, calc(100% - 2 * var(--sp-4))); padding: var(--sp-2) var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: rgba(var(--paper-rgb), .96); color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.35; pointer-events: none; transition: opacity .6s ease, visibility 0s linear .6s; }
 .tmode__strip p { margin: 0; }
-.tmode__strip--gone { opacity: 0; visibility: hidden; }
+.tmode__strip--gone { position: absolute; opacity: 0; visibility: hidden; }
 /* a try holed (no address yet): one line of the HUD's foot asks for it, Adena first, an address pasted behind a tap */
 .hud--bottom:has(.tmode__sign) { align-items: center; gap: var(--sp-3); }
 .tmode__sign { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); max-width: min(760px, calc(100vw - 200px)); padding: var(--sp-2) var(--sp-3); }
@@ -378,7 +380,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__addr { display: flex; align-items: center; gap: var(--sp-2); }
 .tmode__addr .btn { margin: 0; }
 .tmode__addr input { width: 26ch; min-height: 36px; padding: 0 var(--sp-2); border: var(--edge); border-radius: 10px; font: inherit; font-size: 14px; font-family: var(--mono); }
-.tmode:has(.tmode__strip:not(.tmode__strip--gone)) .tmode__notes { top: 312px; } /* (a note while the strip is up: under it) */
 @media (prefers-reduced-motion: reduce) { .tmode__strip { transition: none; } }
 
 /* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */
@@ -409,6 +410,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 .pub__field input, .pub__field textarea { min-height: 44px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; resize: none; }
 .pub__field [aria-invalid="true"] { border-color: var(--hat-ink); }
 .pub__field code { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+/* the address: yours, then its own part typed in place, then its version */
+.pub__field .pub__addr { justify-content: flex-start; align-items: center; gap: var(--sp-1); }
+.pub__addr input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 14px; }
 .pub__field small, .pub__small { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .pub__bad { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; color: var(--hat-ink); font-weight: 700; }
 .pub__note { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: 12px; background: var(--paper); font-weight: 700; }
@@ -504,6 +508,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the shot's handle (a ball by the tee) and the ball where a quick shot stopped: pulled back to play one */
 .board__shot { cursor: grab; }
 .board__shot--tee .board__ball { stroke-width: 2px; filter: drop-shadow(0 0 .08px var(--gold)); }
+.board__shot--tee .board__hit { stroke-width: 0; } /* (its press area its circle alone, as Board places it: no unit-wide halo of an unset stroke over the tee's) */
 .board__shot--tee:hover .board__ball { fill: var(--lamp); }
 /* after a drop that held: a ghost ball runs the meter's line (none with reduced motion) */
 .board__roll { fill: rgba(255, 255, 255, .85); stroke: var(--gold); stroke-width: 2px; vector-effect: non-scaling-stroke; animation: broll 1.2s ease-out both; }

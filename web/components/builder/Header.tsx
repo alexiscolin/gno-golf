@@ -10,7 +10,7 @@
 import { useRef } from "react";
 import { MOD } from "./Inspector";
 import { worldName } from "@/lib/builder/rules";
-import { shortWhy } from "@/lib/builder/editor";
+import { CHECKING, shortWhy } from "@/lib/builder/editor";
 import type { Level } from "@/lib/builder/difficulty";
 import { Button, Dice } from "@/components/ui";
 
@@ -99,7 +99,7 @@ export default function Header({ title, world, worlds = [], step, steps, action,
   onBack: () => void;
 }) {
   const names: Record<Step, string> = { edit: "Build", play: "Play", publish: "Publish" };
-  const waits = !!action?.off && action.off !== "Checking…";
+  const waits = !!action?.off && action.off !== CHECKING;
   return (
     <header className="bhead">
       <div className="bhead__start">

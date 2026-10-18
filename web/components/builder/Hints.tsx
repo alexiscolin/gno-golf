@@ -9,7 +9,7 @@
 // each palette tile's picture, its name and what it does (tiles.ts), and
 // every key; Close or Escape puts it away.
 import { useEffect, useRef } from "react";
-import { pictureOf, tilesOf } from "@/lib/builder/tiles";
+import { allTiles, pictureOf } from "@/lib/builder/tiles";
 import { cap, theWorld } from "@/lib/builder/rules";
 import type { PaletteEntry } from "@/lib/builder/palette";
 import { KEYS } from "@/lib/builder/keys";
@@ -28,12 +28,13 @@ export default function Hints({ onDone, glossary = null }: {
   /** the "?": the world's pieces under the hints */
   glossary?: { world: string; palette: readonly PaletteEntry[] } | null;
 }) {
-  const close = useRef<HTMLButtonElement>(null);
-  useEffect(() => void (glossary && close.current?.focus()), [glossary]);
+  // the glossary opened: Close focused once (a new glossary object each render of the editor's is no reason to take the focus back)
+  const close = useRef<HTMLButtonElement>(null), help = !!glossary;
+  useEffect(() => void (help && close.current?.focus()), [help]);
   const hints = (inPanel: boolean) => HINTS.map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
   // the first run: each hint by its place, the pointer through them
   if (!glossary) return <div className="bhints" role="note" aria-label="Three hints">{hints(false)}</div>;
-  const tiles = (({ first, more }) => [...first, ...more.flatMap((g) => g.tiles)])(tilesOf(glossary.palette));
+  const tiles = allTiles(glossary.palette);
   return (
     <div className="bhints bhints--help" role="note" aria-label="How it works, and the pieces" onKeyDown={(e) => e.key === "Escape" && onDone()}>
       <div className="bhints__centre">

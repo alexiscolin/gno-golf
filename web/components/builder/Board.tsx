@@ -179,6 +179,8 @@ export default function Board(props: BoardProps) {
     toStir.current = id; // (stirred once the draft has it where it landed)
   };
   const toStir = useRef<string | null>(null);
+  // the ghost ball's run: its path written once a run (not each render of the board's)
+  const roll = props.roll, rollPath = useMemo(() => (roll?.path.length ? `M${roll.path.flat().map((v) => `${v[0]},${v[1]}`).join(" L")}` : ""), [roll]);
   /** The snap's tick: a grid step further, a soft creak (at most every 70 ms). */
   const stepped = (key: string) => key !== cell.current && ((cell.current = key), tick());
   // disarmed (Escape, a drop): its ghost goes with it
@@ -331,6 +333,8 @@ export default function Board(props: BoardProps) {
   // the tee's and the cup's hit areas, last in their groups (the selection glows their drawing): wider than it (the
   // flag and its pole with the cup), 14 px at least
   const hit = Math.max(0.9, 14 / view.k);
+  // the ball by the tee: down and right of it, its hit area (12 px at least) touching the tee's, never under it
+  const ballHit = Math.max(0.6, 12 / view.k), teeBall = [0.8 * (hit + ballHit), 0.6 * (hit + ballHit)] as const;
   const ghostBad = ghost && ghost.why;
   // in 3D, the overlay draws a piece only where the scene does not show it yet: dragged, or changed since the hole drawn was checked
   const shownBefore = new Map((props.scene?.of?.pieces ?? []).map((p) => [p.id, JSON.stringify(p)]));
@@ -381,9 +385,9 @@ export default function Board(props: BoardProps) {
         {/* where the last quick shot stopped: its ball, pulled for the next */}
         {ball && latest && !latest.holed && <g data-shot="rest" className="board__shot"><circle className="board__ball" cx={latest.rest[0]} cy={latest.rest[1]} r={0.5} /><circle className="board__hit" cx={latest.rest[0]} cy={latest.rest[1]} r={hit} /></g>}
         {/* after a drop that held: a ghost ball runs the meter's line once */
-          props.roll && props.roll.path.length > 0 && (
-          <circle key={props.roll.n} className="board__roll" r={0.45} pointerEvents="none">
-            <animateMotion dur="1s" fill="freeze" path={`M${props.roll.path.flat().map((v) => `${v[0]},${v[1]}`).join(" L")}`} />
+          rollPath && (
+          <circle key={roll!.n} className="board__roll" r={0.45} pointerEvents="none">
+            <animateMotion dur="1s" fill="freeze" path={rollPath} />
           </circle>
         )}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
@@ -394,10 +398,11 @@ export default function Board(props: BoardProps) {
           </g>
         ))}
         </g>
-        {/* the shot's handle: a ball by the tee, pulled back to play a quick shot (as Shift and a pull anywhere) */}
-        {ball && !armed && <g data-shot="tee" className="board__shot board__shot--tee" transform={badge(draft.tee)} aria-hidden="true"><title>Pull back to play a quick shot (just to try)</title><circle className="board__ball" cx={0.95} cy={0.7} r={0.38} /><circle className="board__hit" cx={0.95} cy={0.7} r={Math.max(0.6, 12 / view.k)} /></g>}
         <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${pt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")} transform={badge(draft.tee)}><circle r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text y={0.3} fontSize={0.8} textAnchor="middle">T</text><circle className="board__hit" r={hit} /></g>
         <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${pt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")} transform={badge(draft.pin)}><circle r={0.6} fill="#1f2a26" /><path d="M0 0 v-2.2 l1.4 0.5 -1.4 0.5" fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /><rect className="board__hit" x={-hit} y={-2.2 - hit / 2} width={1.4 + 2 * hit} height={2.2 + 1.5 * hit} rx={hit} /></g>
+        {/* the shot's handle: a ball by the tee, pulled back to play a quick shot (as Shift and a pull anywhere); drawn over
+            the tee's, its hit area just outside the tee's at every zoom (a press on it never drags the tee) */}
+        {ball && !armed && <g data-shot="tee" className="board__shot board__shot--tee" transform={badge(draft.tee)} aria-hidden="true"><title>Pull back to play a quick shot (just to try)</title><circle className="board__ball" cx={teeBall[0]} cy={teeBall[1]} r={0.38} /><circle className="board__hit" cx={teeBall[0]} cy={teeBall[1]} r={ballHit} /></g>}
       </svg>
       {ball && (aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: just to try</Chip>}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}

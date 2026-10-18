@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { NO_GL, brokenLine, commonShift, dials, gauges, meterFace, nearLimits, offAtLimit, problems, shortWhy, testGate, type Gauge } from "../lib/builder/editor.ts";
+import { CHECKING, NO_GL, brokenLine, commonShift, dials, gauges, meterFace, nearLimits, offAtLimit, playWhenAsked, problems, sameShape, shortWhy, testGate, type Gauge } from "../lib/builder/editor.ts";
 import type { Shown } from "../lib/builder/difficulty.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
@@ -148,7 +148,7 @@ void test("quick shots in Build: said on the board to be no proof, never handed 
   assert.match(editor, /quickShots\(host, /);
   assert.doesNotMatch(editor, /replay\(/, "the editor never makes a proof: Play does (TestMode's replay)");
   assert.equal(editor.match(/onProof=/g)?.length, 1, "proofs come from Play alone");
-  assert.match(editor, /est\?\.of === kept && draft === kept/, "the line: of the hole as kept, and not while a drag moves it");
+  assert.match(editor, /est\?\.of === shape && draft === kept/, "the line: of the hole as kept (its shape), and not while a drag moves it");
 });
 
 void test("the meter where no worker can run (here, in node): every ask answered as not measured, none carried, no level; never measuring for ever", async () => {
@@ -191,4 +191,25 @@ void test("E13 between two pieces of one name: counted, never \"the scarecrow ov
       assert.match(t, /^Two (patches of |sets of )?[a-z ]+[^s ]s$|^Two (patches|sets) of [a-z ]+$|^Two [a-z ]+men$/, `${e.id}: ${t}`);
       assert.doesNotMatch(t, /(ss|[^aeiou]ys|xs|chs|shs|mans)$/, `${e.id}: ${t}`);
     }
+});
+
+void test("sameShape: a round's proof or the par it sets is no change of the hole (nothing to check again, the meter not asked); any other change is", () => {
+  const d = { ...lane("garden", [placePiece(entry("*/post/rock"), "x", [12, 4])]), slug: "lane" };
+  const proof = { key: "k", id: "x", kind: "", period: 1, shots: [], commits: [], strokes: 2, maxWork: 1 };
+  assert.equal(sameShape(d, d), true);
+  assert.equal(sameShape(d, { ...d, proofs: [proof] }), true, "a proof kept in play");
+  assert.equal(sameShape(d, { ...d, par: 3 }), true, "the par the proofs set");
+  assert.equal(sameShape(d, { ...d, title: "Another" }), false, "renamed");
+  assert.equal(sameShape(d, { ...d, slug: "other" }), false, "another address");
+  assert.equal(sameShape(d, { ...d, pieces: [] }), false, "a piece gone");
+  assert.equal(sameShape(d, { ...d, tee: [3, 3] }), false, "the tee moved");
+});
+
+void test("playWhenAsked: Play asked for (back from Publish) plays once the hole is checked, and is dropped when it cannot start (never opening later, unasked)", () => {
+  assert.equal(playWhenAsked(false, ""), "wait", "not asked");
+  assert.equal(playWhenAsked(true, CHECKING), "wait", "still checking");
+  assert.equal(playWhenAsked(true, ""), "play");
+  assert.equal(playWhenAsked(true, "Fix 1 first"), "drop", "errors: the ask goes, the editor stays");
+  assert.equal(playWhenAsked(true, NO_GL), "drop");
+  assert.equal(CHECKING, "Checking…");
 });

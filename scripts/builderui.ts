@@ -54,6 +54,10 @@ async function editor(w: number, h: number, before = "") {
   return c;
 }
 const box = (c: Browser, sel: string) => c.js<Box | null>(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })()`);
+/** The middle of a box, as a pointer presses it. */
+const midpoint = (b: Box): [number, number] => [(b.l + b.r) / 2, (b.t + b.b) / 2];
+/** The middle of the first element sel finds, on the screen. */
+const centre = async (c: Browser, sel: string) => midpoint((await box(c, sel))!);
 const overlap = (a: Box, b: Box) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
 const typeInto = (c: Browser, sel: string, v: string) =>
   c.js(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(el, ${JSON.stringify(v)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
@@ -233,7 +237,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   }
   assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: three hints, no glossary");
   // a piece taken from the palette (the first drag's press): the hints gone
-  const tile = await c.js<[number, number]>(`(() => { const r = document.querySelector(".palette [data-tile]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const tile = await centre(c, ".palette [data-tile]");
   await c.send("Input.dispatchMouseEvent", { type: "mousePressed", x: tile[0], y: tile[1], button: "left", buttons: 1, clickCount: 1 });
   await c.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: tile[0], y: tile[1], button: "left", buttons: 0, clickCount: 1 });
   await sleep(300);
@@ -476,8 +480,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`document.querySelector(".bgloss__close").click()`);
   await sleep(300);
   // Space held, a drag over a piece pans (the piece stays)
-  const tee = () => c.js<[number, number]>(`(() => { const r = document.querySelector("[data-end='tee'] circle").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-  const piece = await c.js<[number, number]>(`(() => { const r = document.querySelector("[data-piece]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const tee = () => centre(c, "[data-end='tee'] circle");
+  const piece = await centre(c, "[data-piece]");
   const pieceAt = () => c.js<string>(`document.querySelector("[data-piece]").getAttribute("aria-label")`);
   const was = await tee(), label = await pieceAt();
   await key(" ", "Space", "down");
@@ -534,7 +538,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.ok(!(await c.ev<boolean>(`!!document.querySelector(".tbench--play")`)) && Math.abs(after[0] - at[0]) < 1 && Math.abs(after[1] - at[1]) < 1, `Escape: back to the editor at the same zoom (${at.join()} → ${after.join()})`);
   // a refused drop, then the same piece pressed and carried again: still armed, its ghost's own words (never the refusal before)
   const waterTile = await c.js<[number, number]>(`(() => { const b = [...document.querySelectorAll(".palette [data-tile]")].find((t) => t.querySelector(".piece__name")?.textContent === "Water"); const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-  const teeAt = await tee(), lane = await c.js<[number, number]>(`(() => { const r = document.querySelector(".board").getBoundingClientRect(); return [r.left + r.width * 0.5, r.top + r.height * 0.5]; })()`);
+  const teeAt = await tee(), lane = await centre(c, ".board");
   const carry = async (to: [number, number]) => {
     await mouse("mousePressed", ...waterTile);
     for (let k = 1; k <= 8; k++) {
@@ -555,6 +559,73 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await mouse("mouseReleased", ...lane);
   await key("Escape", "Escape");
   console.log("keys: ok");
+  c.kill();
+}
+// what the review found, as a player meets it: the "?" panel leaves the focus where Tab put it while the editor draws
+// again; the ball by the tee pressed zoomed out is the ball's, never the tee's; the Inspector's "drag it" is marked seen
+// when it shows (a piece selected), not as its column mounts, and the keys line stays for the visit (an editor opened
+// again); a drop's ghost ball never runs for a change made after it
+{
+  const c = await editor(1280, 800);
+  const press = async (key: string, code: string) => {
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, ...(key.length === 1 && { text: key }) });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
+    await sleep(200);
+  };
+  const SEEN = "gnogolf.builder.seen.";
+  assert.equal(await c.js(`localStorage.getItem("${SEEN}drag")`), null, "no piece selected yet: the Inspector's help not seen");
+  await c.js(`document.querySelector("[data-piece]").focus()`);
+  await sleep(400);
+  assert.ok(await c.js<boolean>(`!!document.querySelector(".insp__hint")`), "a piece selected: how to move it, said");
+  assert.equal(await c.js(`localStorage.getItem("${SEEN}drag")`), "1", "seen as it shows");
+  await press("Escape", "Escape");
+  // "?": Close focused as it opens; the focus moved on, a render of the editor (V tilts the board) leaves it there
+  await c.js(`document.querySelector(".board").focus()`);
+  await press("?", "Slash");
+  assert.equal(await c.js(`document.activeElement?.classList.contains("bgloss__close")`), true, "?: Close focused as it opens");
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").focus()`);
+  await press("v", "KeyV");
+  await press("v", "KeyV");
+  assert.equal(await c.js(`document.activeElement?.getAttribute("aria-label") ?? ""`), "Back to your holes (the draft is kept)", "the editor drew again: the focus not taken back to Close");
+  await c.js(`document.querySelector(".bgloss__close").click()`);
+  await sleep(300);
+  // zoomed out (the wheel, round the tee) and in: the ball by the tee is the ball's to press, the tee the tee's
+  for (const [n, dy] of [[0, 0], [6, 300], [12, -300]] as const) {
+    const [ox, oy] = await centre(c, "[data-end='tee'] circle");
+    for (let k = 0; k < n; k++) await c.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: ox, y: oy, deltaX: 0, deltaY: dy });
+    await sleep(300);
+    const [x, y] = await centre(c, "[data-shot='tee'] .board__ball"), [tx, ty] = await centre(c, "[data-end='tee'] circle");
+    const under = await c.js<[string, string]>(`[document.elementFromPoint(${x}, ${y})?.closest("[data-shot],[data-end]"), document.elementFromPoint(${tx}, ${ty})?.closest("[data-shot],[data-end]")].map((e) => e ? e.dataset.shot ?? "end " + e.dataset.end : "")`);
+    assert.deepEqual(under, ["tee", "end tee"], `zoom ${n ? (dy > 0 ? "out" : "in") : "as framed"}: the ball by the tee and the tee under the pointer (${under.join()})`);
+  }
+  await press("f", "KeyF");
+  // a drop, then a change before the meter answers: no ghost ball for that later change
+  await c.js(`window.__rolled = false; new MutationObserver(() => document.querySelector(".board__roll") && (window.__rolled = true)).observe(document.querySelector(".board"), { subtree: true, childList: true })`);
+  const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  const from = await centre(c, ".palette [data-tile]"), board = (await box(c, ".board"))!, to: [number, number] = [board.l + (board.r - board.l) * 0.5, board.t + (board.b - board.t) * 0.3];
+  await mouse("mousePressed", ...from);
+  for (let k = 1; k <= 8; k++) {
+    await mouse("mouseMoved", from[0] + ((to[0] - from[0]) * k) / 8, from[1] + ((to[1] - from[1]) * k) / 8);
+    await sleep(30);
+  }
+  const pieces = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
+  await mouse("mouseReleased", ...to);
+  await sleep(50);
+  if ((await c.js<number>(`document.querySelectorAll("[data-piece]").length`)) > pieces) {
+    await c.js(`document.querySelector(".bhead__name input").focus()`);
+    await c.send("Input.insertText", { text: "x" }); // (a rename: a change of the hole as kept, the drop's no longer)
+    await sleep(2500);
+    assert.equal(await c.js(`window.__rolled`), false, "a change after the drop: its ghost ball not run for it");
+  } else console.log("fixes: the drop did not hold here, its ghost-ball case skipped");
+  // the keys line: shown on this first visit, and still on the editor opened again in it
+  assert.ok(await c.js<boolean>(`!!document.querySelector(".board__keys")`), "the keys line, a first visit");
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__pick")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bholes__pick").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".palette .piece")`)); k++) await sleep(300);
+  await sleep(500);
+  assert.ok(await c.js<boolean>(`!!document.querySelector(".board__keys")`), "the editor opened again on the same visit: the keys line still there");
+  console.log("fixes: ok");
   c.kill();
 }
 // every palette entry dropped on a blank lane, at a laptop's size and a retina one's: the selection's outline and a hover's

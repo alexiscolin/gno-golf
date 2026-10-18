@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { blank, firstRun, retitle, slugOf, startsIn } from "../lib/builder/templates.ts";
+import { blank, firstRun, retitle, slugOf, startsIn, typedSlug } from "../lib/builder/templates.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
 import { unknownEntry } from "../lib/builder/edit.ts";
@@ -99,11 +99,26 @@ void test("defaults: a new hole is named from its world and starter, its address
   assert.equal(startsIn("mountain").find((s) => s.name === "blank")!.draft.title, "Mountain Lane");
   assert.equal(startsIn("island").find((s) => s.name === "signature")!.draft.title, "Island Tidepool", "a signature named by its piece");
   assert.equal(slugOf("  Le Grand Saut! "), "le-grand-saut");
-  assert.equal(slugOf("!!!"), "hole");
+  assert.match(slugOf("!!!"), /^hole-[a-z0-9]{6}$/, "nothing of a-z0-9 left: an address of its own");
   assert.equal(slugOf("x".repeat(50)).length, 32);
   const d = dog.draft;
   assert.deepEqual([retitle(d, "Mole Run").title, retitle(d, "Mole Run").slug], ["Mole Run", "mole-run"], "the address follows");
   assert.equal(retitle({ ...d, slug: "my-own" }, "Mole Run").slug, "my-own", "a hand-set address is kept");
   const proved = { ...d, proofs: [{ key: "k", id: "x", kind: "", period: 1, shots: [], commits: [], strokes: 2, maxWork: 1 }] };
   assert.equal(retitle(proved, "Mole Run").slug, "garden-dogleg", "proved: its address fixed (the proofs are bound to it)");
+});
+
+void test("slugOf: a name with no Latin letter in it (another script, emoji) gets an address of its own, never one shared with every other such hole", () => {
+  const a = slugOf("日本の庭"), b = slugOf("🌵🌵"), c = slugOf("Сад");
+  for (const s of [a, b, c]) assert.match(s, /^hole-[a-z0-9]{6}$/, s);
+  assert.equal(new Set([a, b, c]).size, 3, "each name its own");
+  assert.equal(slugOf("日本の庭"), a, "the same name, the same address (it follows the name)");
+  assert.equal(slugOf(""), "hole", "no name yet");
+  assert.equal(retitle({ ...startsIn("garden")[0].draft, slug: "" }, "日本の庭").slug, a);
+});
+
+void test("typedSlug: an address typed by hand (on Publish) kept to what the chain takes: lower case, a dash for anything else, at most 32", () => {
+  assert.equal(typedSlug("My Hole_2"), "my-hole-2");
+  assert.equal(typedSlug("x".repeat(40)).length, 32);
+  assert.equal(typedSlug("ok-1"), "ok-1");
 });

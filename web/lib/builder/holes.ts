@@ -56,3 +56,7 @@ export function knownAuthor(): string | null {
 }
 /** Where the Builder keeps the author's address. */
 export const AUTHOR_KEY = "gnogolf.builder.author";
+/** The author's address given (typed, or Adena's read without a popup): kept in this browser for knownAuthor (a browser that keeps nothing: not kept, never thrown). */
+export function keepAuthor(a: string) {
+  try { localStorage.setItem(AUTHOR_KEY, a); } catch {}
+}

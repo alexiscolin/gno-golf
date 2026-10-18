@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { builderOn, onComputer, PHONE_QUERY } from "../lib/builder/route.ts";
-import { AUTHOR_KEY, authorOf, cupsLink, holeByline, knownAuthor, listHoles, playLink } from "../lib/builder/holes.ts";
+import { AUTHOR_KEY, authorOf, cupsLink, holeByline, keepAuthor, knownAuthor, listHoles, playLink } from "../lib/builder/holes.ts";
 import { GNOKEY_ADDR_KEY } from "../lib/adena.ts";
 import type { HoleRow } from "../lib/types.ts";
 
@@ -109,4 +109,19 @@ void test("knownAuthor: the address the Builder last used, else the one the save
   assert.equal(knownAuthor(), A);
   localStorage.setItem(AUTHOR_KEY, "not an address");
   assert.equal(knownAuthor(), B);
+});
+
+void test("keepAuthor: an address given (typed, or Adena's read without a popup) is kept where knownAuthor reads it; a browser that keeps nothing never throws", () => {
+  const A = "g1" + "c".repeat(38);
+  localStorage.clear();
+  keepAuthor(A);
+  assert.equal(localStorage.getItem(AUTHOR_KEY), A);
+  assert.equal(knownAuthor(), A);
+  const real = globalThis.localStorage;
+  Object.defineProperty(globalThis, "localStorage", { get: () => { throw new Error("blocked"); }, configurable: true });
+  try {
+    keepAuthor(A);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", { value: real, configurable: true, writable: true });
+  }
 });

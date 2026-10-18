@@ -2,7 +2,7 @@
 // keys as the board's key line and the glossary say them (one list).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { KEY_LINE, KEYS, keyAction, markSeen, playKey, seen } from "../lib/builder/keys.ts";
+import { KEY_LINE, KEYS, keyAction, markSeen, playKey, seen, showOnce, shownOnce } from "../lib/builder/keys.ts";
 
 const press = (key: string, o: { meta?: boolean; ctrl?: boolean; alt?: boolean } = {}) => keyAction({ key, metaKey: !!o.meta, ctrlKey: !!o.ctrl, altKey: !!o.alt });
 
@@ -60,4 +60,15 @@ void test("seen, markSeen: a help shown on a browser's first visit only, kept ap
   } finally {
     Object.defineProperty(globalThis, "localStorage", { value: real, configurable: true, writable: true });
   }
+});
+
+void test("showOnce, shownOnce: a help is marked seen when it is shown (not when its place mounts), and stays for the rest of the visit", () => {
+  localStorage.clear();
+  assert.equal(showOnce("drag"), true, "a first visit");
+  assert.equal(seen("drag"), false, "asked, not yet shown: not seen");
+  shownOnce("drag");
+  assert.equal(seen("drag"), true, "shown: not on the next visit");
+  assert.equal(showOnce("drag"), true, "this visit: still shown (an editor opened again)");
+  markSeen("keys");
+  assert.equal(showOnce("keys"), false, "seen on an earlier visit, never shown on this one: not shown");
 });
