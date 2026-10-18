@@ -10,7 +10,7 @@ import fs from "node:fs";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
 import { worldName } from "../lib/card.ts";
 import {
-  COLLECTOR, album, albumLine, albumShown, makeCollectors, nextRank, pointsOf, rankOf, rankWords, rankLine, ranksShown, type Holding,
+  COLLECTOR, album, albumLine, albumNext, albumShown, albumSummary, makeCollectors, seriesLine, nextRank, pointsOf, rankOf, rankWords, rankLine, ranksShown, type Holding,
 } from "../lib/gnomes/collection.ts";
 
 const catalogue = JSON.parse(fs.readFileSync(new URL("../../data/gnomes.json", import.meta.url), "utf8")) as Catalogue;
@@ -111,6 +111,26 @@ test("collection: the next rank, and the rank in words", () => {
   assert.equal(rankLine(held(c(9))), "Collector silver · 9 points · gold at 20");
   assert.equal(rankLine(held([])), "No gnome yet");
   assert.match(rankLine(held(c(36))), /^Collector gold · 36 points · legendary at 36, with a Legendary$/);
+});
+
+test("collection: the album in one line, what a buy brings, a gnome's place in the series", () => {
+  const garden = byTier("common").filter((g) => g.home === "garden").slice(0, 4).map((g) => row(g.id));
+  const a = album(gnomes, earned, garden), of = a.worlds.find((w) => w.key === "garden")!.of;
+  assert.equal(albumSummary(a, held(garden), "garden"), `Garden 4/${of} · Bronze — Silver at 8`);
+  assert.equal(albumSummary(album(gnomes, earned, []), held([]), "garden"), `Garden 0/${of}`, "nothing held: the row alone");
+  assert.equal(albumNext(a, held(garden), "garden"), `Garden 4/${of} · 4 more points for Silver`);
+  assert.equal(albumNext(a, held(garden.slice(0, 1)), "garden"), `Garden 4/${of} · 7 more points for Silver`);
+  const c = (n: number) => byTier("common").slice(0, n).map((g) => row(g.id));
+  assert.match(albumNext(album(gnomes, earned, c(36)), held(c(36)), "garden"), / · a Legendary for Legendary$/, "points enough: the Legendary it lacks");
+  assert.match(albumNext(album(gnomes, earned, c(30)), held(c(30)), "garden"), / · 6 more points and a Legendary for Legendary$/);
+  const top = [row(byTier("legendary")[0].id), ...c(40)];
+  assert.match(albumNext(album(gnomes, earned, top), held(top), "garden"), /^Garden \d+\/\d+$/, "the top: the row alone");
+  assert.match(albumSummary(album(gnomes, earned, top), held(top)), / · Legendary$/);
+  // the series, from the catalogue: one of a kind in his world's tier, or one of them
+  const legend = gnomes.find((g) => g.tier === "legendary" && g.home === "garden")!;
+  assert.equal(seriesLine(legend, gnomes), `#${legend.id} · the only Legendary of Garden · 1 of ${gnomes.length}`);
+  const epic = gnomes.find((g) => g.tier === "epic" && g.home === "garden")!, epics = gnomes.filter((g) => g.tier === "epic" && g.home === "garden").length;
+  assert.equal(seriesLine(epic, gnomes), `#${epic.id} · one of ${epics} Epics of Garden · 1 of ${gnomes.length}`);
 });
 
 // ------------------------------------------------------------ the reader

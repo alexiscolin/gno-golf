@@ -3,13 +3,16 @@
 // A player's album (ADR-011), in My gnomes and on a player's gnomes: how
 // much of each world, each tier and each archetype's set they hold, a row
 // each, opening on its slots (a held gnome's face, a silhouette for each one
-// missing). Status only: nothing to win, nothing given. Every figure and word
-// is lib/gnomes/collection.ts's; a tap on a slot opens that gnome's sheet.
+// missing). Folded to one line under their team, opened by a tap: the
+// player's own says its world, its rank and the next ("Garden 4/104 · Bronze
+// — Silver at 8"), another's its head. Status only: nothing to win, nothing
+// given. Every figure and word is lib/gnomes/collection.ts's; a tap on a slot
+// opens that gnome's sheet.
 import "@/app/collection.css";
 import { useMemo, useState } from "react";
 import { Segmented } from "@/components/ui";
 import type { Chain } from "@/lib/chain";
-import { ALBUM_WORDS, album, howRanks, rankLine, type Progress } from "@/lib/gnomes/collection";
+import { ALBUM_WORDS, album, albumSummary, howRanks, rankLine, type Progress } from "@/lib/gnomes/collection";
 import type { Served } from "@/lib/gnomes/served";
 import Collector from "./Rank";
 import { thumb } from "./parts";
@@ -19,7 +22,7 @@ type Group = "worlds" | "tiers" | "sets";
 const LEAF = <path d="M3 13C3 7 7 3 13 3c0 6-4 10-10 10z" />;
 const SILHOUETTE = <path d="M20 3 11 19h18L20 3Zm0 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z" />;
 
-export default function Album({ cat, owned, chain, player, mine, onOpen }: {
+export default function Album({ cat, owned, chain, player, mine, home, onOpen }: {
   cat: Served;
   /** what they hold (GnomesOf's rows, every page) */
   owned: readonly { id: string; tier: string; traits?: string }[];
@@ -27,6 +30,8 @@ export default function Album({ cat, owned, chain, player, mine, onOpen }: {
   player: string;
   /** the player's own (their next rank said), or another's */
   mine: boolean;
+  /** the world its one line says (the wave's), else the one most filled */
+  home?: string;
   /** a slot tapped: its gnome's number, or an earned kind */
   onOpen: (open: string) => void;
 }) {
@@ -80,12 +85,11 @@ export default function Album({ cat, owned, chain, player, mine, onOpen }: {
       )}
     </>
   );
-  // the player's own open; another player's folded to its head, their gnomes first
-  return mine ? (
-    <section className="galbum" aria-label={ALBUM_WORDS.title}>{head}{body}</section>
-  ) : (
-    <details className="galbum galbum--fold" aria-label={ALBUM_WORDS.theirs}>
-      <summary>{head}</summary>
+  // folded, their gnomes first: the player's own to its one line, another player's to its head
+  return (
+    <details className="galbum galbum--fold" aria-label={mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}>
+      <summary>{mine ? <span className="galbum__line"><b>{ALBUM_WORDS.title}</b> {albumSummary(a, { total: owned.length, rows: owned }, home)}</span> : head}</summary>
+      {mine && head}
       {body}
     </details>
   );

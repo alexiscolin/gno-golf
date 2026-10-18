@@ -4,25 +4,29 @@
 // and the receipt with every field it must carry.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BOX_A, BOX_B, review, orderButton, receipt, jstDate, SELLER, TRUST, BANNED } from "../lib/gnomes/legal.ts";
+import { BOX_A, BOX_B, review, orderButton, orderTotal, chainCosts, parLine, receipt, jstDate, SELLER, TRUST, BANNED } from "../lib/gnomes/legal.ts";
 
 const closes = Date.UTC(2026, 11, 13, 18) / 1000; // Sun 13 Dec 2026, 18:00 UTC = Mon 14 Dec, 03:00 JST
 const order = { name: "Tansy of the Garden", id: 94, tier: "epic", n: 1, price: 336e6, deposit: 310_000, fee: 150_000, address: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", closesAt: closes, now: closes - 86400 * 60 };
 
-test("legal: the order, term by term, before the wallet opens (§1.1)", () => {
-  const rows = review(order);
-  assert.deepEqual(rows.map(([k]) => k), ["Item", "Price", "Other costs", "Total", "Payment", "Delivery", "Sale period", "Cancellation", "Nature", "Seller"]);
+const all = (r: ReturnType<typeof review>) => [r.total, ...r.pay, ...r.terms];
+test("legal: the order, term by term, before the wallet opens (§1.1): its total first, what is paid, then the terms", () => {
+  const r = review(order), rows = all(r);
+  assert.deepEqual(r.pay.map(([k]) => k), ["Item", "Price", "Other costs", "Payment"]);
+  assert.deepEqual(r.terms.map(([k]) => k), ["Delivery", "Sale period", "Cancellation", "Nature", "Seller"]);
+  assert.equal(rows.length, 10, "every term, none left out");
   const at = (k: string) => rows.find(([x]) => x === k)![1];
   assert.equal(at("Item"), "Tansy of the Garden (#94, Epic), 1 item");
   assert.equal(at("Price"), "336 GNOT");
   assert.equal(at("Other costs"), "Storage deposit about 0.31 GNOT (held by the chain, returned if you burn the gnome) + network fee about 0.15 GNOT. Neither is paid to us.");
-  assert.equal(at("Total"), "about 336.46 GNOT");
+  assert.equal(r.total[0], "Total");
+  assert.equal(at("Total"), "336.46 GNOT at most");
   assert.equal(at("Delivery"), "Delivered at once to g1jg8m…sqf5, in the same transaction.");
   assert.equal(at("Sale period"), "The genesis sale closes on Sun 13 Dec, 18:00 UTC (Mon 14 Dec, 03:00 JST).");
   assert.match(at("Cancellation"), /^No returns, cancellations or refunds once the transaction is final/);
   assert.equal(at("Seller"), `${SELLER.name}, ${SELLER.address}, ${SELLER.email}`);
   // no closing date set (the realm runs the sale without one): the period still said, plainly, never left out
-  const open = review({ ...order, closesAt: 0 });
+  const open = all(review({ ...order, closesAt: 0 }));
   assert.deepEqual(open.map(([k]) => k), rows.map(([k]) => k));
   assert.equal(open.find(([k]) => k === "Sale period")![1], "The genesis sale has no closing date set: it runs until the owner sets one on the Contract.");
 });
@@ -33,6 +37,24 @@ test("legal: two boxes, each its own; the button names the obligation to pay, ne
   assert.match(BOX_B, /lose my right of withdrawal/);
   assert.equal(orderButton(336_460_000), "Order with obligation to pay (336.46 GNOT): sign in wallet");
   assert.doesNotMatch(orderButton(1), /^(Next|Send|Continue)\b/);
+});
+
+test("legal: one figure, up to the hundredth: the review's Total and the button say the same, never under the bill's most", () => {
+  const odd = { ...order, price: 36e6, deposit: 429_001, fee: 60_000 }; // (36.489001 all told)
+  assert.equal(orderTotal(odd), 36_490_000);
+  assert.equal(review(odd).total[1], "36.49 GNOT at most");
+  assert.equal(orderButton(orderTotal(odd)), "Order with obligation to pay (36.49 GNOT): sign in wallet");
+  assert.equal(orderButton(36_489_001), "Order with obligation to pay (36.49 GNOT): sign in wallet", "a raw sum is rounded up, never shown to the millionth");
+  assert.equal(orderTotal({ price: 72e6, deposit: 0, fee: 0 }), 72e6);
+});
+
+test("legal: a sheet's chain costs, from the review's own estimate; a price's golf number, its tier's own price only", () => {
+  assert.equal(chainCosts(429_001, 60_000), "+ ≈0.49 GNOT chain costs, 0.43 back if you burn it");
+  assert.equal(chainCosts(430_000, 70_000), "+ ≈0.5 GNOT chain costs, 0.43 back if you burn it");
+  assert.equal(parLine("common", 36e6), "36: the par of nine holes");
+  assert.equal(parLine("legendary", 1296e6), "1,296: eighteen holes times par 72");
+  assert.equal(parLine("rare", 80e6), "", "another price: no golf number claimed");
+  assert.equal(parLine("earned", 0), "");
 });
 
 test("legal: the receipt carries every field (§3): seller, date in UTC and JST, item, contract, price and costs, delivery, transaction, terms, consents as ticked", () => {
@@ -52,6 +74,6 @@ test("legal: JST is UTC+9, said as the copy says it", () => {
 });
 
 test("legal: none of the shop's words is one it never uses (§5)", () => {
-  const all = [BOX_A, BOX_B, ...TRUST, ...review(order).map(([, v]) => v), orderButton(1)].join(" ").toLowerCase();
-  for (const w of BANNED) assert.ok(!all.includes(w), w);
+  const words = [BOX_A, BOX_B, ...TRUST, ...all(review(order)).map(([, v]) => v), orderButton(1), chainCosts(1, 1), parLine("epic", 336e6)].join(" ").toLowerCase();
+  for (const w of BANNED) assert.ok(!words.includes(w), w);
 });

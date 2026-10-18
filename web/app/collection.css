@@ -22,10 +22,6 @@
 .who__line { display: flex; align-items: center; min-width: 0; }
 .who__line > .who__name { flex: 0 1 auto; }
 
-/* the gallery's one line of the album: a tap to it, its height kept from the first frame, at the start (it only grows to its right) */
-.galbum-line { justify-self: start; display: block; max-width: 100%; height: 24px; line-height: 24px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
-.galbum-line > button { display: block; max-width: 100%; height: 24px; padding: 0; line-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* the album: one paper panel, a row a world (a tier, a set), each opening on its silhouettes */
 .galbum { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); background: var(--paper); border: var(--edge); border-radius: var(--r-card); min-width: 0; }
 .galbum__head, .galbum__rank { text-align: left; }
@@ -54,7 +50,13 @@
 .galbum__slot--miss svg { width: 70%; height: 70%; fill: rgba(var(--ink-rgb), .12); }
 .galbum__slot:focus-visible { outline: none; box-shadow: var(--ring-shadow); }
 .galbum .more { font-size: 13px; }
-/* another player's album, folded to its head (their gnomes first), opened by it */
+/* the player's own album folded to one line under their team: its name, its world, its rank and the next */
+.galbum__line { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; text-align: left; }
+.galbum__line b { margin-right: 4px; font-weight: 800; }
+.galbum__line::after { content: " ▸"; }
+.galbum--fold[open] .galbum__line::after { content: " ▾"; }
+@media (max-width: 600px) { .galbum__line { white-space: normal; } }
+/* an album folded (their gnomes first), opened by its line or its head */
 .galbum--fold { display: block; }
 .galbum--fold > summary { list-style: none; cursor: pointer; }
 .galbum--fold > summary::-webkit-details-marker { display: none; }

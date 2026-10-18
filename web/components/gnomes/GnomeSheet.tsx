@@ -1,17 +1,18 @@
 "use client";
 
 // A gnome, in the game's own sheet (ui.tsx Sheet): who he is and his one
-// action; for one on sale, the order before the wallet opens (every term,
-// the two boxes, the button that names the obligation to pay: legal.ts),
-// then the wallet (lib/adena.ts sendGnome, gnokey behind a tap), the chain
-// read back, and the moment he is yours with the receipt. A step changes the
-// sheet's content, never opens another. One gnome, one call (Buy(id)). He
-// is drawn in the look the shop shows (his 3D portrait, or the chain's), the
-// switch under his picture.
+// action; for one on sale, the order before the wallet opens (its total
+// first, every term, the two boxes over the button that names the obligation
+// to pay: legal.ts), then the wallet (lib/adena.ts sendGnome, gnokey behind a
+// tap), the chain read back, and the moment he is yours (his portrait turns
+// once, his place in the series said) with the receipt. Not connected, his
+// button connects Adena and goes on to the order. A step changes the sheet's
+// content, never opens another. One gnome, one call (Buy(id)). He is drawn in
+// the look the shop shows (his 3D portrait, or the chain's), the switch under
+// his picture, the one place it is.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Sheet } from "@/components/ui";
 import { buttonClass } from "@/components/button";
-import Share from "@/components/Share";
 import { GnokeyTx } from "@/components/Gnokey";
 import { messageOf } from "@/components/common";
 import { ADENA_URL, GNOT_URL } from "@/lib/network";
@@ -22,10 +23,10 @@ import { worldName } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
 import { bill, gnot, landing, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
-import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, orderButton, receipt, review } from "@/lib/gnomes/legal";
+import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, chainCosts, orderButton, orderTotal, parLine, receipt, review } from "@/lib/gnomes/legal";
 import { tokenSkin } from "@/lib/gnomes/wear";
 import { portraitsOf, type Look } from "@/lib/gnomes/onchain";
-import { LookSwitch, TierChip, Tile, tierName } from "./parts";
+import { LookSwitch, ShareOne, TierChip, Tile, tierName } from "./parts";
 
 type Account = { address: string; chainId: string };
 type Step =
@@ -45,9 +46,13 @@ interface Props {
   onChanged: () => void;
   /** how he is drawn (the shop's look), and the switch to the other */
   look: Look; onLook: (l: Look) => void;
+  /** his place in the series ("#104 · the only Legendary of Garden · 1 of 720": collection.ts seriesLine) */
+  series: string;
+  /** once he is the player's: what he brings their album ("Garden 5/104 · 3 more points for Silver"), null not read */
+  albumNote: string | null;
 }
 
-export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onRound, onChanged, look, onLook }: Props) {
+export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onRound, onChanged, look, onLook, series, albumNote }: Props) {
   const me = account && account.address;
   const [row, setRow] = useState<GnomeRow | null>(null);
   const [unread, setUnread] = useState(false); // (the gnome's read failed: said, never a Buy greyed out with no reason)
@@ -60,15 +65,23 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
     const el = (!ticks.a ? boxA : boxB).current;
     if (el) (el.scrollIntoView({ block: "center", behavior: "smooth" }), el.focus({ preventScroll: true }));
   };
-  // the bill's figures, read when the order is reviewed
+  // the bill's figures: read with the gnome (his price's chain costs) and again when the order is reviewed (the balance)
   const [costs, setCosts] = useState<{ price: number; storage: number; balance: number | null; chainId: string | null; ours: boolean | null } | null>(null);
   // Equip: "" not asked, "busy" in Adena, "done", else what went wrong
   const [equip, setEquip] = useState("");
+  // Connect Adena to buy pressed: the order once the wallet answers and the chain says he can be bought
+  const [want, setWant] = useState(false);
 
+  const readCosts = () =>
+    void Promise.all([
+      chain.gasPrice().catch(() => PRICE), chain.storagePrice().catch(() => BYTE_PRICE),
+      me ? chain.balance(me) : Promise.resolve(null), chain.chainId().catch(() => null), onOurNode(chain.rpc),
+    ]).then(([p, storage, balance, chainId, ours]) => setCosts({ price: p, storage, balance, chainId, ours }));
   const read = () => {
     setUnread(false);
     void shop.gnome(g.id).then(setRow, () => (setRow(null), setUnread(true)));
     if (me) void shop.canBuy(me, [g.id]).then(setCan, () => setCan(null));
+    readCosts();
   };
   useEffect(read, [g.id, me]); // eslint-disable-line react-hooks/exhaustive-deps -- (shop: the same for the visit)
 
@@ -76,16 +89,20 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const price = row ? row.price : 0;
   const tx = gnomeCall.buy([g.id], Math.max(1, price));
   const cost = costs && bill({ price, bytes: tx.bytes, storagePrice: costs.storage, gas: tx.gas, gasPrice: costs.price, balance: costs.balance });
-  const deposit = cost ? cost.lines[1][1] : 0, fee = cost ? cost.lines[2][1] : 0;
+  const part = (k: string) => (cost && cost.lines.find(([x]) => x === k)?.[1]) || 0; // (by name: a price not read yet has no line)
+  const deposit = part("Storage deposit"), fee = part("Network fee");
   const order = me && cost && { name: g.name, id: g.id, tier: g.tier, n: 1, price, deposit, fee, address: me, closesAt: c.closesAt, now };
+  const why = can && row && !row.sold ? whyNot(can, c, g, now) : null;
 
-  const toReview = () => {
-    setStep({ at: "review" });
-    void Promise.all([
-      chain.gasPrice().catch(() => PRICE), chain.storagePrice().catch(() => BYTE_PRICE),
-      me ? chain.balance(me) : Promise.resolve(null), chain.chainId().catch(() => null), onOurNode(chain.rpc),
-    ]).then(([p, storage, balance, chainId, ours]) => setCosts({ price: p, storage, balance, chainId, ours }));
-  };
+  const toReview = () => (setStep({ at: "review" }), readCosts());
+  // connected for the order: on to it once the chain has said he can be bought (else his sheet says why)
+  useEffect(() => {
+    if (!want || !me || !row || !can) return;
+    setWant(false);
+    if (!row.sold && !whyNot(can, c, g, now)) toReview();
+  }, [want, me, row, can]); // eslint-disable-line react-hooks/exhaustive-deps -- (the rest: this gnome's, this visit's)
+  // someone was first: who, read again (their gnomes a tap away)
+  const taken = () => (setStep({ at: "taken" }), read());
 
   async function buy() {
     if (!me || !costs) return;
@@ -98,7 +115,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
     } catch (e) {
       const err = e as SendError;
       if (err.cancelled) setStep({ at: "review", note: <p className="note note--bad" role="status">Cancelled in Adena: nothing was sent.</p> });
-      else if (/already sold/.test(err.message)) setStep({ at: "taken" });
+      else if (/already sold/.test(err.message)) taken();
       else if (err.maybe) setStep({ at: "unsure", hash: err.hash, why: err.message });
       else setStep({ at: "review", note: <p className="note note--bad" role="alert">{err.message}</p> });
     }
@@ -116,7 +133,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           return setStep({ at: "done", hash, height, when });
         }
       } catch (e) {
-        if (errorKind(e) === "chain") return /already sold/.test(messageOf(e)) ? setStep({ at: "taken" }) : setStep({ at: "unsure", hash, why: messageOf(e) });
+        if (errorKind(e) === "chain") return /already sold/.test(messageOf(e)) ? taken() : setStep({ at: "unsure", hash, why: messageOf(e) });
       }
       await wait(1500);
     }
@@ -131,7 +148,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       if (now === undefined) return setStep({ at: "unsure", why: "The chain did not answer." });
       const at = landing(now, me);
       if (at === "mine") return (setRow(now), onChanged(), setStep({ at: "done", hash: "", height: 0, when: null }));
-      if (at === "taken") return setStep({ at: "taken" });
+      if (at === "taken") return taken();
       await wait(1500);
     }
     setStep({ at: "review", note: <p className="note note--warn" role="status">Nothing landed: {g.name} is still on sale. You can order again.</p> });
@@ -152,19 +169,18 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
 
   const onChain = look === "chain" ? portraitsOf(chain) : null;
   // his picture, the look switch under it (in his first view alone), then who he is on the same axis: his tier and
-  // number on one line, his name (the sheet's title)
-  const head = (small = false, title: ReactNode = g.name, swap = false) => (
+  // number on one line (or his place in the series), his name (the sheet's title)
+  const head = (small = false, title: ReactNode = g.name, swap = false, meta: ReactNode = <>#{g.id} · Wave {g.wave} · {worldName(g.home)}</>) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
       <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
       {swap && <LookSwitch look={look} onLook={onLook} />}
       <div className="gsheet__id">
-        {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /><span>#{g.id} · Wave {g.wave} · {worldName(g.home)}</span></span>}
+        {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /><span>{meta}</span></span>}
         <h2>{title}</h2>
       </div>
     </div>
   );
-  const why = can && row && !row.sold ? whyNot(can, c, g, now) : null;
-  const share = <Share text={shareWords.bought(g.name, g.id)} link={`g/${g.id}/`} label="Show your gnome" what="hole" kind="share" />;
+  const theirs = (who: string) => <button className="linkish" onClick={() => onTheirs(who)}>Their gnomes →</button>;
   const close = step.at === "sign" || step.at === "read" ? () => {} : onClose; // (no closing while Adena is open)
 
   let body: ReactNode;
@@ -179,10 +195,12 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           {row && row.closed ? (
             <p className="gsheet__fine"><b>Never made.</b> The sale closed before this gnome found a player.</p>
           ) : owner && !mine ? (
-            <p className="gsheet__fine">Found a player. <button className="linkish" onClick={() => onTheirs(owner)}>Their gnomes →</button></p>
+            <p className="gsheet__fine">Found a player. {theirs(owner)}</p>
           ) : !mine && !unread && region ? (
             <div className="gsheet__offer">
-              {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
+              {/* his price, its chain costs from the order's own estimate, the golf number it is */}
+              {row && <p className="gsheet__price">{gnot(price)} GNOT <small>{cost ? chainCosts(deposit, fee) : "+ chain costs"}</small></p>}
+              {row && parLine(g.tier, price) && <p className="gsheet__par">{parLine(g.tier, price)}</p>}
               <ul className="trust">{TRUST.slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
             </div>
           ) : null}
@@ -192,7 +210,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
               <dl className="review">{traitRows(traits).map((r, i) => <Term key={`${r.trait}-${i}`} k={r.trait} v={r.value} />)}</dl>
             </details>
           )}
-          <Share text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} what="hole" kind="share" />
+          <ShareOne text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} />
           {row && row.closed ? null : mine ? (
             <div className="gsheet__foot">
               <Button variant="gold" className="btn--wide" onClick={() => (onPlay(skin.id), onClose())}>{playing === skin.id ? `Playing ${g.name}` : `Play with ${g.name}`}</Button>
@@ -202,14 +220,19 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                 </button>
               )}
               {equip && equip !== "busy" && equip !== "done" && <p className="gsheet__fine" role="alert">{equip}</p>}
-              {equip === "done" && <Share text={shareWords.equipped(g.name, g.home)} link={`g/${g.id}/`} label={`Your rivals will see ${g.name}`} kind="share" />}
+              {equip === "done" && <ShareOne text={shareWords.equipped(g.name, g.home)} link={`g/${g.id}/`} label={`Your rivals will see ${g.name}`} />}
               <p className="gsheet__fine">Playing any gnome you hold is free. {worn === skin.id ? "Everyone sees this one on your ball." : ""}</p>
             </div>
           ) : owner ? null : unread ? (
             <div className="gsheet__foot"><p className="note note--bad" role="alert">The chain did not answer.</p><Button variant="primary" className="btn--wide" onClick={read}>Try again</Button></div>
+          ) : region && !account && hasAdena() ? (
+            <div className="gsheet__foot">
+              {want && wallet.error && <p className="note note--bad" role="alert">{wallet.error}</p>}
+              <Button variant="chain" className="btn--wide" disabled={!row || wallet.busy} onClick={() => (setWant(true), onConnect())}>{wallet.busy ? "Waiting for Adena…" : "Connect Adena to buy"}</Button>
+            </div>
           ) : region ? (
             <div className="gsheet__foot">
-              <Button variant="chain" className="btn--wide" disabled={!row || !!why} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
+              <Button variant="chain" className="btn--wide" disabled={!row || !!why || want} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
               {why && why.note && <p className="gsheet__fine">{why.note}</p>}
               {why && why.play && <Button variant="gold" className="btn--wide" onClick={() => (onClose(), onRound())}>Play a round →</Button>}
             </div>
@@ -220,6 +243,9 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
     }
     case "review": {
       const wrongNet = !!(account && costs && costs.chainId && account.chainId !== costs.chainId) || (costs && costs.ours === false);
+      // the order for reading: its total first and large, what is paid, then the terms a step smaller; the two boxes in
+      // the footer over the button, in view from the first screen with it (every term scrolls above them)
+      const terms = order && review(order);
       body = (
         <>
           {head(true, "Review your order")}
@@ -234,16 +260,17 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                   : <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={ADENA_URL} target="_blank" rel="noopener noreferrer">Install Adena ↗</a>}
               </div>
             </>
-          ) : !order ? (
+          ) : !order || !terms ? (
             <p className="gsheet__line">Reading the costs…</p>
           ) : (
             <>
-              <dl className="review" aria-label="Your order">{review(order).map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl>
+              <p className="review__total"><span>{terms.total[0]}</span><b>{terms.total[1]}</b></p>
+              <section className="review__group" aria-label="What you pay"><h3>What you pay</h3><dl className="review">{terms.pay.map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl></section>
+              <section className="review__group review__group--terms" aria-label="Terms"><h3>Terms</h3><dl className="review">{terms.terms.map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl></section>
               <p className="legal"><a href={LINKS.terms} target="_blank" rel="noopener noreferrer">Terms of Sale</a> · <a href={LINKS.seller} target="_blank" rel="noopener noreferrer">Seller information (特定商取引法に基づく表記)</a> · <a href={LINKS.privacy} target="_blank" rel="noopener noreferrer">Privacy</a></p>
-              <label className="box"><input ref={boxA} type="checkbox" checked={ticks.a} onChange={(e) => setTicks((t) => ({ ...t, a: e.target.checked }))} /><span>{BOX_A}</span></label>
-              <label className="box"><input ref={boxB} type="checkbox" checked={ticks.b} onChange={(e) => setTicks((t) => ({ ...t, b: e.target.checked }))} /><span>{BOX_B}</span></label>
-              {ticks.a && ticks.b && <Gnokey chain={chain} shop={shop} id={g.id} price={price} />}
-              <div className="gsheet__foot">
+              <div className="gsheet__foot gsheet__foot--order">
+                <label className="box"><input ref={boxA} type="checkbox" checked={ticks.a} onChange={(e) => setTicks((t) => ({ ...t, a: e.target.checked }))} /><span>{BOX_A}</span></label>
+                <label className="box"><input ref={boxB} type="checkbox" checked={ticks.b} onChange={(e) => setTicks((t) => ({ ...t, b: e.target.checked }))} /><span>{BOX_B}</span></label>
                 {wrongNet ? (
                   <><p className="note note--warn" role="status">Adena is on another network. Pick <b>{costs && costs.chainId}</b> in Adena: nothing was sent.</p>
                     <Button variant="primary" className="btn--wide" onClick={toReview}>Check again</Button></>
@@ -255,10 +282,11 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                     {/* off, but pressable: a press finds the box left (a disabled button hears nothing) */}
                     <Button variant="chain" className="btn--wide" aria-disabled={ticks.a && ticks.b ? undefined : true} aria-describedby={ticks.a && ticks.b ? undefined : "order-ticks"}
                       onClick={() => (ticks.a && ticks.b ? void buy() : toBox())}>
-                      {orderButton(cost ? cost.most : price)}
+                      {orderButton(orderTotal(order))}
                     </Button></>
                 )}
                 <p className="gsheet__fine">{SIGN_NOTE}</p>
+                {ticks.a && ticks.b && <Gnokey chain={chain} shop={shop} id={g.id} price={price} />}
               </div>
             </>
           )}
@@ -272,10 +300,11 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
     case "done":
       body = (
         <>
-          {head(false, `${g.name}'s yours!`)}
+          {head(false, `${g.name}'s yours!`, false, series)}
+          {albumNote && <p className="gsheet__line">{albumNote}</p>}
           <div className="gsheet__foot">
             <Button variant="gold" className="btn--wide" onClick={() => (onPlay(skin.id), onClose())}>Play with {g.name}</Button>
-            {share}
+            <ShareOne text={shareWords.bought(g.name, g.id)} link={`g/${g.id}/`} label="Show your gnome" />
             <button className="linkish" onClick={() => setStep({ at: "receipt", hash: step.hash, when: step.when })}>Your receipt: print or save it</button>
           </div>
         </>
@@ -294,7 +323,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       );
       break;
     case "taken":
-      body = <>{head(true)}<p className="note note--bad" role="alert">Someone took {g.name} a moment before you. <b>Nothing was sent.</b></p><div className="gsheet__foot"><Button variant="primary" className="btn--wide" onClick={onClose}>Pick another</Button></div></>;
+      body = <>{head(true)}<p className="note note--bad" role="alert">Someone took {g.name} a moment before you. <b>Nothing was sent.</b></p>{owner && owner !== me && <p className="gsheet__fine">{theirs(owner)}</p>}<div className="gsheet__foot"><Button variant="primary" className="btn--wide" onClick={onClose}>Pick another</Button></div></>;
       break;
     case "unsure":
       body = (

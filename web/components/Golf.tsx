@@ -1666,7 +1666,7 @@ export default function Golf() {
         <Shop chain={game.current.chain} account={account} wallet={wallet} onConnect={() => void connectWallet()} view={shopView} onView={setShopView}
           onBack={() => (sound("blip"), setScreen(shopFrom.current))} onAbout={() => setAbout(true)} playing={gnome}
           onPlay={(id) => (choose(id), readWorn())} onRace={(p) => toGhosts(p, undefined, "board")}
-          onRound={() => (sound("blip"), s && s.world ? enterCup(s.world) : setScreen("worlds"))} />
+          onRound={(cup) => { sound("blip"); const w = cup || (s && s.world); if (w) enterCup(w); else setScreen("worlds"); }} />
       )}
 
       {s && playing && (

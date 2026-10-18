@@ -77,7 +77,7 @@ export const howRanks = () => {
 };
 export const ALBUM_WORDS = {
   title: "Your album", theirs: "Their album", worlds: "Worlds", tiers: "Tiers", sets: "Sets",
-  missing: "Not in the album yet", open: "Your album",
+  missing: "Not in the album yet",
 };
 
 // ------------------------------------------------------------ the album
@@ -120,6 +120,28 @@ export function album(gnomes: readonly Gnome[], earned: Served["earned"], owned:
 export function albumLine(a: Album, home?: string) {
   const w = a.worlds.find((x) => x.key === home) ?? [...a.worlds].sort((x, y) => y.have / y.of - x.have / x.of)[0];
   return w ? `${w.label} ${w.have}/${w.of}` : "";
+}
+/** The player's own album folded to one line, its rank and the next: "Garden 4/104 · Bronze — Silver at 8". */
+export function albumSummary(a: Album, h: Holding, home?: string) {
+  const now = rankOf(h), next = nextRank(h), line = albumLine(a, home);
+  if (!now) return line;
+  return `${line} · ${now.label}${next ? ` — ${next.rank.label} at ${next.rank.points}${"holds" in next.rank ? " with a Legendary" : ""}` : ""}`;
+}
+/** What a gnome just bought brings: his world's row and what the next rank still asks ("Garden 5/104 · 3 more points
+ *  for Silver"; at the top, the row alone). */
+export function albumNext(a: Album, h: Holding, home: string) {
+  const next = nextRank(h), line = albumLine(a, home);
+  if (!next) return line;
+  const rank: Rank = next.rank, legend = "holds" in rank && !h.rows.some((r) => r.tier === rank.holds) ? "a Legendary" : "";
+  const points = next.points ? `${next.points} more ${next.points === 1 ? "point" : "points"}` : "";
+  return `${line} · ${[points, legend].filter(Boolean).join(" and ") || "nothing more"} for ${next.rank.label}`;
+}
+/** A gnome's place in the series, from the catalogue: "#104 · the only Legendary of Garden · 1 of 720" ("one of 12
+ *  Epics of Garden" where his world holds more of his tier). */
+export function seriesLine(g: Pick<Gnome, "id" | "tier" | "home">, gnomes: readonly Pick<Gnome, "tier" | "home">[]) {
+  const kin = gnomes.filter((x) => x.tier === g.tier && x.home === g.home).length, tier = TIER_ROWS.find(([t]) => t === g.tier);
+  const one = tier ? tier[1].replace(/ies$/, "y").replace(/s$/, "") : g.tier;
+  return `#${g.id} · ${kin <= 1 ? `the only ${one}` : `one of ${kin} ${tier ? tier[1] : g.tier}`} of ${worldName(g.home)} · 1 of ${gnomes.length}`;
 }
 
 // ------------------------------------------------------------ where it shows (ADR-011)

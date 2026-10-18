@@ -1,12 +1,18 @@
 "use client";
 
 // The shop's small pieces, one of each (the GUI spec's "Shared pieces"): a
-// tier's chip, a gnome's tile (his 3D portrait, or the chain's), his card in
-// a grid (and a Legendary's to come, to look at), the switch between the two
-// looks, the closing date. On the game's own tokens (app/gnomes.css).
+// tier's chip, a gnome's tile (his 3D portrait, or the chain's; an earned
+// one's leaf), his card in a grid (and a Legendary's to come, to look at), the
+// switch between the two looks, the closing date, the one share button. On
+// the game's own tokens (app/gnomes.css).
 import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Button, Segmented } from "@/components/ui";
+import { useCopied } from "@/components/common";
 import { retryIn } from "@/lib/retry";
+import { sound } from "@/lib/feel";
+import { isTouch } from "@/lib/device";
+import { siteURL } from "@/lib/site";
+import { track } from "@/lib/analytics";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
 import { comingFact, gnot, utcDate, localDate, type TierShare, type WaveLine } from "@/lib/gnomes/shop";
@@ -74,6 +80,11 @@ export function Tile({ id, tier, never = false, lazy = true, onChain = null }: {
     </span>
   );
 }
+
+/** An earned gnome's tile: his tier's leaf on its stage (no portrait is made of the game's own gnomes). */
+export const EarnedTile = () => (
+  <span className="gtile gtile--earned"><svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE.earned}</svg></span>
+);
 
 /** The switch between a gnome's two looks: his 3D portrait, or the SVG the chain draws (the gallery's and a sheet's). */
 export const LookSwitch = ({ look, onLook }: { look: Look; onLook: (l: Look) => void }) => (
@@ -150,7 +161,8 @@ export function SaleLine({ line, closes }: { line: WaveLine; closes?: ReactNode 
   );
 }
 
-/** The tiers as the shelf's filter: a chip each, its price in the wave (once, here; no price, none said), pressed
+/** The tiers as the shelf's filter: a chip each, its price in the wave (once, here; no price, none said) and how many
+ *  of it are left of what the wave holds (the wave's own count, never a countdown), pressed
  *  when it filters; pressed again, every tier. Each chip says its tier's share of the wave to a screen reader. */
 export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierShare[]; value?: string; onChange: (t: string | undefined) => void }) {
   const known = new Map(tiers.map((t) => [t.tier, t]));
@@ -164,6 +176,7 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
             <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[t]}</svg>
             <span className="tierbtn__name">{tierName(t)}</span>{t === "legendary" && <span className="tierbtn__short">Legend</span>}
             {s && s.price > 0 && <span className="tierbtn__price">{gnot(s.price)}<span className="tierbtn__unit"> GNOT</span></span>}
+            {s && <span className="tierbtn__left">{s.total - s.found}/{s.total} left</span>}
           </Button>
         );
       })}
@@ -217,5 +230,25 @@ export function SearchRow({ search: s }: { search: Search }) {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
     </div>
+  );
+}
+
+/** Sharing in the shop, one button: the phone's own share sheet (the words and the link), else the link copied, and
+ *  "Copied" said (a computer's share sheet is a bare panel without the networks people mean: Share.tsx). */
+export function ShareOne({ text, link, label = "Share" }: { text: string; link: string; label?: string }) {
+  const [copied, copy] = useCopied();
+  const url = siteURL(link);
+  const go = () => {
+    sound("blip");
+    const sheet = typeof navigator !== "undefined" && !!navigator.share && isTouch();
+    track("share", { target: sheet ? "sheet" : "copy", what: "hole", kind: "share" });
+    if (sheet) void navigator.share({ title: "Gnogolf", text, url }).catch(() => {}); // (cancelled: nothing to say)
+    else void copy(url);
+  };
+  return (
+    <Button size="s" type="button" className="gshare" onClick={go} aria-label={copied ? "Link copied" : label}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{copied ? <path d="M5 12l5 5 9-10" /> : <path d="M12 3v12M7 8l5-5 5 5M5 13v6h14v-6" />}</svg>
+      <span aria-live="polite">{copied ? "Copied" : label}</span>
+    </Button>
   );
 }

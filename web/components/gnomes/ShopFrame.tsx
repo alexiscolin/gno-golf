@@ -34,7 +34,7 @@ export const BarSlot = () => <div className="gbar gbar--skel" aria-hidden="true"
  *  the closing line's room as the sale already read says (closing); onRetry, once the chunk could not be fetched. */
 export function ShopSkeleton({ onBack, onAbout, closing, onRetry }: { onBack: () => void; onAbout: () => void; closing: "line" | "none" | "room"; onRetry?: () => void }) {
   return (
-    <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.eyebrow} title={SHOP_HEAD.title} dare={<ShopPitch />}>
+    <FrontScreen className="front--fit shop shop--sale" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.eyebrow} title={SHOP_HEAD.title} dare={<ShopPitch />}>
       <WaveSlot closing={closing} />
       <BarSlot />
       {onRetry ? <div className="gempty" role="alert"><p>The shop did not load.</p><Button variant="primary" onClick={onRetry}>Try again</Button></div> : <BlankShelf />}
