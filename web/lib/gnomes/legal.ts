@@ -49,9 +49,9 @@ const stamp = (unix: number) => {
 };
 
 /** The sale period (申込期間), on the confirmation and the receipt: the genesis's closing date, or plainly that none
- *  is set (the realm runs the sale without one until the owner sets it). */
+ *  is set (the realm sells none of the genesis until the owner sets it: only a later series' gnome then). */
 const salePeriod = (closesAt: number, now: number) =>
-  closesAt ? `The genesis sale closes on ${utcDate(closesAt, now)} (${jstDate(closesAt)}).` : "The genesis sale has no closing date set: it runs until the owner sets one on the Contract.";
+  closesAt ? `The genesis sale closes on ${utcDate(closesAt, now)} (${jstDate(closesAt)}).` : "The genesis sale has no closing date set yet: the Contract sells none of the genesis until one is set.";
 
 interface Order { name: string; id: number; tier: string; n: number; price: number; deposit: number; fee: number; address: string; closesAt: number; now: number }
 /** The order, term by term (§1.1): [label, term]; the total "about" (the deposit and fee are the bill's most). */

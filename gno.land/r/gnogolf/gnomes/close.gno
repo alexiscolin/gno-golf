@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
-// The genesis sale's closing date (ADR-007), optional: none at deploy, and
-// the sale runs on until the owner sets one, once the genesis is published.
-// Once set it comes forward, never back: a buyer can count on the date
+// The genesis sale's closing date (ADR-007): none at deploy, and the
+// genesis is not sold until the owner sets one, once it is published: the
+// sale does not open (SetMintOpen) and no genesis wave is added (AddWave)
+// before it, so a buyer always knows when the sale ends. Once set it comes
+// forward, never back: a buyer can count on the date
 // announced, and on no gnome of the genesis being sold after it. No genesis
 // wave starts at or after it. From that block on, its unsold gnomes are
 // closed for good: Buy and AddWave refuse them, and the genesis's final
@@ -57,16 +59,21 @@ func isClosed(id int64) bool {
 	return genesisClosed() && seriesAt(id) == 0 && !isSold(id)
 }
 
+// errNoClose refuses the genesis's sale before its closing date is set.
+const errNoClose = "gnomes: the genesis sells only once its closing date is set (SetCloseAt)"
+
 func errClosedOn() string { return "gnomes: the genesis sale closed on " + dateOf(closeAt) }
 
 // checkCloseFor checks a wave of ids from first, from start, against the
-// close, once a date is set: for the genesis's ids (the first series: a
-// range is the genesis's when its first id is), none once it has closed, nor
-// one starting at or after it, which nobody could buy from.
+// close: for the genesis's ids (the first series: a range is the genesis's
+// when its first id is), none before a date is set, none once it has
+// closed, nor one starting at or after it, which nobody could buy from.
 func checkCloseFor(first, start int64) error {
 	switch {
-	case closeAt == 0 || seriesAt(first) != 0:
+	case seriesAt(first) != 0:
 		return nil
+	case closeAt == 0:
+		return errors.New(errNoClose)
 	case genesisClosed():
 		return errors.New(errClosedOn())
 	case start >= closeAt:

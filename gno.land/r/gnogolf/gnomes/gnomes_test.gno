@@ -19,14 +19,14 @@ var (
 )
 
 // `gno test` runs init with no signer: each test starts from a fresh
-// collection owned by the deployer, the placeholder genesis published, one
-// wave over all of it on sale now with no player window, the mint open.
+// collection owned by the deployer, the placeholder genesis published, its
+// close a year off, one wave over all of it on sale now with no player
+// window, the mint open.
 func fresh(t *testing.T, rlm realm) {
-	published(t, rlm)
+	noWave(t, rlm)
 	if err := addWave(1, genesisTotal(), now(), 0); err != nil {
 		panic(err)
 	}
-	mintOpen = true
 }
 
 // published is a fresh collection with the placeholder genesis published,

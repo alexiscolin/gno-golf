@@ -105,25 +105,31 @@ func TestTheCloseDateReads(t *testing.T) {
 	uassert.Equal(t, "2026-11-30 18:00 UTC", dateOf(1796061600))
 }
 
-// The closing date is the owner's to set, or not: with none, waves are
-// added and the sale opens; once one is set, no genesis wave starts at or
-// after it, which nobody could buy from.
-func TestAWaveStartsBeforeTheCloseOnceOneIsSet(cur realm, t *testing.T) {
+// The genesis is sold only once its closing date is set: before it, the
+// sale does not open and no genesis wave is added (a buyer always knows
+// when its sale ends). A later series is not held to it. Once one is set,
+// no genesis wave starts at or after it, which nobody could buy from.
+func TestTheGenesisSellsOnlyOnceItsCloseIsSet(cur realm, t *testing.T) {
 	setUp(0, cur, deployer)
-	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
 	testing.SetRealm(asUser(deployer, nil))
-	AddWave(cross(cur), 1, 104, now(), 0)
-	SetMintOpen(cross(cur), true)
-	uassert.True(t, MintOpen(), "no closing date: the sale opens")
+	urequire.AbortsContains(t, cur, errNoClose, func() { SetMintOpen(cross(cur), true) }, "nothing published")
+	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
+	urequire.AbortsContains(t, cur, errNoClose, func() { SetMintOpen(cross(cur), true) })
+	urequire.AbortsContains(t, cur, errNoClose, func() { AddWave(cross(cur), 1, 104, now(), 0) })
+	uassert.False(t, MintOpen())
+	uassert.Equal(t, 0, len(waves))
+	SetMintOpen(cross(cur), false) // closing it is always taken
+	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
+	urequire.NoError(t, addWave(721, 723, now(), 0), "a later series is not the genesis's")
 
 	at := now() + 3600
 	SetCloseAt(cross(cur), at)
+	AddWave(cross(cur), 1, 104, now(), 0)
+	SetMintOpen(cross(cur), true)
+	uassert.True(t, MintOpen())
 	urequire.ErrorContains(t, addWave(105, 208, at, 0), "before the genesis sale closes")
 	urequire.ErrorContains(t, addWave(105, 208, at+5, 0), "before the genesis sale closes")
 	urequire.NoError(t, addWave(105, 208, at-5, 0))
-
-	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
-	urequire.NoError(t, addWave(721, 723, at, 0), "a later series is not the genesis's")
 }
 
 // From the other side: a close is never set, nor brought forward, to at or

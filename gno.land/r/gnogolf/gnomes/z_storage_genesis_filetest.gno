@@ -19,6 +19,7 @@ import (
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
+	gnomes.SetCloseAt(cross(cur), 4102444800) // (2100: the genesis sells only once its close is set)
 	gnomes.AddWave(cross(cur), 1, 720, 0, 0)
 	gnomes.SetMintOpen(cross(cur), true)
 	println(gnomes.Gnome("720"))
@@ -70,4 +71,4 @@ func genesis() string {
 // gno.land/r/test/storedgenesis: 0
 
 // Gas:
-// 1395740113
+// 1396001832

@@ -9,9 +9,11 @@ import (
 	"gno.land/r/gnogolf/store"
 )
 
-// noWave is a fresh collection with no wave yet.
+// noWave is a fresh collection with no wave yet: the genesis's close a
+// year off (it sells only once one is set), the sale open.
 func noWave(t *testing.T, rlm realm) {
 	published(t, rlm)
+	closeAt = now() + 365*24*3600
 	mintOpen = true
 }
 

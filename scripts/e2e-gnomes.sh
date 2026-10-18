@@ -37,9 +37,9 @@
 # and its row says so. The players are other accounts, so they call with gnokey.
 #
 # SEED=1 plays no scenario: it deploys, then seeds what the shop's screens
-# show (the genesis published; wave 1 of data/gnomes.json open since a
-# minute, its player window an hour; wave 2 in two days; the close in 30
-# days; p1 and b1 with a record, p1 holding two Commons and a Rare, one
+# show (the genesis published; the close in 30 days, set first: the realm
+# sells none of the genesis without one; wave 1 of data/gnomes.json open
+# since a minute, its player window an hour; wave 2 in two days; p1 and b1 with a record, p1 holding two Commons and a Rare, one
 # worn, b1 a Common; wave 1's Legendary on sale at its price; p0 and b2 with
 # their balance alone), in a few minutes. The chain
 # is left running (KEEP=1) and $WORK/seed.env written: its addresses, the
@@ -53,8 +53,9 @@
 # new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
 # end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WAVE2=0 adds
 # no wave 2, SEED_WORLDS publishes every course hole of those worlds too
-# ("garden island": garden/3 alone by default), SEED_CLOSE=0 sets no closing
-# date (as a launch may leave it unset), SEED_PUBLISHING=1 opens
+# ("garden island": garden/3 alone by default), SEED_CLOSE sets the closing
+# date that many days off (30; more than 2 with wave 2, which starts before
+# it; never none: the genesis is not sold without one), SEED_PUBLISHING=1 opens
 # community publishing, SEED_TREASURY=1 moves the treasury to the treas key.
 set -u
 
@@ -354,7 +355,12 @@ if [ "${SEED:-}" = 1 ]; then
 	WIN2=$(jf "d['series'][0]['sale']['playerWindowHours']" <"$G")
 	price() { qg "Gnome(\"$1\")" | jf 'd["price"]'; }
 	recorded() { q "$STORE" "Has(\"totals\",\"assisted $1\")"; }
+	days=${SEED_CLOSE:-30}
+	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ] || die "seed: SEED_CLOSE is a number of days, 1 or more"
 	GASW=3000000000 ok "seed: publish the genesis" "published" test1 "$GN" AddSeries genesis "$(cat "$ROWS")"; must
+	# the close first: the realm opens no sale of the genesis, nor a wave of it, before one is set
+	CLOSE=$(($(chaintime) + days * 86400))
+	ok "seed: close in $days days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
 	ok "seed: open the sale" "open" test1 "$GN" SetMintOpen true; must
 	# the records first (finding a holing shot may wait out a period), so
 	# that the player window starts when the rest is quick
@@ -370,13 +376,10 @@ if [ "${SEED:-}" = 1 ]; then
 	done
 	NOW=$(chaintime)
 	ok "seed: wave 1 ($W1F-$W1L) open, 1 h player window" "added" test1 "$GN" AddWave "$W1F" "$W1L" "$((NOW - 60))" 1; must
-	W1UNTIL=$((NOW - 60 + 3600)) W2AT=$((NOW + 2 * 86400)) CLOSE=$((NOW + 30 * 86400))
+	W1UNTIL=$((NOW - 60 + 3600)) W2AT=$((NOW + 2 * 86400))
 	if [ "${SEED_WAVE2:-1}" = 1 ]; then
 		ok "seed: wave 2 ($W2F-$W2L) in 2 days" "added" test1 "$GN" AddWave "$W2F" "$W2L" "$W2AT" "$WIN2"; must
 	else W2AT=""; fi
-	if [ "${SEED_CLOSE:-1}" = 1 ]; then
-		ok "seed: close in 30 days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
-	else CLOSE=0; fi
 	C2=$((C1 + 1)) C3=$((C1 + 2))
 	SEND=$(($(price "$C1") + $(price "$C2")))ugnot ok "seed: p1 buys Commons $C1, $C2" "sold" p1 "$GN" Buy "$C1,$C2"; must
 	SEND=$(price "$R1")ugnot ok "seed: p1 buys Rare $R1" "sold" p1 "$GN" Buy "$R1"; must
@@ -438,6 +441,10 @@ is "catalogue: Gnome(104)" "Gnome(\"104\").tier,name" "legendary The Miller" "$(
 # ------------------------------------------------------- the sale opens
 REALM_ADDR=$(py realm "$GN")
 SEND=36000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
+NOW=$(chaintime)
+no "sale: not before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" SetMintOpen true
+no "waves: not before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" AddWave 1 104 "$NOW" 1
+ok "close: set a year off, before any sale" "set" test1 "$GN" SetCloseAt "$((NOW + 365 * 86400))"
 ok "sale: open" "open" test1 "$GN" SetMintOpen true
 is "sale: MintOpen()" "MintOpen()" "true" "$(qg 'MintOpen()')"
 
@@ -643,7 +650,7 @@ wait_until "$((W209 + 5))" "wave 209-310 open" # (a close comes after every gene
 NOW=$(chaintime)
 no "close: owner only" "only the owner" p0 "$GN" SetCloseAt "$((NOW + 600))"
 no "close: in the future" "a closing date is in the future" test1 "$GN" SetCloseAt "$((NOW - 10))"
-ok "close: set, in 10 minutes (none until now)" "set" test1 "$GN" SetCloseAt "$((NOW + 600))"
+ok "close: brought forward, to 10 minutes" "set" test1 "$GN" SetCloseAt "$((NOW + 600))"
 no "close: never later" "never later than" test1 "$GN" SetCloseAt "$((NOW + 900))"
 no "close: no genesis wave from it on" "before the genesis sale closes" test1 "$GN" AddWave 400 410 "$((NOW + 600))" 0
 NOW=$(chaintime)

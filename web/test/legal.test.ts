@@ -21,10 +21,10 @@ test("legal: the order, term by term, before the wallet opens (§1.1)", () => {
   assert.equal(at("Sale period"), "The genesis sale closes on Sun 13 Dec, 18:00 UTC (Mon 14 Dec, 03:00 JST).");
   assert.match(at("Cancellation"), /^No returns, cancellations or refunds once the transaction is final/);
   assert.equal(at("Seller"), `${SELLER.name}, ${SELLER.address}, ${SELLER.email}`);
-  // no closing date set (the realm runs the sale without one): the period still said, plainly, never left out
+  // no closing date set (the realm then sells none of the genesis: an order of a later series' gnome): the period still said, plainly, never left out
   const open = review({ ...order, closesAt: 0 });
   assert.deepEqual(open.map(([k]) => k), rows.map(([k]) => k));
-  assert.equal(open.find(([k]) => k === "Sale period")![1], "The genesis sale has no closing date set: it runs until the owner sets one on the Contract.");
+  assert.equal(open.find(([k]) => k === "Sale period")![1], "The genesis sale has no closing date set yet: the Contract sells none of the genesis until one is set.");
 });
 
 test("legal: two boxes, each its own; the button names the obligation to pay, never Next, Send or Continue (§1.2, §1.3)", () => {
@@ -42,7 +42,7 @@ test("legal: the receipt carries every field (§3): seller, date in UTC and JST,
     "336 GNOT (+ network fee 0.15 GNOT, storage deposit 0.31 GNOT held by the chain)", order.address, "3F9AC21B", "gnoland-1", BOX_A, BOX_B, "No returns or refunds once final"])
     assert.ok(text.includes(want), `the receipt says ${want}`);
   assert.ok(text.includes("Sale period: The genesis sale closes on Sun 13 Dec, 18:00 UTC (Mon 14 Dec, 03:00 JST)."), "the receipt keeps the sale period");
-  assert.ok(receipt({ ...order, closesAt: 0, at: 0, hash: "", realm: "r", chainId: "c", consents: [BOX_A] }).includes("Sale period: The genesis sale has no closing date set: it runs until the owner sets one on the Contract."));
+  assert.ok(receipt({ ...order, closesAt: 0, at: 0, hash: "", realm: "r", chainId: "c", consents: [BOX_A] }).includes("Sale period: The genesis sale has no closing date set yet: the Contract sells none of the genesis until one is set."));
   assert.ok(receipt({ ...order, at: 0, hash: "", realm: "r", chainId: "c", consents: [BOX_A] }).includes("Transaction: in your wallet's history (permanent record on c)"), "no hash (the wallet gave none): where it is");
   assert.ok(!receipt({ ...order, at: 0, hash: "x", realm: "r", chainId: "c", consents: [BOX_A] }).join("\n").includes(BOX_B), "only the boxes shown and ticked");
 });
