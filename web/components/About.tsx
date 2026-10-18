@@ -50,9 +50,10 @@ function courseFact(counts: Readonly<Record<string, number>>) {
 }
 
 /** The round corner button every screen has: back at the top left, about at the top right. */
-function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
+/** No onClick: there but not yet live (the menu's frame while the game loads). */
+function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick?: () => void; children: ReactNode }) {
   return (
-    <button className={`round round--icon screen__${side}`} aria-label={label} title={label} onClick={(e) => (e.stopPropagation(), onClick())}>
+    <button className={`round round--icon screen__${side}`} aria-label={label} title={label} disabled={!onClick} onClick={(e) => (e.stopPropagation(), onClick?.())}>
       {children}
     </button>
   );
@@ -62,13 +63,13 @@ export const InfoIcon = () => (
   <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
 );
 /** A screen's back button: an inked arrow in the top-left corner. */
-export const BackButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
+export const BackButton = ({ label, onClick }: { label: string; onClick?: () => void }) => (
   <CornerButton side="back" label={label} onClick={onClick}>
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
   </CornerButton>
 );
 /** A screen's about button: an inked (i) in the top-right corner. */
-export const AboutButton = ({ onClick }: { onClick: () => void }) => (
+export const AboutButton = ({ onClick }: { onClick?: () => void }) => (
   <CornerButton side="about" label="About Gnogolf" onClick={onClick}>
     <InfoIcon />
   </CornerButton>
@@ -87,8 +88,9 @@ interface FrontScreenProps {
   /** the inner column's own class, beside "worlds__in" */
   inner?: string;
   back: string;
-  onBack: () => void;
-  onAbout: () => void;
+  /** (none: there but not yet live) */
+  onBack?: () => void;
+  onAbout?: () => void;
   /** the line over the title (none: the title alone) */
   eyebrow?: string;
   /** the title's words (and what stands by them, out of the flow: the shop's keeper) */
@@ -100,7 +102,7 @@ interface FrontScreenProps {
 export function FrontScreen({ className, tint = "garden", inner = "", back, onBack, onAbout, eyebrow, title, dare, corner, children }: FrontScreenProps) {
   return (
     <div className={`screen worlds front ${className} tint--${tint}`}>
-      <BackButton label={back} onClick={() => (sound("blip"), onBack())} />
+      <BackButton label={back} onClick={onBack && (() => (sound("blip"), onBack()))} />
       <AboutButton onClick={onAbout} />
       {corner}
       <div className={`worlds__in ${inner}`.trim()}>

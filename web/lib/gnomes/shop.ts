@@ -165,15 +165,15 @@ const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name 
 /** Whether a gnome is the closed genesis's: the closing closes the genesis alone (close.gno isClosed), a later series sells on. */
 const closedOut = (c: Collection, id: number) => !!c.series[0]?.closed && id >= c.series[0].first && id <= c.series[0].last;
 /** The sale a gnome is in, his series' (none: not opened yet). */
-const saleOf = (c: Collection, id: number) => c.series.find((s) => id >= s.first && id <= s.last)?.sale ?? undefined;
+const saleOf = (c: Collection, id: number) => c.series.find((s) => id >= s.first && id <= s.last)?.sale;
 
 // ------------------------------------------------------------ the sale's life (A9)
-type Some = Pick<Listed, "id" | "tier" | "home">;
+type Some = Pick<Listed, "id" | "tier">;
 /** A series' sale as the screens say it: its series (the realm's name) and its name for people ("Genesis"), its
  *  row, its ids, its size and what found a player. */
 export interface SaleInfo { series: string; name: string; row: SaleRow; first: number; last: number; size: number; sold: number }
 /** The gallery's "now" row: closed (made and never made: the genesis closed, no later series' sale), or the sale
- *  of the moment (the last started, else the next: a teaser) and what it is at. */
+ *  of the moment (the latest started still selling, else the next: a teaser) and what it is at. */
 export type Now =
   | { at: "closed"; closesAt: number; made: number; never: number }
   | { at: "none" }
@@ -188,15 +188,15 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
     const ids = entries.filter((e) => e.id >= s.first && e.id <= s.last);
     return { series: s.name, name: names.find((n) => n.id === s.name)?.name || capitalised(s.name), row: s.sale, first: s.first, last: s.last, size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
   };
-  const started = on.filter((s) => s.sale.start <= now).pop();
-  if (!started) {
-    const first = [...on].sort((a, b) => a.sale.start - b.sale.start)[0];
-    return first ? { at: "teaser", sale: info(first) } : { at: "none" };
-  }
-  const sale = info(started);
+  // by start: the latest started still selling; all sold out, the next to come (a teaser), else the latest sold out
+  const byStart = [...on].sort((a, b) => a.sale.start - b.sale.start);
+  const started = byStart.filter((s) => s.sale.start <= now).map(info), ahead = byStart.find((s) => s.sale.start > now);
+  const out = (s: SaleInfo) => s.size > 0 && s.sold >= s.size;
+  const sale = started.filter((s) => !out(s)).pop() ?? (ahead ? undefined : started.pop());
+  if (!sale) return ahead ? { at: "teaser", sale: info(ahead) } : { at: "none" };
   if (!c.open) return { at: "paused", sale };
-  if (sale.size && sale.sold >= sale.size) return { at: "soldout", sale };
-  return { at: now < started.sale.playersUntil ? "players" : "open", sale };
+  if (out(sale)) return { at: "soldout", sale };
+  return { at: now < sale.row.playersUntil ? "players" : "open", sale };
 }
 
 // ------------------------------------------------------------ the shop's sale card (a little fairway, tee to flag)
@@ -264,7 +264,7 @@ export interface Promo {
   /** an Epic, a Rare, a Common of the sale, those it holds, each with its own tier */
   faces: { id: number; tier: Tier }[];
 }
-export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "home" | "name">[]): Promo | null {
+export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "name">[]): Promo | null {
   if (now.at === "soldout" || now.at === "closed" || now.at === "none") return null;
   const { sale } = now, { row } = sale, inSale = entries.filter((e) => e.id >= sale.first && e.id <= sale.last);
   const priceOf = (t: string) => row.prices[tierIndex(c, t)] ?? 0, legend = inSale.find((e) => e.tier === "legendary");

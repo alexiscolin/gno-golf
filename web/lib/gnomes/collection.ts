@@ -122,8 +122,8 @@ export function albumLine(a: Album, home?: string) {
   return w ? `${w.label} ${w.have}/${w.of}` : "";
 }
 /** The player's own album folded to one line, its rank and the next: "Garden 4/104 · Bronze — Silver at 8". */
-export function albumSummary(a: Album, h: Holding, home?: string) {
-  const now = rankOf(h), next = nextRank(h), line = albumLine(a, home);
+export function albumSummary(a: Album, h: Holding) {
+  const now = rankOf(h), next = nextRank(h), line = albumLine(a);
   if (!now) return line;
   return `${line} · ${now.label}${next ? ` — ${next.rank.label} at ${next.rank.points}${"holds" in next.rank ? " with a Legendary" : ""}` : ""}`;
 }

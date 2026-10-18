@@ -116,8 +116,8 @@ test("collection: the next rank, and the rank in words", () => {
 test("collection: the album in one line, what a buy brings, a gnome's place in the series", () => {
   const garden = byTier("common").filter((g) => g.home === "garden").slice(0, 4).map((g) => row(g.id));
   const a = album(gnomes, earned, garden), of = a.worlds.find((w) => w.key === "garden")!.of;
-  assert.equal(albumSummary(a, held(garden), "garden"), `Garden 4/${of} · Bronze — Silver at 8`);
-  assert.equal(albumSummary(album(gnomes, earned, []), held([]), "garden"), `Garden 0/${of}`, "nothing held: the row alone");
+  assert.equal(albumSummary(a, held(garden)), `Garden 4/${of} · Bronze — Silver at 8`);
+  assert.equal(albumSummary(album(gnomes, earned, []), held([])), `Garden 0/${of}`, "nothing held: the row alone");
   assert.equal(albumNext(a, held(garden), "garden"), `Garden 4/${of} · 4 more points for Silver`);
   assert.equal(albumNext(a, held(garden.slice(0, 1)), "garden"), `Garden 4/${of} · 7 more points for Silver`);
   const c = (n: number) => byTier("common").slice(0, n).map((g) => row(g.id));

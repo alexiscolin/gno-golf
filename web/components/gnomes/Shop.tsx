@@ -18,7 +18,7 @@ import { Button, Sheet } from "@/components/ui";
 import { CUP_NAMES, UNLOCKS, type Cup, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, closingSlot, theirTitle, makeShop, neverMade, nowRow, saleLine, shelf, shareWords, teamOrder, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, closingSlot, theirTitle, makeShop, neverMade, nowRow, saleLine, shelf, shareWords, teamOrder, PAGE, SHOP, type Collection, type Held, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
@@ -120,7 +120,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const list = useMemo(() => {
     if (!cat || !seen) return [];
     if (theirs) return theirs.ids.map((id) => cat.gnomes.find((g) => g.id === id)).filter((g): g is Listed => !!g);
-    const v: View = viewing === "mine" ? "mine" : "all";
+    const v = viewing === "mine" ? "mine" : "all"; // (theirs: above)
     const out = shelf(cat.gnomes, { view: v, tier: f.tier, text: v === "all" ? f.text : "" }, seen).list;
     return v === "mine" ? teamOrder(out.map((g) => ({ ...g, id: String(g.id) }))).map((g) => ({ ...g, id: Number(g.id) })) : out;
   }, [cat, seen, theirs, viewing, f]);

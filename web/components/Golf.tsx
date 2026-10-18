@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { menuReached, onMenuLink } from "@/lib/menu";
+import { menuLink, menuReached, onMenuLink } from "@/lib/menu";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
@@ -366,6 +366,7 @@ export default function Golf() {
   // title -> game choice -> cups, or rival -> their ghosts -> gnome -> play; the title shows at once, the hole loads behind it
   // the menu's address (the Builder's and the shop's Back) opens on it from the first frame: it needs no course read
   const [screen, setScreen] = useState<Screen>(() => (onMenuLink() ? "modes" : "title"));
+  const opened = useRef(screen); // (the address's screen, once the game started: only if the player is still where the page opened)
   useEffect(menuReached, []);
   const playing = screen === "play";
   // what the effects below follow of the game's state, as plain values
@@ -726,14 +727,16 @@ export default function Golf() {
           if (cfg.play) play();
           else if (cfg.screen === "shop") {
             // landed on the shop (its link, a reload): the menu under it in the history, the browser's Back goes there as the shop's does
-            const q = chainQuery(), here = window.location.pathname + window.location.search;
-            q.set("screen", "modes");
-            window.history.replaceState({ screen: "modes" }, "", `/?${q}`);
+            const here = window.location.pathname + window.location.search;
+            window.history.replaceState({ screen: "modes" }, "", menuLink(String(chainQuery())));
             window.history.pushState({ screen: "shop" }, "", here);
             setShopView(cfg.shop);
             setScreen("shop");
           }
-          else if (cfg.screen && cfg.screen !== "pick" && !dare) setScreen(cfg.screen);
+          else if (cfg.screen && cfg.screen !== "pick" && !dare) {
+            const go = cfg.screen;
+            setScreen((now) => (now === opened.current ? go : now));
+          }
           else if (cfg.hole || cfg.cup) {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first), a cup's from its first, on the picker; a link to

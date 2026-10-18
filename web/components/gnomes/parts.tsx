@@ -87,7 +87,7 @@ export const EarnedTile = () => (
 
 /** The switch between a gnome's two looks: his 3D portrait, or the SVG the chain draws (the gallery's and a sheet's). */
 export const LookSwitch = ({ look, onLook }: { look: Look; onLook: (l: Look) => void }) => (
-  <Segmented label="How the gnomes are drawn" className="seg--look" options={[["3d", "3D"], ["chain", "On chain"]]} value={look} onChange={onLook} />
+  <Segmented label="How the gnomes are drawn" className="seg--s" options={[["3d", "3D"], ["chain", "On chain"]]} value={look} onChange={onLook} />
 );
 
 /** A gnome in the grid: his tile, name and number, his tier and one fact (his price when on sale), and Buy when he

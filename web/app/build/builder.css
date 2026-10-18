@@ -474,7 +474,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bgloss p { margin: 0; font-size: 15px; line-height: normal; color: var(--ink); } /* (not the sheet's grey prose) */
 .bhint--in { position: static; max-width: none; padding: 0; border: 0; box-shadow: none; background: none; }
 .bgloss .bgloss__keys { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 600; line-height: 1.7; color: var(--ink); }
-.bgloss__keys kbd { font: inherit; font-weight: 800; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
+/* a key said in words (the glossary, the board's keys, the player's view) */
+:is(.bgloss__keys, .board__keys, .pview__say) kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
+.bgloss__keys kbd { font-weight: 800; }
 .board--pan, .board--pan * { cursor: grab !important; }
 .bgloss h2 { margin: var(--sp-2) 0 0; font-size: var(--fs-sub); } /* (a group's title in the sheet: .h-sub's size) */
 .bgloss ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--sp-2) var(--sp-3); }
@@ -490,7 +492,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 .board__keys { white-space: nowrap; } /* (one line: the few keys most used; ? shows them all) */
 .board__keys > span { white-space: nowrap; }
 .board__keys > span:not(:last-child)::after { content: "\00a0·"; }
-.board__keys kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
 /* quick shots and the meter's line (Board's ball): paths in the board's units, their strokes in pixels; the latest bright, three before it faded */
 .board__shots polyline { fill: none; stroke: var(--white); stroke-width: 2.5px; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .board__shots polyline.old { opacity: .35; }
@@ -546,7 +547,7 @@ button.issue__why:hover { text-decoration-style: solid; }
    Sheet: its dim, its X, its title beside the X), wider; not on a narrow screen */
 .pview { display: grid; gap: var(--sp-2); }
 .pview__say { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-soft); }
-.pview__say kbd { padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; font: inherit; font-family: var(--mono); color: var(--ink); }
+.pview__say kbd { color: var(--ink); }
 .pview__pic { display: block; width: 100%; margin: 0; padding: 0; font: inherit; cursor: zoom-in; }
 .pview__big.sheet__in { display: grid; gap: var(--sp-3); width: min(92vw, 1040px); max-width: none; max-height: 92dvh; padding: 22px var(--sp-5) var(--sp-5); }
 .pview__big h2 { margin: 0 52px 0 0; }

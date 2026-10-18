@@ -177,6 +177,13 @@ test("shop: the genesis closing closes the genesis alone: a later series' sale s
   assert.equal(nowRow(collection({ series: [...CLOSED, winter(T0 + 86400 * 30)] }), none, all, now).at, "teaser", "its sale to come");
   // no later sale at all: the sale is closed
   assert.equal(nowRow(collection({ series: [...CLOSED, { ...winter(T0), sale: null }] }), none, all, now).at, "closed");
+  // two sales: the latest started still selling; the genesis sold out, the next to come (never a dead end)
+  const both = (w: SeriesRow) => collection({ series: [genesis(), w] }), every = isSold(Array.from({ length: 720 }, (_, i) => i + 1));
+  const pick = (r: ReturnType<typeof nowRow>) => (r.at === "closed" || r.at === "none" ? r.at : `${r.at} ${r.sale.series}`);
+  assert.equal(pick(nowRow(both({ ...winter(T0 + 30), sold: 3 }), isSold([721, 722, 723]), all, now)), "players genesis", "winter sold out: the genesis sells on");
+  assert.equal(pick(nowRow(both(winter(T0 + 30)), every, all, now)), "open winter-2027");
+  assert.equal(pick(nowRow(both(winter(T0 + 86400 * 30)), every, all, now)), "teaser winter-2027");
+  assert.equal(pick(nowRow(collection(), every, entries, now)), "soldout genesis");
 });
 
 // ------------------------------------------------------------ the collection on the game's screens

@@ -20,7 +20,7 @@ const Golf = dynamic(() => import("@/components/Golf"), {
 });
 
 /** The menu's frame while the game loads: its head as the menu has it (Modes.tsx), its cards to come. */
-const MenuFrame = () => <FrontScreen className="modes" back={MENU_HEAD.back} onBack={() => {}} onAbout={() => {}} eyebrow={MENU_HEAD.eyebrow} title={MENU_HEAD.title} />;
+const MenuFrame = () => <FrontScreen className="modes" back={MENU_HEAD.back} eyebrow={MENU_HEAD.eyebrow} title={MENU_HEAD.title} />;
 
 export default function Game() {
   // analytics, once the page is idle (nothing without its key)

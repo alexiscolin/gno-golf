@@ -25,7 +25,7 @@ export function RankBadge({ rank, full = false }: { rank: Rank; full?: boolean }
   return (
     <span className={`crank crank--${rank.id}${full ? " crank--full" : ""}`} title={rankTitle(rank)}>
       <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[rank.id]}</svg>
-      {full ? rankWords(rank) : <span className="crank__word"><span className="crank__sr">Collector </span>{rank.label}</span>}
+      {full ? rankWords(rank) : <span className="crank__word"><span className="sr-only">Collector </span>{rank.label}</span>}
     </span>
   );
 }

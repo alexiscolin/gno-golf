@@ -34,7 +34,7 @@ export default function PlayerView({ eye, large, onLarge }: { eye: Eye; large: b
       </button>
       <p className="pview__say">The hole from its tee, as a round opens on it. Click it or press <kbd>P</kbd> to see it large.</p>
       {large && (
-        <Sheet label="The player's view" className="pview__big" onClose={() => onLarge(false)}>
+        <Sheet label="What the player sees" className="pview__big" onClose={() => onLarge(false)}>
           <h2>What the player sees</h2>
           <canvas ref={big} />
         </Sheet>

@@ -134,7 +134,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "tiers mine end"; grid-template-rows: 32px; align-items: center; gap: var(--sp-2) var(--sp-4); }
 .gbar__tiers { grid-area: tiers; } .gbar__mine { grid-area: mine; } .gbar__end { grid-area: end; justify-self: end; display: flex; align-items: center; gap: var(--sp-2); }
 /* every control the same height, on one line: the toolbar's rhythm */
-.gbar .seg button { min-height: 28px; font-size: 13px; } /* (in the segment's 2 px edge: 32 all told; the words of one size, on one baseline) */
+.gbar .seg button { min-height: 28px; white-space: nowrap; } /* (the small switch, in its 2 px edge: 32 all told; one line) */
 .gbar__tiers { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .tierbtn__unit { font-size: 11px; }
 /* a tier's chip as the shelf's filter (Button, small): its shape and colour its tier's, its name bold, its price
@@ -191,7 +191,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 /* his tier over his fact, always (fixed rows: every card the same) */
 .gcard__foot { display: grid; grid-template-rows: 24px 18px; align-items: center; justify-items: start; gap: var(--sp-1); margin: 0 2px; }
 .gcard__foot:not(:last-child) { margin-bottom: var(--sp-2); } /* (8 more over Buy) */
-.gcard > :last-child { margin-top: auto; } /* (the last line at the card's foot) */
+.gcard > .btn:last-child { margin-top: auto; } /* (Buy at the card's foot; the tier under the name on every card, in line row to row) */
 @media (max-width: 600px) { .gcard { padding: var(--sp-2); } } /* (with its 3 px edge, 11 round a phone's card) */
 .gcard__fact { max-width: 100%; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard--mine { background: var(--ink); color: var(--paper); }

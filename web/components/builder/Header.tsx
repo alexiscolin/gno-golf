@@ -64,7 +64,7 @@ function More({ world, worlds, onWorld }: { world: string; worlds: readonly stri
   const menu = useRef<HTMLDetailsElement>(null);
   return (
     <details ref={menu} className="bhead__more" onKeyDown={(e) => e.key === "Escape" && menu.current?.open && (e.stopPropagation(), (menu.current.open = false))}>
-      <summary className={buttonClass({ size: "s" })} aria-label={`The hole's world: ${worldName(world)}. Change it`} title="Change the hole's world">
+      <summary className={buttonClass({ size: "m" })} aria-label={`The hole's world: ${worldName(world)}. Change it`} title="Change the hole's world">
         {worldName(world)}
         <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </summary>
@@ -113,7 +113,7 @@ export default function Header({ title, world, worlds = [], step, steps, action,
         </Button>
         <span className="bhead__name">
           <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
-          {onRoll && <Button variant="icon" size="s" type="button" className="bhead__roll" aria-label="Suggest a name" title="Suggest a name (again: another)" onClick={onRoll}><Dice /></Button>}
+          {onRoll && <Button variant="icon" size="m" type="button" className="bhead__roll" aria-label="Suggest a name" title="Suggest a name (again: another)" onClick={onRoll}><Dice /></Button>}
         </span>
         {onWorld && worlds.length > 1 && <More world={world} worlds={worlds} onWorld={onWorld} />}
       </div>
