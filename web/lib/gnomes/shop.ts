@@ -202,14 +202,14 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
 // ------------------------------------------------------------ the shop's sale card (a little fairway, tee to flag)
 /** A tier of the sale: what found a player of what it holds, its price (ugnot, 0: none said), all in words. */
 export interface TierShare { tier: BuyTier; found: number; total: number; price: number; label: string }
-/** The shop's sale card: the series' name ("Genesis") and its count ("4 of 720 found a player"), the same said
+/** The shop's sale card: the series' name ("Genesis") and its count ("4 of 720 found a player": big "4", rest the words), the same said
  *  whole (label), the ball's place
  *  from tee (0) to flag (1) as the share that found a player, each tier's share, its Legendaries at
  *  the flag, and the state's chip (a date, never a countdown: none while the sale is simply open; short, a phone's);
  *  closed: what was made and never made; null: no sale to show. */
 export type SaleCard =
   | { at: "closed"; title: string; count: string; label: string }
-  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; title: string; count: string; label: string; share: number; tiers: TierShare[];
+  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; title: string; count: string; big: string; rest: string; label: string; share: number; tiers: TierShare[];
       legend: { id: number; name: string; words: string } | null; chip: { text: string; short: string; full: string } | null };
 export function saleLine(row: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "name">[], sold: (id: number) => boolean, now: number): SaleCard | null {
   if (row.at === "none") return null;
@@ -226,10 +226,12 @@ export function saleLine(row: Now, c: Collection, entries: readonly Pick<Listed,
     : row.at === "players" ? { text: `Players first · until ${until}`, short: `Players first · ${bare(until)}`, full: `Players first until ${until}: save one round on-chain to buy now.` }
     : row.at === "paused" ? { text: "Paused for a moment", short: "Paused", full: "Paused for a moment: the sale picks up where it stopped." } : null;
   const all = sale.size && sale.sold >= sale.size;
+  // the count's figure (the card says it big) and the words after it
+  const big = all ? "All" : String(sale.sold), rest = `${all ? sale.size : `of ${sale.size}`} found a player`;
   return {
-    at: row.at, chip, tiers,
+    at: row.at, chip, tiers, big, rest,
     title: sale.name,
-    count: `${all ? `All ${sale.size}` : `${sale.sold} of ${sale.size}`} found a player`,
+    count: `${big} ${rest}`,
     label: `${sale.name}: ${all ? `all ${sale.size}` : `${sale.sold} of ${sale.size}`} ${plural("gnome", sale.size)} found a player`,
     share: sale.size ? Math.min(1, sale.sold / sale.size) : 0,
     // (several: the first still waiting stands for them, the words their count)

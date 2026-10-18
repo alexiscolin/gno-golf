@@ -179,17 +179,14 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       {theirs && <Button variant="gold" className="btn--cta" onClick={() => onRace(theirs.who)}>Race their ghost</Button>}
       {/* their album (ADR-011), under their Race, folded; the player's own comes under their team */}
       {theirs && theirs.rows.length > 0 && albumOf(theirs.rows, theirs.who, false)}
-      {/* one toolbar: the tiers (their prices and what is left, once), the search (open, a row of its own under it) and
-          Mine (the album's count its badge: the one way to the player's own) at its left; how the gnomes are drawn at its right */}
+      {/* one toolbar: the tiers (their prices and what is left, once) and Mine (the album's count its badge: the one way
+          to the player's own) at its left; the search (open, a row of its own under it) and how the gnomes are drawn at its right */}
       {!theirs && (
         <>
           <div className="gbar">
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
-            <div className="gbar__tools">
-              {searching && <SearchButton search={search} />}
-              {me && <Button size="s" type="button" aria-pressed={viewing === "mine"} onClick={() => onView(viewing === "mine" ? {} : { who: me })}>{myAlbum && myAlbum.have ? `Mine · ${myAlbum.have}` : "Mine"}</Button>}
-            </div>
-            <div className="gbar__end"><LookSwitch look={look} onLook={onLook} /></div>
+            {me && <Button size="s" type="button" className="gbar__mine" aria-pressed={viewing === "mine"} onClick={() => onView(viewing === "mine" ? {} : { who: me })}>{myAlbum && myAlbum.have ? `Mine · ${myAlbum.have}` : "Mine"}</Button>}
+            <div className="gbar__end">{searching && <SearchButton search={search} />}<LookSwitch look={look} onLook={onLook} /></div>
           </div>
           {searching && <SearchRow search={search} />}
         </>

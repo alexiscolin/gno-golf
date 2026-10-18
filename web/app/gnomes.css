@@ -74,26 +74,26 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
    a player's page), never under the About button */
 @media (max-width: 420px) { .shop .front__head { justify-self: stretch; } .shop .worlds__title { justify-self: stretch; font-size: 28px; text-align: center; text-wrap: balance; } }
 /* the sale's card: the game's front card (title.css: paper, the inked edge, its radius and drop), centred at the
-   gallery's width, 720 at most, compact: its Legendary on the left, its title with the state's chip at its
-   right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
-   (fixed tracks: the slot while it is read is the same room) */
-.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: var(--sp-4) var(--sp-5); color: var(--ink); font-style: normal; text-align: left; } /* (16 above and under its words, 24 at its sides) */
-.wcard__legend { grid-area: legend; align-self: center; width: 48px; height: 48px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
+   gallery's width, 880 at most, compact: its Legendary on the left, the series' name over its count (its figure big)
+   and the Legendaries' words; at its right the state's chip over the fairway; the closing date its foot (fixed
+   tracks: the slot while it is read is the same room) */
+.wcard { justify-self: center; width: min(880px, 100%); display: grid; grid-template-columns: 64px minmax(0, auto) minmax(200px, 1fr); grid-template-rows: 22px 40px 22px; grid-template-areas: "legend title chip" "legend count fw" "legend who fw"; align-items: center; gap: 0 var(--sp-5); padding: var(--sp-4) var(--sp-5); color: var(--ink); font-style: normal; text-align: left; }
+.wcard__legend { grid-area: legend; align-self: center; width: 64px; height: 64px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
 .wcard__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
-.wcard__title { grid-area: title; min-width: 0; font-size: 17px; font-weight: 800; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* (the pitch line's words: its family, weight and upright style) */
-.wcard__count { grid-area: count; min-width: 0; font-size: 14px; font-weight: 600; font-style: normal; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wcard__who::before { content: " · "; }
-.wcard__who b { font-weight: 800; }
+.wcard__title { grid-area: title; min-width: 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; line-height: 22px; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wcard__count { grid-area: count; min-width: 0; font-size: 16px; font-weight: 600; line-height: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wcard__big { font-size: 34px; font-weight: 800; line-height: 1; vertical-align: -3px; }
+.wcard__who { grid-area: who; min-width: 0; font-size: 14px; font-weight: 600; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wcard__who b { font-weight: 800; color: var(--ink); background: linear-gradient(transparent 55%, rgba(255, 215, 94, .7) 55%); }
 .wcard__chip { grid-area: chip; justify-self: end; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 8px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .wcard__chip svg { width: 14px; height: 14px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
 .wcard__short { display: none; }
-/* the sale's closing date, the card's last line, under its fairway: its words flat (no pill of its own) */
-.wcard--closes { grid-template-rows: 22px 20px 36px 26px; } /* (its date's line in its padding's room) */
-.wcard .wcard__closes { grid-column: 1 / -1; align-self: end; justify-self: start; display: block; padding: 0; border: 0; background: none; font-size: 13px; text-align: left; }
-.wcard--closed { grid-template-areas: "title title title" "count count count" "fw fw fw"; justify-items: center; text-align: center; }
-/* the fairway, from the tee to the flag, the ball at the share that found a player, 12 under the words (its track 36) */
-.fw { grid-area: fw; align-self: end; position: relative; width: 100%; height: 24px; margin-top: var(--sp-3); }
+/* the sale's closing date, the card's foot, under a hairline: its words flat (no pill of its own) */
+.wcard--closes { grid-template-rows: 22px 40px 22px 40px; grid-template-areas: "legend title chip" "legend count fw" "legend who fw" "closes closes closes"; }
+.wcard .wcard__closes { grid-area: closes; align-self: end; justify-self: stretch; display: block; margin: 0; padding: var(--sp-2) 0 0; border: 0; border-top: 1.5px solid rgba(var(--ink-rgb), .12); border-radius: 0; background: none; font-size: 13px; text-align: left; }
+.wcard--closed { grid-template-columns: minmax(0, 1fr); grid-template-rows: 22px 40px; grid-template-areas: "title" "count"; justify-items: center; text-align: center; }
+/* the fairway, from the tee to the flag, the ball at the share that found a player */
+.fw { grid-area: fw; align-self: center; position: relative; width: 100%; height: 24px; }
 .fw__lane { position: absolute; left: 0; right: 0; top: 2px; height: 20px; border: var(--edge); border-radius: var(--pill); background: var(--turf); overflow: hidden; }
 /* the way rolled, tee to ball, a deeper green: the share sold reads at a glance (no stripes: never a loader's) */
 .fw__lane::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(20px + var(--at) * (100% - 44px)); background: var(--green-light); animation: fw-fill 1.6s cubic-bezier(.2, .75, .3, 1) both; }
@@ -105,38 +105,33 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .fw__ball::after { content: ""; position: absolute; left: 2px; top: 3px; width: 3px; height: 3px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
 @keyframes fw-roll { from { left: 14px; transform: rotate(-600deg); } }
 @media (prefers-reduced-motion: reduce) { .fw__ball, .fw__lane::before { animation: none; } }
-/* a phone: the title its line's whole width (wrapped, never cut), the state's chip under it beside the Legendary, the
-   count and the Legendary's words on two clean lines under them, the chip's words short */
-@media (max-width: 480px) {
-  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: minmax(22px, auto) 26px 36px 36px; grid-template-areas: "legend title title" "legend chip chip" "count count count" "fw fw fw"; column-gap: var(--sp-2); padding: calc(var(--sp-4) + var(--sp-1)); } /* (20 round it) */
-  .wcard__title { white-space: normal; overflow: visible; }
-  .wcard__chip { justify-self: start; align-self: end; }
-  .wcard__legend { width: 40px; height: 40px; }
-  .wcard__title { font-size: 15px; }
-  .wcard__count { font-size: 13px; line-height: 18px; }
-  .wcard__chip { gap: 4px; padding: 0 8px 0 6px; font-size: 11px; }
+/* narrower: everything stacked, the Legendary beside the name and the count, the Legendaries' words, the chip,
+   then the fairway the card's width; the chip's words short */
+@media (max-width: 700px) {
+  .wcard { grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: 22px 36px 20px 30px 36px; grid-template-areas: "legend title" "legend count" "who who" "chip chip" "fw fw"; column-gap: var(--sp-3); padding: calc(var(--sp-4) + var(--sp-1)); } /* (20 round it) */
+  .wcard--closes { grid-template-rows: 22px 36px 20px 30px 36px 52px; grid-template-areas: "legend title" "legend count" "who who" "chip chip" "fw fw" "closes closes"; }
+  .wcard__legend { width: 48px; height: 48px; }
+  .wcard__count { font-size: 14px; line-height: 36px; }
+  .wcard__big { font-size: 28px; }
+  .wcard__who { font-size: 13px; line-height: 20px; white-space: normal; }
+  .wcard__chip { justify-self: start; align-self: end; gap: 4px; padding: 0 8px 0 6px; font-size: 11px; }
   .wcard__chip svg { width: 12px; height: 12px; }
-  .wcard__count > span { display: block; overflow: hidden; text-overflow: ellipsis; }
-  .wcard__who::before { content: none; }
   .wcard__long { display: none; } .wcard__short { display: inline; }
-  .wcard--closes { grid-template-rows: minmax(22px, auto) 26px 36px 36px 44px; } /* (its date on two lines) */
   .wcard .wcard__closes { font-size: 12px; line-height: 16px; }
-  .wcard--closed { grid-template-rows: 22px 36px 36px; grid-template-areas: "title title title" "count count count" "fw fw fw"; }
 }
 /* a narrow phone: the card a step tighter, the chip's words alone */
 @media (max-width: 380px) {
-  .wcard { grid-template-columns: 36px minmax(0, 1fr) auto; padding: var(--sp-3); }
-  .wcard__legend { width: 36px; height: 36px; }
-  .wcard__title { font-size: 14px; }
+  .wcard { grid-template-columns: 40px minmax(0, 1fr); padding: var(--sp-3); }
+  .wcard__legend { width: 40px; height: 40px; }
   .wcard__chip { padding: 0 7px; } .wcard__chip svg { display: none; }
 }
 
-/* one toolbar on the gallery's grid: the tiers (their prices and what is left, once), the search and Mine at its left
-   edge, how the gnomes are drawn (3D · On chain) at its right; every control the small size (32), on one line; two
+/* one toolbar on the gallery's grid: the tiers (their prices and what is left, once) and Mine at its left edge, the
+   search and how the gnomes are drawn (3D · On chain) at its right; every control the small size (32), on one line; two
    lines narrower, the tiers under, 8 apart; a phone's lines one height, 36 (each line's height fixed: the slot while
    it is read is the same room) */
-.gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "tiers tools end"; grid-template-rows: 32px; align-items: center; gap: var(--sp-2) var(--sp-4); }
-.gbar__tiers { grid-area: tiers; } .gbar__tools { grid-area: tools; display: flex; align-items: center; gap: var(--sp-2); } .gbar__end { grid-area: end; justify-self: end; }
+.gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "tiers mine end"; grid-template-rows: 32px; align-items: center; gap: var(--sp-2) var(--sp-4); }
+.gbar__tiers { grid-area: tiers; } .gbar__mine { grid-area: mine; } .gbar__end { grid-area: end; justify-self: end; display: flex; align-items: center; gap: var(--sp-2); }
 /* every control the same height, on one line: the toolbar's rhythm */
 .gbar .seg button { min-height: 28px; font-size: 13px; } /* (in the segment's 2 px edge: 32 all told; the words of one size, on one baseline) */
 .gbar__tiers { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
@@ -164,12 +159,12 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 @media (max-width: 1179px) { .tierbtn__unit { display: none; } }
 /* narrower: the tiers on a line of their own, 8 under the first */
 @media (max-width: 1099px) {
-  .gbar, .gbar--skel { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "tools end" "tiers tiers"; grid-template-rows: 32px 32px; min-height: 72px; }
+  .gbar, .gbar--skel { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "mine end" "tiers tiers"; grid-template-rows: 32px 32px; min-height: 72px; }
 }
-/* a phone: the search, Mine and the look; then the tiers, two by two (a shape, the tier's name, its price and what
+/* a phone: Mine, the search and the look; then the tiers, two by two (a shape, the tier's name, its price and what
    is left each, so a chip says what it is); each line 36 */
 @media (max-width: 700px) {
-  .gbar, .gbar--skel { grid-template-areas: "tools end" "tiers tiers" "tiers tiers"; grid-template-rows: 36px 36px 36px; column-gap: var(--sp-2); min-height: 124px; } /* (the tiers two lines of one track each: in line by line) */
+  .gbar, .gbar--skel { grid-template-areas: "mine end" "tiers tiers" "tiers tiers"; grid-template-rows: 36px 36px 36px; column-gap: var(--sp-2); min-height: 124px; } /* (the tiers two lines of one track each: in line by line) */
   .gbar .btn { --h: 36px; }
   .gbar .seg button { min-height: 32px; }
   .gbar__tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-self: stretch; align-self: stretch; gap: var(--sp-2); width: 100%; }

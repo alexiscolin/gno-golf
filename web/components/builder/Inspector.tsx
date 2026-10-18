@@ -99,7 +99,7 @@ export default function Inspector({ draft, piece, quick, full, playing, onPlay, 
 }) {
   // Details open unless the player folded them this visit (prefs.ts); how to move a piece said on a browser's first visit (seen once a piece is selected: it shows then)
   const [open] = useState(detailsOpen), drag = useOnce("drag", !!piece);
-  if (!piece) return <p className="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>;
+  if (!piece) return (<><h3>The piece</h3><p className="nothing">None selected. Click a piece on the board to change it here.</p></>);
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
   const p = piece, ent: PaletteEntry = e;

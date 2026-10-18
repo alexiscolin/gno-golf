@@ -116,11 +116,11 @@ export function Closes({ at, now }: { at: number; now: number }) {
   );
 }
 
-/** The sale's card, the game's front card (title.css): its Legendary in gold on the left, the series' name in
- *  bold over its count and the Legendaries' words, its state's chip at the right of the title (a date, never a
- *  countdown; a phone's shorter), the fairway under them its whole width, the ball rolled from the tee to the share
- *  that found a player (still with reduced motion); the sale's end in words; the closing date (closes), its last line,
- *  in the card. Its height the slot's (ShopFrame SaleSlot). */
+/** The sale's card, the game's front card (title.css): its Legendary in gold on the left, the series' name over
+ *  its count (its figure big) and the Legendaries' words; at its right the state's chip (a date, never a countdown; a
+ *  phone's shorter) over the fairway, the ball rolled from the tee to the share that found a player (still with
+ *  reduced motion); the closing date (closes) its foot. A phone: all stacked, the fairway under. Its height the
+ *  slot's (ShopFrame SaleSlot). */
 export function SaleLine({ line, closes }: { line: SaleCard; closes?: ReactNode }) {
   if (line.at === "closed")
     return <section className="wcard wcard--closed" aria-label="The sale"><b className="wcard__title">{line.title}</b><span className="wcard__count">{line.count}</span></section>;
@@ -135,10 +135,8 @@ export function SaleLine({ line, closes }: { line: SaleCard; closes?: ReactNode 
           <span className="wcard__long">{chip.text}</span><span className="wcard__short">{chip.short}</span>
         </span>
       )}
-      <span className="wcard__count" aria-hidden="true">
-        <span>{line.count}</span>
-        {legend && <span className="wcard__who"><b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</span>}
-      </span>
+      <span className="wcard__count" aria-hidden="true"><b className="wcard__big">{line.big}</b> {line.rest}</span>
+      {legend && <span className="wcard__who" aria-hidden="true"><b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</span>}
       <span className="fw" role="img" aria-label={legend ? `${line.label}. ${legend.words}` : line.label} style={{ "--at": line.share } as CSSProperties}>
         <span className="fw__lane" />
         <span className="fw__tee" />
@@ -197,7 +195,7 @@ export function useSearch(value: string, onChange: (text: string) => void) {
 }
 type Search = ReturnType<typeof useSearch>;
 
-/** The search's icon, in the toolbar's left group, pressed (gold) while the search shows. */
+/** The search's icon, in the toolbar's right group, by the look switch, pressed (gold) while the search shows. */
 export function SearchButton({ search: s }: { search: Search }) {
   return (
     <Button ref={s.icon} variant="icon" size="s" type="button" className={`gbar__icon${s.shown ? " btn--on" : ""}`} aria-label="Find a gnome by name or number"

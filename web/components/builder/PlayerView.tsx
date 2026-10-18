@@ -1,6 +1,6 @@
 "use client";
 
-// The player's view, a small picture at the foot of the right column: the
+// The player's view, a small picture under the piece in the right column, titled and said: the
 // hole from its tee through the game's own lens, as a round opens on it.
 // Painted from the board's own scene (Scene.tsx paint: no second build, no
 // second context), once an edit has settled and the hole is built, never a
@@ -28,11 +28,12 @@ export default function PlayerView({ eye, large, onLarge }: { eye: Eye; large: b
   }, [eye, large]);
 
   return (
-    <section className="pview" aria-label="The player's view">
+    <section className="pview" aria-labelledby="pview-head">
+      <h3 id="pview-head">What the player sees</h3>
       <button type="button" className="preview pview__pic" onClick={() => onLarge(true)} title="The hole from the tee, as a player sees it (P: large)" aria-label="The hole from the tee, as a player sees it: show it large (P)">
         <canvas ref={small} />
-        <span className="pill">From the tee <kbd>P</kbd></span>
       </button>
+      <p className="pview__say">The hole from its tee, as a round opens on it. Click it or press <kbd>P</kbd> to see it large.</p>
       <dialog ref={dialog} className="pview__big" aria-label="The player's view" onClose={() => onLarge(false)} onClick={(e) => e.target === e.currentTarget && dialog.current?.close()}>
         <canvas ref={big} />
         <form method="dialog"><Button type="submit" keycap="Esc">Close</Button></form>

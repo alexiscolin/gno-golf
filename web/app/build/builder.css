@@ -548,8 +548,8 @@ button.issue__why:hover { text-decoration-style: solid; }
 
 /* the player's view (PlayerView.tsx): under the inspector, the hole from the tee; large in a dialog on a click; not on a narrow screen */
 .pview { display: grid; gap: var(--sp-2); }
-.pview .pill { height: 22px; padding: 0 var(--sp-2); font-size: 11px; }
-.pview .pill kbd { margin-left: 4px; padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; font: inherit; font-family: var(--mono); }
+.pview__say { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-soft); }
+.pview__say kbd { padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; font: inherit; font-family: var(--mono); color: var(--ink); }
 .pview__pic { display: block; width: 100%; margin: 0; padding: 0; font: inherit; cursor: zoom-in; }
 .pview__pic:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .pview__big { width: min(92vw, 1040px); max-height: 92dvh; padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
