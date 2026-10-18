@@ -34,7 +34,6 @@
    column; a front screen's head (the rival's: title.css .front--fit) but the screen scrolling from its top, the
    head in the corner buttons' row, the gutters slim (the banner's room at the end, as the cups') */
 .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { justify-content: flex-start; padding: 0 40px 48px; } /* (24 inside the page's frame, 16 in) */
-body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room); }
 @media (max-width: 600px) { .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { padding-inline: 16px; } } /* (the page's frame closer: globals.css) */
 .shop .worlds__in { width: min(1160px, 100%); display: grid; gap: var(--sp-4); justify-items: stretch; }
 .shop .front__head { justify-self: center; }
@@ -46,7 +45,6 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .closes b { color: var(--ink); white-space: nowrap; }
 
 /* the shop's slots (ShopFrame): the same height before and after their figures are read */
-.closes-slot { min-height: 34px; display: grid; justify-items: center; align-items: center; }
 .gcard__buy.gcard__buy--skel { background: rgba(var(--ink-rgb), .08); border-color: transparent; box-shadow: none; }
 .shop__pitch { margin: var(--sp-2) auto 0; max-width: 640px; text-align: center; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); } /* (small words in ink: the soft ink is under 4.5:1 on a front's ground) */
 /* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
@@ -58,14 +56,20 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 /* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf */
 /* room to breathe, the game's steps: 32 between the head, the card, the toolbar and the shelf, the card a step more
    on each side (40); a phone a step tighter (24, the card 28) */
-.shop .worlds__in { padding-top: 34px; gap: var(--sp-6); }
-.shop .wcard { margin-block: var(--sp-1); }
-.shop .gbar { margin-top: var(--sp-2); } /* (40 over the toolbar, 32 under it: the toolbar the gallery's) */
-@media (max-width: 700px) { .shop .worlds__in { gap: var(--sp-5); } .shop .wcard { margin-block: var(--sp-1); } }
+.shop .worlds__in { padding-top: 34px; gap: var(--sp-5); }
+.shop .galbum-line { margin-top: calc(-1 * var(--sp-3)); } /* (the album's line close under the toolbar it belongs to) */
+/* (a computer: the head a step tighter, the first row of gnomes whole in the first view; a phone keeps its line clear of the corner buttons) */
+@media (min-width: 701px) { .shop .front__head > .eyebrow { margin-bottom: calc(-1 * var(--sp-1)); } .shop .shop__pitch { margin-top: 0; } }
+/* the foot: room for the fixed chips (the network's, Feedback, Support: --chip-room) and a row's gap under the last
+   row, so its names and prices scroll clear of them */
+body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-room) + var(--sp-5)); }
+@media (max-width: 700px) { .shop .worlds__in { gap: var(--sp-5); } }
 .shop .front__head { margin: 0; }
 /* a phone: the title alone (title.css), between the corner buttons, a line clear of them */
 @media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } .shop .worlds__title { margin-inline: 56px; } }
-@media (max-width: 380px) { .shop .worlds__title { font-size: 30px; } } /* (a narrow phone: clear of the corner buttons it sits between) */
+/* a phone: the title in the room between the corner buttons, a step smaller, wrapped there if it must ("Your team of 4",
+   a player's page), never under the About button */
+@media (max-width: 420px) { .shop .front__head { justify-self: stretch; } .shop .worlds__title { justify-self: stretch; font-size: 28px; text-align: center; text-wrap: balance; } }
 /* the sale's card: the game's front card (title.css: paper, the inked edge, its radius and drop), centred at the
    gallery's width, 720 at most, compact: the wave's Legendary on the left, its title with the state's chip at its
    right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
@@ -81,6 +85,9 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .wcard__chip { grid-area: chip; justify-self: end; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 8px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .wcard__chip svg { width: 14px; height: 14px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
 .wcard__short { display: none; }
+/* the sale's closing date, the card's last line, under its fairway: its words flat (no pill of its own) */
+.wcard--closes { grid-template-rows: 22px 20px 36px 26px; padding-block: var(--sp-5); } /* (its date's line in its padding's room) */
+.wcard .wcard__closes { grid-column: 1 / -1; align-self: end; justify-self: start; display: block; padding: 0; border: 0; background: none; font-size: 13px; text-align: left; }
 .wcard--closed { grid-template-areas: "title title title" "count count count" "fw fw fw"; justify-items: center; text-align: center; }
 /* the fairway, from the tee to the flag, the ball at the share that found a player, 12 under the words (its track 36) */
 .fw { grid-area: fw; align-self: end; position: relative; width: 100%; height: 24px; margin-top: var(--sp-3); }
@@ -92,9 +99,12 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .fw__ball::after { content: ""; position: absolute; left: 2px; top: 3px; width: 3px; height: 3px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
 @keyframes fw-roll { from { left: 14px; transform: rotate(-600deg); } }
 @media (prefers-reduced-motion: reduce) { .fw__ball { animation: none; } }
-/* a phone: the count and the Legendary's words on two clean lines, the chip's words short */
+/* a phone: the title its line's whole width (wrapped, never cut), the state's chip under it beside the Legendary, the
+   count and the Legendary's words on two clean lines under them, the chip's words short */
 @media (max-width: 480px) {
-  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: 22px 36px 36px; column-gap: var(--sp-2); padding: calc(var(--sp-4) + var(--sp-1)); } /* (20 round it) */
+  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: minmax(22px, auto) 26px 36px 36px; grid-template-areas: "legend title title" "legend chip chip" "count count count" "fw fw fw"; column-gap: var(--sp-2); padding: calc(var(--sp-4) + var(--sp-1)); } /* (20 round it) */
+  .wcard__title { white-space: normal; overflow: visible; }
+  .wcard__chip { justify-self: start; align-self: end; }
   .wcard__legend { width: 40px; height: 40px; }
   .wcard__title { font-size: 15px; }
   .wcard__count { font-size: 13px; line-height: 18px; }
@@ -103,13 +113,16 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
   .wcard__count > span { display: block; overflow: hidden; text-overflow: ellipsis; }
   .wcard__who::before { content: none; }
   .wcard__long { display: none; } .wcard__short { display: inline; }
+  .wcard--closes { grid-template-rows: minmax(22px, auto) 26px 36px 36px 44px; } /* (its date on two lines) */
+  .wcard .wcard__closes { font-size: 12px; line-height: 16px; }
+  .wcard--closed { grid-template-rows: 22px 36px 36px; grid-template-areas: "title title title" "count count count" "fw fw fw"; }
 }
-/* a narrow phone: the card a step tighter, so the title and the chip share their line whole */
+/* a narrow phone: the card a step tighter, the chip's words alone */
 @media (max-width: 380px) {
   .wcard { grid-template-columns: 36px minmax(0, 1fr) auto; padding: var(--sp-3); }
   .wcard__legend { width: 36px; height: 36px; }
   .wcard__title { font-size: 14px; }
-  .wcard__chip { padding: 0 7px; } .wcard__chip svg { display: none; } /* (its words alone: the clock's room is the title's) */
+  .wcard__chip { padding: 0 7px; } .wcard__chip svg { display: none; }
 }
 
 /* one toolbar on the gallery's grid: which gnomes at its left edge, the tiers (their prices, once) in its centre, the
@@ -149,21 +162,23 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
   .gbar, .gbar--skel { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "views end" "tiers tiers"; grid-template-rows: 32px 32px; min-height: 72px; }
   .gbar__views { min-width: 0; }
 }
-/* a phone: which gnomes, the look and the search; then the tiers (a shape and a price each, the name said to a
-   screen reader) spread to more filters at the line's end; both lines 36 */
+/* a phone: which gnomes, the look and the search; then the tiers, two by two (a shape, the tier's name and its price
+   each, so a chip says what it is), more filters at the first line's end; each line 36 */
 @media (max-width: 700px) {
-  .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views look search" "tiers tiers tiers"; grid-template-rows: 36px 36px; column-gap: var(--sp-2); min-height: 80px; }
+  .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views look search" "tiers tiers tiers" "tiers tiers tiers"; grid-template-rows: 36px 36px 36px; column-gap: var(--sp-2); min-height: 124px; } /* (the tiers two lines of one track each: in line by line) */
   .gbar__end { display: contents; }
   .gbar__find { grid-area: search; } .gbar__end > .seg--look { grid-area: look; }
-  .gbar__more { grid-area: tiers; justify-self: end; } /* (at the tiers' line's end) */
+  .gbar__more { grid-area: tiers; justify-self: end; align-self: start; } /* (at the tiers' first line's end) */
   .gbar .btn { --h: 36px; }
   .gbar .seg button, .gbar .gbar__end > .seg--look button { min-height: 32px; }
   .gbar__views { justify-self: stretch; display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; }
-  .gbar__tiers { justify-self: stretch; justify-content: flex-start; gap: var(--sp-2); width: calc(100% - 36px - var(--sp-2)); }
-  .gbar__tiers .tierbtn { flex: 1; justify-content: center; }
-  .tierbtn__name { display: none; }
+  .gbar__tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-self: stretch; align-self: stretch; gap: var(--sp-2); width: calc(100% - 36px - var(--sp-2)); }
+  .gbar__tiers .tierbtn { justify-content: center; min-width: 0; white-space: nowrap; }
   .tierbtn { padding: 0 6px 0 5px; }
 }
+/* a narrow phone: the Legendary's name short, so each chip keeps its name and its price on its line */
+.tierbtn__short { display: none; }
+@media (max-width: 380px) { .tierbtn--long .tierbtn__name { display: none; } .tierbtn--long .tierbtn__short { display: inline; } }
 
 /* more filters, unfolded under the toolbar */
 .gfilters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }

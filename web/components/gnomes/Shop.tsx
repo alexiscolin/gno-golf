@@ -23,7 +23,7 @@ import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
 import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchButton, SearchRow, TierChip, TierFilter, useSearch } from "./parts";
-import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
+import { BlankShelf, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
@@ -49,9 +49,11 @@ export interface ShopProps {
   onPlay: (skinId: string) => void;
   /** race a player's ghost */
   onRace: (player: string) => void;
+  /** to the holes, for a round */
+  onRound: () => void;
 }
 
-export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace }: ShopProps) {
+export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace, onRound }: ShopProps) {
   const shop = useMemo(() => makeShop(chain), [chain]);
   const me = account && account.address;
   // the first frame from the sale the menu already read (its panel), when it has: then read again (load)
@@ -159,12 +161,12 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     );
   return (
     <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={theirs || viewing === "mine" ? SHOP_HEAD.page : SHOP_HEAD.eyebrow} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch /> : undefined}>
-      {/* the closing line and the wave in their places from the first frame (ShopFrame), the line's room kept until the
-          sale is read (no room at all when it says no date): nothing moves as they are read */}
-      {!theirs && viewing !== "mine" && closingSlot(c) !== "none" && <ClosesSlot>{c && closingSlot(c) === "line" && <Closes at={c.closesAt} now={now} />}</ClosesSlot>}
-      {!theirs && viewing !== "mine" && !row && <WaveSlot />}
-      {/* the sale in one line, a little fairway: the wave of the moment, or the sale's end (none: no wave yet) */}
-      {!theirs && viewing !== "mine" && line && <SaleLine line={line} />}
+      {/* the wave's card in its place from the first frame (ShopFrame), its closing line's room kept until the sale is
+          read (none when it says no date): nothing moves as they are read */}
+      {!theirs && viewing !== "mine" && !row && <WaveSlot closing={closingSlot(c)} />}
+      {/* the sale in one line, a little fairway: the wave of the moment, or the sale's end (none: no wave yet); the
+          closing date its card's last line */}
+      {!theirs && viewing !== "mine" && line && <SaleLine line={line} closes={c && closingSlot(c) === "line" && <Closes at={c.closesAt} now={now} />} />}
       {/* the player's own: who sees what, and their team to share */}
       {viewing === "mine" && me && mine.length > 0 && (
         <>
@@ -235,7 +237,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       </details>
       {open && c && (
         <GnomeSheet g={open} shop={shop} chain={chain} c={c} account={account} region={region === true} now={now} wallet={wallet} onConnect={onConnect}
-          onClose={() => onView({ who: view.who })} playing={playing} worn={wornSkin} onPlay={onPlay} onTheirs={(who) => onView({ who })} onChanged={mineLoad}
+          onClose={() => onView({ who: view.who })} playing={playing} worn={wornSkin} onPlay={onPlay} onRound={onRound} onTheirs={(who) => onView({ who })} onChanged={mineLoad}
           look={look} onLook={onLook} />
       )}
       {earned && (

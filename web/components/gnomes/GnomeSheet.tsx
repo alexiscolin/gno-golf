@@ -8,7 +8,7 @@
 // sheet's content, never opens another. One gnome, one call (Buy(id)). He
 // is drawn in the look the shop shows (his 3D portrait, or the chain's), the
 // switch under his picture.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Sheet } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
@@ -39,19 +39,27 @@ interface Props {
   /** the gnome played (a skin id): his is "t<id>" */
   playing: string; worn: string | null;
   onPlay: (skinId: string) => void; onTheirs: (owner: string) => void;
+  /** to the holes, for a round (a players' window asks one saved on-chain) */
+  onRound: () => void;
   /** after a buy or an equip: read the player's gnomes again */
   onChanged: () => void;
   /** how he is drawn (the shop's look), and the switch to the other */
   look: Look; onLook: (l: Look) => void;
 }
 
-export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onChanged, look, onLook }: Props) {
+export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onRound, onChanged, look, onLook }: Props) {
   const me = account && account.address;
   const [row, setRow] = useState<GnomeRow | null>(null);
   const [unread, setUnread] = useState(false); // (the gnome's read failed: said, never a Buy greyed out with no reason)
   const [can, setCan] = useState<CanBuy | null>(null);
   const [step, setStep] = useState<Step>({ at: "view" });
   const [ticks, setTicks] = useState({ a: false, b: false });
+  const boxA = useRef<HTMLInputElement>(null), boxB = useRef<HTMLInputElement>(null);
+  // the order button pressed before both boxes: the first one left, brought into view and focused (never ticked for them)
+  const toBox = () => {
+    const el = (!ticks.a ? boxA : boxB).current;
+    if (el) (el.scrollIntoView({ block: "center", behavior: "smooth" }), el.focus({ preventScroll: true }));
+  };
   // the bill's figures, read when the order is reviewed
   const [costs, setCosts] = useState<{ price: number; storage: number; balance: number | null; chainId: string | null; ours: boolean | null } | null>(null);
   // Equip: "" not asked, "busy" in Adena, "done", else what went wrong
@@ -203,6 +211,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
             <div className="gsheet__foot">
               <Button variant="chain" className="btn--wide" disabled={!row || !!why} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
               {why && why.note && <p className="gsheet__fine">{why.note}</p>}
+              {why && why.play && <Button variant="gold" className="btn--wide" onClick={() => (onClose(), onRound())}>Play a round →</Button>}
             </div>
           ) : null}
         </>
@@ -231,8 +240,8 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
             <>
               <dl className="review" aria-label="Your order">{review(order).map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl>
               <p className="legal"><a href={LINKS.terms} target="_blank" rel="noopener noreferrer">Terms of Sale</a> · <a href={LINKS.seller} target="_blank" rel="noopener noreferrer">Seller information (特定商取引法に基づく表記)</a> · <a href={LINKS.privacy} target="_blank" rel="noopener noreferrer">Privacy</a></p>
-              <label className="box"><input type="checkbox" checked={ticks.a} onChange={(e) => setTicks((t) => ({ ...t, a: e.target.checked }))} /><span>{BOX_A}</span></label>
-              <label className="box"><input type="checkbox" checked={ticks.b} onChange={(e) => setTicks((t) => ({ ...t, b: e.target.checked }))} /><span>{BOX_B}</span></label>
+              <label className="box"><input ref={boxA} type="checkbox" checked={ticks.a} onChange={(e) => setTicks((t) => ({ ...t, a: e.target.checked }))} /><span>{BOX_A}</span></label>
+              <label className="box"><input ref={boxB} type="checkbox" checked={ticks.b} onChange={(e) => setTicks((t) => ({ ...t, b: e.target.checked }))} /><span>{BOX_B}</span></label>
               {ticks.a && ticks.b && <Gnokey chain={chain} shop={shop} id={g.id} price={price} />}
               <div className="gsheet__foot">
                 {wrongNet ? (
@@ -242,9 +251,12 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                   <><p className="note note--warn" role="status"><b>{gnot(cost.short)} GNOT</b> to go.</p>
                     <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={GNOT_URL} target="_blank" rel="noopener noreferrer">Get GNOT ↗</a></>
                 ) : (
-                  <Button variant="chain" className="btn--wide" disabled={!ticks.a || !ticks.b} title={ticks.a && ticks.b ? undefined : "Tick both boxes first"} onClick={() => void buy()}>
-                    {orderButton(cost ? cost.most : price)}
-                  </Button>
+                  <>{!(ticks.a && ticks.b) && <p className="gsheet__fine" id="order-ticks" role="status">Tick both boxes above to order</p>}
+                    {/* off, but pressable: a press finds the box left (a disabled button hears nothing) */}
+                    <Button variant="chain" className="btn--wide" aria-disabled={ticks.a && ticks.b ? undefined : true} aria-describedby={ticks.a && ticks.b ? undefined : "order-ticks"}
+                      onClick={() => (ticks.a && ticks.b ? void buy() : toBox())}>
+                      {orderButton(cost ? cost.most : price)}
+                    </Button></>
                 )}
                 <p className="gsheet__fine">{SIGN_NOTE}</p>
               </div>

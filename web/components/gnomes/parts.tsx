@@ -110,7 +110,7 @@ export const BlankCard = () => (
 /** The closing date: a date in UTC (the player's own time on hover and for a screen reader), never a countdown. */
 export function Closes({ at, now }: { at: number; now: number }) {
   return (
-    <p className="closes" title={localDate(at)}>
+    <p className="closes wcard__closes" title={localDate(at)}>
       <span>Sale closes for good on <b aria-label={`${utcDate(at, now)}, ${localDate(at)} your time`}>{utcDate(at, now)}</b>. Unsold gnomes are never made.</span>
     </p>
   );
@@ -119,13 +119,14 @@ export function Closes({ at, now }: { at: number; now: number }) {
 /** The sale's card, the game's front card (title.css): the wave's Legendary in gold on the left, the wave's title in
  *  bold over its count and the Legendary's words, its state's chip at the right of the title (a date, never a
  *  countdown; a phone's shorter), the fairway under them its whole width, the ball rolled from the tee to the share
- *  that found a player (still with reduced motion); the sale's end in words. Its height the slot's (ShopFrame WaveSlot). */
-export function SaleLine({ line }: { line: WaveLine }) {
+ *  that found a player (still with reduced motion); the sale's end in words; the closing date (closes), its last line,
+ *  in the card. Its height the slot's (ShopFrame WaveSlot). */
+export function SaleLine({ line, closes }: { line: WaveLine; closes?: ReactNode }) {
   if (line.at === "closed")
     return <section className="wcard wcard--closed" aria-label="The sale"><b className="wcard__title">{line.title}</b><span className="wcard__count">{line.count}</span></section>;
   const { legend, chip } = line;
   return (
-    <section className="wcard" aria-label="The sale">
+    <section className={`wcard${closes ? " wcard--closes" : ""}`} aria-label="The sale">
       {legend && <span className="wcard__legend" title={legend.words}><img src={thumb(legend.id)} alt="" width={256} height={256} decoding="async" /></span>}
       <b className="wcard__title" aria-hidden="true">{line.title}</b>
       {chip && (
@@ -144,6 +145,7 @@ export function SaleLine({ line }: { line: WaveLine }) {
         <svg className="fw__flag" viewBox="0 0 16 32" aria-hidden="true"><ellipse cx="4" cy="23" rx="4" ry="2" className="fw__cup" /><path d="M4 23V2" className="w__pole" /><path d="M4 2l11 4-11 4z" className="w__flag" /></svg>
         <span className="fw__ball" />
       </span>
+      {closes}
     </section>
   );
 }
@@ -157,10 +159,10 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
       {(["common", "rare", "epic", "legendary"] as const).map((t) => {
         const s = known.get(t);
         return (
-          <Button key={t} size="s" type="button" className={`tier tier--${t} tierbtn`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
+          <Button key={t} size="s" type="button" className={`tier tier--${t} tierbtn${t === "legendary" ? " tierbtn--long" : ""}`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
             aria-label={s ? s.label : tierName(t)}>
             <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[t]}</svg>
-            <span className="tierbtn__name">{tierName(t)}</span>
+            <span className="tierbtn__name">{tierName(t)}</span>{t === "legendary" && <span className="tierbtn__short">Legend</span>}
             {s && s.price > 0 && <span className="tierbtn__price">{gnot(s.price)}<span className="tierbtn__unit"> GNOT</span></span>}
           </Button>
         );

@@ -7,7 +7,6 @@
 // Shop.tsx draws its own head and slots with the same pieces while the chain
 // answers: the same sizes then, nothing moving once the figures come in.
 import "@/app/gnomes.css";
-import type { ReactNode } from "react";
 import { FrontScreen } from "@/components/About";
 import { Button } from "@/components/ui";
 import { BlankCard } from "./parts";
@@ -25,10 +24,9 @@ export const SHOP_HEAD = {
 export const ShopPitch = () => <p className="shop__pitch">{SHOP_HEAD.pitch}</p>;
 /** The shelf while it is read: a page of blank cards, each the size of a card on sale. */
 export const BlankShelf = ({ n = 12 }: { n?: number }) => <ul className="gshelf" aria-busy="true">{Array.from({ length: n }, (_, i) => <li key={i}><BlankCard /></li>)}</ul>;
-/** The closing date's line, its height fixed: where a date is set, or while it is not known (lib/gnomes/shop.ts closingSlot). */
-export const ClosesSlot = ({ children }: { children?: ReactNode }) => <div className="closes-slot">{children}</div>;
-/** The sale's card while it is read: its room, blank (its height fixed: app/gnomes.css .wcard). */
-export const WaveSlot = () => <div className="wcard wcard--skel" aria-hidden="true" />;
+/** The sale's card while it is read: its room, blank (its height fixed: app/gnomes.css .wcard), with its closing line's
+ *  where a date is set, or while it is not known (lib/gnomes/shop.ts closingSlot). */
+export const WaveSlot = ({ closing }: { closing: "line" | "none" | "room" }) => <div className={`wcard wcard--skel${closing === "none" ? "" : " wcard--closes"}`} aria-hidden="true" />;
 /** The toolbar while it is read: its rows' room, blank (their heights fixed: app/gnomes.css .gbar). */
 export const BarSlot = () => <div className="gbar gbar--skel" aria-hidden="true" />;
 
@@ -37,8 +35,7 @@ export const BarSlot = () => <div className="gbar gbar--skel" aria-hidden="true"
 export function ShopSkeleton({ onBack, onAbout, closing, onRetry }: { onBack: () => void; onAbout: () => void; closing: "line" | "none" | "room"; onRetry?: () => void }) {
   return (
     <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.eyebrow} title={SHOP_HEAD.title} dare={<ShopPitch />}>
-      {closing !== "none" && <ClosesSlot />}
-      <WaveSlot />
+      <WaveSlot closing={closing} />
       <BarSlot />
       {onRetry ? <div className="gempty" role="alert"><p>The shop did not load.</p><Button variant="primary" onClick={onRetry}>Try again</Button></div> : <BlankShelf />}
     </FrontScreen>

@@ -92,7 +92,7 @@ async function sheet(key, id, width = 1280) {
   return o;
 }
 const owner = async (/** @type {number} */ id) => JSON.parse(await qg(`Gnome("${id}")`)).owner;
-const button = (/** @type {any} */ b, /** @type {string} */ words) => b.ev(`(() => { const el = [...document.querySelectorAll(".gsheet button, .gsheet a.btn")].find((e) => e.textContent.includes(${JSON.stringify(words)})); return el ? { text: el.textContent, off: el.disabled } : null; })()`);
+const button = (/** @type {any} */ b, /** @type {string} */ words) => b.ev(`(() => { const el = [...document.querySelectorAll(".gsheet button, .gsheet a.btn")].find((e) => e.textContent.includes(${JSON.stringify(words)})); return el ? { text: el.textContent, off: el.disabled || el.getAttribute("aria-disabled") === "true" } : null; })()`);
 const tick = (/** @type {any} */ b) => b.js(`[...document.querySelectorAll(".gsheet .box input")].forEach((i) => { if (!i.checked) i.click(); })`);
 
 // a player with no record, in the players' window: the button says why, off
@@ -100,6 +100,7 @@ for (const width of [390, 1280]) {
   const { b } = await sheet("p0", 5, width);
   const btn = await button(b, "Players first");
   say(!!btn && btn.off, "p0 in the players' window: Buy off, the reason said", btn ? btn.text : "no such button");
+  say(!!(await button(b, "Play a round")), "p0: a round to play, a tap away");
   await shot(b, `sheet-players-only-${width}`);
   b.kill();
 }
@@ -112,6 +113,11 @@ for (const width of [390, 1280]) {
   await sleep(500);
   const off = await button(b, "Order with obligation to pay");
   say(!!off && off.off, "the order button waits for both boxes", off ? off.text : "none");
+  say((await b.ev(`document.querySelector(".gsheet__foot")?.textContent || ""`)).includes("Tick both boxes above to order"), "the footer says why: tick both boxes");
+  await click(b, ".gsheet button", "Order with obligation to pay");
+  await sleep(600);
+  say(await b.ev(`document.activeElement === document.querySelector(".gsheet .box input") && !document.activeElement.checked`), "the order pressed early: the first box focused, never ticked for them");
+  say(!(await b.ev(`document.querySelector(".gsheet h2")?.textContent.includes("Sign in")`)), "nothing sent while a box is unticked");
   await shot(b, "review-1280");
   await tick(b);
   w.next("cancel");
