@@ -62,6 +62,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const [copied, copy] = useCopied();
   const live = useRef(true);
   const capture = useRef<(() => HTMLCanvasElement | null) | null>(null);
+  const gnokey = useRef<HTMLDetailsElement>(null);
   useEffect(() => ((live.current = true), () => void (live.current = false)), []); // (true again on a remount: dev's StrictMode mounts twice)
 
   // the name and note as the chain will keep them, and what the data will be with that name in it
@@ -163,6 +164,11 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
     );
   }
   const off = step.at !== "ready" || !cost;
+  // no Adena: the footer's way to gnokey, its section (above it, in the form's scroll) opened and brought into view
+  const toGnokey = () => {
+    const d = gnokey.current;
+    if (d) (d.open = true, d.scrollIntoView({ block: "nearest", behavior: "smooth" }), d.querySelector("summary")?.focus({ preventScroll: true }));
+  };
   return (
     <main className="pub">
       <section className="pub__hole" aria-label="The hole as players will see it">
@@ -185,16 +191,17 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             <textarea value={draft.note} rows={2} aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
             {note !== draft.note && <small>Kept as: {note}</small>}
           </label>
-          {step.at === "unread" && <Button onClick={() => setTries((n) => n + 1)}>Try again</Button>}
+          {/* what went wrong, then its Try again */}
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
             : step.why && <p className={step.at === "name" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
+          {step.at === "unread" && <Button onClick={() => setTries((n) => n + 1)}>Try again</Button>}
           <dl className="pub__bill">
             <dt>Storage deposit</dt><dd>{aboutGnot(b.deposit)} GNOT</dd>
             <dt>Network fee</dt><dd>{aboutGnot(b.fee)} GNOT</dd>
             <dt>At most</dt><dd><b>{aboutGnot(b.most)} GNOT</b></dd>
           </dl>
           <p className="pub__small">The chain&apos;s price for keeping and checking the hole. Nothing goes to the game.</p>
-          <details className="pub__gnokey">
+          <details className="pub__gnokey" ref={gnokey}>
             <summary>Publish with gnokey instead</summary>
             {command && !off ? (
               <>
@@ -214,7 +221,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
                 : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${aboutGnot(b.most)} GNOT`}</Button>
-                  : <p className="pub__note">No Adena here: publish with gnokey above.</p>}
+                  : <button type="button" className="linkish" onClick={toGnokey}>No Adena here: publish with gnokey above</button>}
         </div>
       </section>
     </main>

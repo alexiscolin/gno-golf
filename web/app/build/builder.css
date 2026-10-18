@@ -386,7 +386,15 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the Hole it step's first words (over its weathers to hole: the HUD's chips, here a card of their own) */
 .tmode__ask .tmode__intro { max-width: 56ch; font-size: 17px; font-weight: 400; line-height: 1.45; text-wrap: pretty; }
 .tmode__sign { display: grid; justify-items: center; gap: var(--sp-3); width: 100%; margin-top: var(--sp-4); padding: var(--sp-5); border: var(--edge); border-radius: var(--r-card); background: var(--white); }
-.tmode__notes .tmode__intro { color: var(--ink); font-weight: 700; }
+/* before the first shot: the step's line and what to know, one strip under the HUD's cards (clear of the lane's middle),
+   faded out once a shot is struck */
+.tmode__strip { position: absolute; top: 104px; left: var(--sp-4); z-index: 1; display: grid; gap: var(--sp-1); width: min(560px, calc(100% - 2 * var(--sp-4))); padding: var(--sp-2) var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: rgba(var(--paper-rgb), .96); color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.35; pointer-events: none; transition: opacity .6s ease, visibility 0s linear .6s; }
+.tbench:not(.tbench--quick) .tmode__strip { top: 196px; } /* (the HUD's cards end at 92 + 16 + 76: 12 under them) */
+.tmode__strip p { margin: 0; }
+.tmode__strip .tmode__intro { font-weight: 700; }
+.tmode__strip--gone { opacity: 0; visibility: hidden; }
+.tmode:has(.tmode__strip:not(.tmode__strip--gone)) .tmode__notes { top: 312px; } /* (a note while the strip is up: under it) */
+@media (prefers-reduced-motion: reduce) { .tmode__strip { transition: none; } }
 .tmode__addr { display: grid; gap: var(--sp-1); text-align: left; font-size: 13px; font-weight: 700; }
 .tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
 
@@ -408,6 +416,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-5); padding: var(--sp-5); }
 .pub__foot { padding: var(--sp-4) var(--sp-5); border-top: var(--rule); background: var(--paper); }
 .pub__foot .btn { margin: 0; width: 100%; }
+.pub__foot > .linkish { display: block; width: 100%; font-size: 14px; text-align: center; } /* (no Adena: the way to gnokey, above) */
 .pub__foot .pub__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (the footer one line, holding the action) */
 .pub__forever a { color: var(--green); font-weight: 700; }
 .pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
@@ -434,7 +443,8 @@ button.issue__why:hover { text-decoration-style: solid; }
 
 /* the big button's reason, in a few words, in a slot of its own width */
 .bhead__slot { flex: none; display: flex; justify-content: flex-end; width: 118px; }
-@media (max-width: 1200px) { .bhead__slot { width: 40px; } .bhead__slot .meter { width: 40px; padding: 0; justify-content: center; } .bhead__slot .meter > span { display: none; } }
+@media (max-width: 1200px) { .bhead__slot { width: 76px; } .bhead__slot .meter { width: 76px; padding: 0 var(--sp-1); justify-content: center; } .bhead__slot .meter > i { display: none; } } /* (narrower: the word kept, the pips go) */
+@media (max-width: 1100px) { .bhead__end { gap: var(--sp-2); } .bhead__next { display: none; } .bhead__act { min-width: 112px; } } /* (the next step's name and its arrow: the header on one line) */
 .bhead__why { width: 100%; text-align: right; font-size: 14px; font-weight: 700; color: var(--hat-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 1200px) { .bhead__why { display: none; } }
 

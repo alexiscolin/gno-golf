@@ -127,7 +127,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
           // the dock's verdict (bench-verdict), and its title
           <Button variant={action.kind} size="m" type="button" keycap={action.key} className={`bhead__act${action.pulse && !action.off ? " btn--pulse" : ""}`}
             aria-disabled={action.off ? true : undefined} aria-describedby={action.off ? "bench-verdict" : undefined} title={action.off || undefined} onClick={() => !action.off && action.onClick()}>
-            {action.text}
+            {/* "Next: " the step it goes to (said in full; a narrow header keeps its arrow alone: builder.css) */}
+            {action.text.startsWith("Next: ") ? <><span className="bhead__next">Next: </span>{action.text.slice(6)}</> : action.text}
           </Button>
         )}
       </div>

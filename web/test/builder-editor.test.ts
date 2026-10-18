@@ -13,6 +13,8 @@ import { placePiece } from "../lib/builder/edit.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
 import { DRAFT_ID, validate } from "../lib/builder/pipeline.ts";
 import type { Issue } from "../lib/builder/checks.ts";
+import { plainOf, two } from "../lib/builder/explain.ts";
+import { pieceName } from "../lib/builder/names.ts";
 
 const garden = await loadPalette("garden");
 const entry = (id: string) => garden.find((e) => e.id === id)!;
@@ -189,3 +191,20 @@ void test("meterFace: measured, measuring, not measurable (said so, never \"meas
   assert.deepEqual(meterFace(false, { of: d, e }, d), { level: null, word: "–", title: "Difficulty: measured once the hole has no error", busy: false });
 });
 
+
+void test("E13 between two pieces of one name: counted, never \"the scarecrow overlaps the scarecrow\", the plural right for every piece", async () => {
+  const say = (text: string) => plainOf({ rule: "E13", text });
+  assert.equal(say("The scarecrow overlaps the scarecrow at (3, 4)"), "Two scarecrows overlap: move one.");
+  assert.equal(say("The sand lies over the sand"), "Two patches of sand lie over each other: move one.");
+  assert.equal(say("The plank crosses the plank"), "Two planks cross: move one.");
+  assert.equal(say("The plank overlaps the rock"), "The plank overlaps the rock: move one of them.");
+  assert.deepEqual(["the bench", "the snowman", "the buoy", "the city", "the stairs", "the wet sand", "the hay bales", "the crevasse", "a piece", "the blinking hand (pulse 2)"].map(two),
+    ["Two benches", "Two snowmen", "Two buoys", "Two cities", "Two sets of stairs", "Two patches of wet sand", "Two sets of hay bales", "Two crevasses", "Two pieces", "Two blinking hands (pulse 2)"]);
+  // every piece of every world: one plural each, never a word doubled or a bare "s" on a plural
+  for (const w of ["garden", "island", "town", "mountain"])
+    for (const e of await loadPalette(w)) {
+      const t = two(pieceName({ entry: e.id }));
+      assert.match(t, /^Two (patches of |sets of )?[a-z ]+[^s ]s$|^Two (patches|sets) of [a-z ]+$|^Two [a-z ]+men$/, `${e.id}: ${t}`);
+      assert.doesNotMatch(t, /(ss|[^aeiou]ys|xs|chs|shs|mans)$/, `${e.id}: ${t}`);
+    }
+});

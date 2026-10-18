@@ -36,6 +36,19 @@ export function explain(sentence: string, counts: Partial<Record<keyof typeof LI
   return Object.hasOwn(plain, s) ? plain[s] : s;
 }
 
+// a piece's name that is ground, not a thing (two of them: two patches), or already a plural (two sets)
+const BOTH: Record<string, string> = { overlaps: "overlap", "stands on": "stand on each other", crosses: "cross", "lies over": "lie over each other", "stands in": "stand in each other" };
+const MASS = /(?:^| )(?:water|dirt|ice|sand|paving|marble)$/, MANY = /[^s]s$/;
+/** Two pieces of one name, counted: "the scarecrow": "Two scarecrows", "the bench": "Two benches", "the snowman": "Two
+ *  snowmen", "the sand": "Two patches of sand", "the stairs": "Two sets of stairs" (a pulse's mark, kept at the end). */
+export function two(name: string): string {
+  const [, n, rest] = /^(?:the |a )?(.+?)( \(pulse \d+\))?$/i.exec(name)!;
+  if (MASS.test(n)) return `Two patches of ${n}${rest ?? ""}`;
+  if (MANY.test(n)) return `Two sets of ${n}${rest ?? ""}`;
+  const many = /man$/.test(n) ? n.replace(/man$/, "men") : /[^aeiou]y$/.test(n) ? n.replace(/y$/, "ies") : /(s|x|z|ch|sh)$/.test(n) ? `${n}es` : `${n}s`;
+  return `Two ${many}${rest ?? ""}`;
+}
+
 /**
  * A check's sentence in the player's words (the GUI spec's B1): what is
  * wrong, named by its pieces, and what to do, without the place in numbers
@@ -52,7 +65,8 @@ export function plainOf(i: Pick<Issue, "rule" | "text">): string {
   if ((r = m(/^The cup cannot be reached from the tee: the (tee is closed in|cup is closed off)$/))) return r[1] === "tee is closed in" ? "The tee is closed in: no way to the cup. Open a way through." : "The cup is closed off: no way from the tee. Open a way through.";
   if (/^The cup cannot be reached from the tee$/.test(t)) return "The ball can't get from the tee to the cup: open a way through.";
   if ((r = m(/^The gap between (.+) and (.+) is ([\d.]+) wide, and the way to the cup goes through it: at least ([\d.]+), .*$/))) return `The way to the cup squeezes between ${r[1]} and ${r[2]} (${r[3]} wide): widen it to at least ${r[4]}.`;
-  if (i.rule === "E13" && (r = m(/^(.+) (overlaps|stands on|crosses|lies over|stands in) (.+)$/))) return `${r[1]} ${r[2]} ${r[3]}: move one of them.`;
+  if (i.rule === "E13" && (r = m(/^(.+) (overlaps|stands on|crosses|lies over|stands in) (.+)$/)))
+    return r[1].toLowerCase() === r[3].toLowerCase() ? `${two(r[1])} ${BOTH[r[2]]}: move one.` : `${r[1]} ${r[2]} ${r[3]}: move one of them.`;
   if ((r = m(/^(.+) is outside the lane: no ball reaches it$/))) return `${r[1]} is outside the lane, where no ball goes: move it in or remove it.`;
   if ((r = m(/^(.+) is ([\d.]+) from (.+): at least ([\d.]+), or the kerb swallows it$/))) return `${r[1]} is too close to ${r[3]} (${r[2]}): leave at least ${r[4]} between them.`;
   if ((r = m(/^(.+) stands in the (.+) round the lane: the world draws over it$/))) return `${r[1]} stands in the ${r[2]} round the lane, drawn over: move it into the lane.`;

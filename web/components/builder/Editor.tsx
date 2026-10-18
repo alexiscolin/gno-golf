@@ -342,7 +342,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? (gl ? "Fix the errors first" : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Hole it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
+        action={proved ? { text: "Publish →", kind: "gold", onClick: () => onPublish(kept) } : { text: "Next: Hole it →", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={meterFace(clean, est, kept)}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)}

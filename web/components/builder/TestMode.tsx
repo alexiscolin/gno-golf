@@ -135,6 +135,9 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
 }) {
   const [id, setId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  // the words for before the first shot (the step's line, the chain unread): one strip under the weathers, gone once a shot is struck
+  const [aside, setAside] = useState("");
+  const [struck, setStruck] = useState(false);
   const [why, setWhy] = useState<Record<string, string>>({});
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [checking, setChecking] = useState(false);
@@ -171,7 +174,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const { rpc, web } = endpoints(window.location.search), alias = `${author}/${draft.slug}`;
     makeChain({ rpc, web }).versions(alias).then(
       (v) => setId(holeId(author, draft.slug, v)),
-      () => (setId(holeId(author, draft.slug, null)), setNote("The chain could not be read: tested as a new hole (v1). If it has versions already, test again once it can be.")),
+      () => (setId(holeId(author, draft.slug, null)), setAside("The chain could not be read: tested as a new hole (v1). If it has versions already, test again once it can be.")),
     );
   }, [author, draft.slug, quick]);
 
@@ -191,6 +194,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   useEffect(() => void (on === null && first !== undefined && setOn(first)), [on, first]);
   const now = kinds.find((k) => k.kind === on) ?? null;
   // the round's time in play: from its game's start (or a play again) to the cup; each weather's proved on this visit (the summary's)
+  useEffect(() => void (snap?.strokes && setStruck(true)), [snap?.strokes]);
   const [took, setTook] = useState<number | null>(null);
   const [times, setTimes] = useState<Record<string, number>>({});
   const since = useRef(0), [tick, setTick] = useState(0);
@@ -289,8 +293,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     : finished({ quick, strokes: holed, kind: now.kind, why: why[now.kind], proveOff });
   const waits = card?.actions.find((a) => a.off)?.off; // (why the way on waits, under it)
   const act: Record<Act, (() => void) | undefined> = { again, edit: onLeave, prove: onProve, publish: onPublish };
-  // the step as it opens (nothing holed yet, no stroke played): its one line over the HUD
-  const opening = !quick && kinds.length > 0 && left.length === kinds.length && !holed && !snap?.strokes;
+  // the step as it opens (no weather holed yet): its one line, in the strip under the HUD until the first shot
+  const opening = !quick && kinds.length > 0 && left.length === kinds.length;
   return (
     <main className={`tmode${quick ? " tmode--quick" : ""}${party ? " tmode--party" : ""}`}>
       {party && <div className="bconfetti" aria-hidden="true">{BITS.map((b, i) => <i key={i} style={{ left: `${b.x}%`, background: b.color, animationDelay: `${b.delay}ms`, ["--drift" as string]: `${b.drift}px`, ["--turn" as string]: `${b.turn}deg` }} />)}</div>}
@@ -321,9 +325,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
           </div>
         )}
       </header>
-      {(snap?.error || lost || note || checking || said || (proved && !now) || opening) && (
+      {(opening || aside) && (
+        <div className={`tmode__strip${struck ? " tmode__strip--gone" : ""}`} role="status" aria-hidden={struck || undefined}>
+          {opening && <p className="tmode__intro">{HOLE_IT}</p>}
+          {aside && <p>{aside}</p>}
+        </div>
+      )}
+      {(snap?.error || lost || note || checking || said || (proved && !now)) && (
         <div className="tmode__notes">
-          {opening && <p className="tmode__note tmode__intro">{HOLE_IT}</p>}
           {snap?.error && <p className="tmode__why" role="alert">{snap.error}</p>}
           {lost && <p className="tmode__why" role="alert">{gone ? "The 3D view did not come back. Reloading brings it back; your draft is kept." : "The browser took the 3D view away for a moment. Bringing it back…"}{gone && <Button variant="primary" onClick={() => window.location.reload()}>Reload</Button>}</p>}
           {note && <p className="tmode__note" role="status">{note}</p>}
@@ -353,7 +362,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
             {card.actions.length > 0 && (
               <div className="banner__row">
                 {card.actions.map((a) => (
-                  <Button key={a.act} variant={a.act === "publish" ? "chain" : a.primary ? "primary" : "secondary"} aria-disabled={a.off ? true : undefined} title={a.off || undefined}
+                  <Button key={a.act} variant={a.act === "publish" ? "gold" : a.primary ? "primary" : "secondary"} aria-disabled={a.off ? true : undefined} title={a.off || undefined}
                     keycap={a.key} onClick={() => !a.off && act[a.act]?.()}>
                     {a.text}
                   </Button>

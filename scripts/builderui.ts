@@ -319,7 +319,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`[...document.querySelectorAll(".bholes button")].find((b) => b.textContent.trim() === "Open").click()`);
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".issue button.issue__why")`)); k++) await sleep(300);
   const well = (await box(c, ".checks"))!, row = await c.js<string>(`document.querySelector(".issue button.issue__why").textContent`);
-  assert.match(row, /overlaps/, "a problem: its plain reason in the dock");
+  assert.match(row, /^Two \w+s overlap: move one\.$/, "a problem: its plain reason in the dock (two of one piece, counted)");
   assert.ok(well.b - well.t > 72, "a problem: the dock opened on it");
   await c.js(`document.querySelector(".issue button.issue__why").click()`);
   await sleep(500);

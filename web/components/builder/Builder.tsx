@@ -138,7 +138,7 @@ export default function Builder() {
         <div className={`tbench tint--${d.world}`}>
           <Header title={d.title} slug={d.slug} author={author} world={d.world} worlds={[d.world]} step="test"
             steps={{ edit: { locked: "", done: true }, test: { locked: "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-            action={proved ? { text: "Publish →", kind: "chain", pulse: true, onClick: publish } : { text: "Back to edit", kind: "secondary", key: "Esc", onClick: edit }}
+            action={proved ? { text: "Publish →", kind: "gold", pulse: true, onClick: publish } : { text: "Back to edit", kind: "secondary", key: "Esc", onClick: edit }}
             history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}} onStep={(s) => (s === "edit" ? edit() : s === "publish" && proved && publish())} onBack={edit} />
           <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} guess={guess} onAuthor={setAuthor} onLeave={edit} onPublish={publish}
             onProof={(p) => update((x) => ({ ...x, proofs: [...x.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }))}

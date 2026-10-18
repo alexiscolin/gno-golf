@@ -124,7 +124,7 @@ try {
 
   // Hole it, under the author's address
   await until(`!document.querySelector(".bhead__end .btn[aria-disabled]")`, "Hole it on");
-  await click(button(/^Hole it$/), "Hole it");
+  await click(button(/^Next: Hole it →$/), "Next: Hole it →");
   // the step opens on its one line, over the weathers to hole, none ticked yet
   await until(`!!document.querySelector(".tmode--ask .tmode__intro")`, "the Hole it step's first page");
   const opens = await c.js<{ line: string; chips: number; done: number }>(`({ line: document.querySelector(".tmode--ask .tmode__intro").textContent, chips: document.querySelectorAll(".tmode--ask .tmode__chip").length, done: document.querySelectorAll(".tmode--ask .tmode__chip--done").length })`);

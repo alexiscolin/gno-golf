@@ -86,98 +86,105 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     setBusy(true);
     void openPublished(chain, host, census, id, author).then(take).finally(() => setBusy(false));
   };
+  const any = drafts.length + elsewhere.length > 0;
+  const fresh = (
+    <section className="bholes__new" aria-labelledby="bholes-new">
+      <div className="bholes__bar">
+        <h2 id="bholes-new" className="bholes__h">Start a new hole</h2>
+        {/* the worlds as tabs, each in its colours with its emblem (the cups' own) */}
+        <div className="bholes__worlds" role="radiogroup" aria-label="Its world">
+          {WORLDS.map((w) => (
+            <button key={w} type="button" role="radio" aria-checked={w === world} className={`bholes__world tint--${w}${w === world ? " on" : ""}`} onClick={() => setWorld(w)}>
+              <Emblem id={w} />{worldName(w)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* the starters are templates, ready-made holes to change; the blank lane one card of the same row, under its own label */}
+      <div className="bholes__starts">
+        {[{ label: "Start from a template", list: starts.filter((s) => s.name !== "blank") }, { label: "Or start blank", list: starts.filter((s) => s.name === "blank") }].map(({ label, list }) => (
+          <section key={label} className={`bholes__set${list[0]?.name === "blank" ? " bholes__set--blank" : ""}`} aria-label={label}>
+            <h3 className="bholes__group">{label}</h3>
+            <ul>
+              {list.map((s) => (
+                <li key={s.name}>
+                  <button type="button" className={`bholes__start${s.name === "blank" ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
+                    <span className={`bholes__map${s.name === "blank" ? " bholes__blank" : ""}`}><HoleMap hole={s.map} className="bholes__svg" /></span>
+                    <b>{s.title}</b>
+                    <span className="bholes__line">{s.line}</span>
+                    <span className="bholes__foot" aria-hidden="true">
+                      <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
+                      <span className="bholes__go">Start <i>→</i></span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+  const mine = (
+    <section className="bholes__mine" aria-labelledby="bholes-mine">
+      <h2 id="bholes-mine" className="bholes__h">Your holes {drafts.length + elsewhere.length > 0 && <small>{drafts.length + elsewhere.length}</small>}</h2>
+      {got && author && got.rows.length > 0 && <BuilderBadges facts={factsOf(got.rows, got.saved, author)} />}
+      {drafts.length + elsewhere.length ? (
+        <ul className="bholes__list">
+          {drafts.map((d, i) => {
+            const st = draftState(d, keys[i] ?? null), h = rowOf(d);
+            return (
+              <li key={i} className="bholes__draft">
+                <span className="bholes__map bholes__map--s"><HoleMap hole={draftMap(d)} className="bholes__svg" /></span>
+                <span className="bholes__name">
+                  <b>{d.title || "A hole with no name yet"}</b>
+                  <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
+                  {/* (published and not tested here since: its line on the chain says it all) */}
+                  {!(h && st.stage === "new") && <span className={`bholes__state bholes__state--${st.stage}`}>{st.word}</span>}
+                  {h && live(h)}
+                  {/* the author's test round, the record to beat while none of theirs is saved */}
+                  {h && got && author && !statsOf(h, got.saved, author).mine && <SaveTestRound chain={chain} proofs={d.proofs} id={h.id} world={d.world} author={author} onSaved={reload} />}
+                </span>
+                <span className="bholes__acts">
+                  <Button size="s" onClick={() => onOpen(i)}>Open</Button>
+                  {h && <a className="linkish" href={playLink(h, keep)}>Play</a>}
+                  <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
+                  <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
+                </span>
+              </li>
+            );
+          })}
+          {/* published from another browser (or the draft deleted): on the chain, opened as its next version */}
+          {elsewhere.map((h) => {
+            const m = maps.get(h.id);
+            return (
+              <li key={h.id} className="bholes__draft">
+                <span className="bholes__map bholes__map--s">{m ? <HoleMap hole={m} className="bholes__svg" /> : <NoMap className="bholes__svg" />}</span>
+                <span className="bholes__name">
+                  <b>{h.name || h.slot}</b>
+                  <small>{worldName(h.world)} · par {h.par}</small>
+                  {live(h)}
+                </span>
+                <span className="bholes__acts">
+                  <a className={buttonClass({ size: "s" })} href={playLink(h, keep)}>Play</a>
+                  <button type="button" className="linkish" disabled={busy} onClick={() => openHole(h.id)}>Open its next version</button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="bholes__none">No hole of yours yet: pick a starter above, it opens ready to play.</p>
+      )}
+    </section>
+  );
   return (
     <div className={`screen worlds front bholes tint--${world}`}>
       <BackButton label="Back to the game" onClick={() => window.location.assign("/")} />
       <div className="worlds__in bholes__in">
         <Workshop />
-        <section className="bholes__new" aria-labelledby="bholes-new">
-          <div className="bholes__bar">
-            <h2 id="bholes-new" className="bholes__h">Start a new hole</h2>
-            {/* the worlds as tabs, each in its colours with its emblem (the cups' own) */}
-            <div className="bholes__worlds" role="radiogroup" aria-label="Its world">
-              {WORLDS.map((w) => (
-                <button key={w} type="button" role="radio" aria-checked={w === world} className={`bholes__world tint--${w}${w === world ? " on" : ""}`} onClick={() => setWorld(w)}>
-                  <Emblem id={w} />{worldName(w)}
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* the starters are templates, ready-made holes to change; the blank lane one card of the same row, under its own label */}
-          <div className="bholes__starts">
-            {[{ label: "Start from a template", list: starts.filter((s) => s.name !== "blank") }, { label: "Or start blank", list: starts.filter((s) => s.name === "blank") }].map(({ label, list }) => (
-              <section key={label} className={`bholes__set${list[0]?.name === "blank" ? " bholes__set--blank" : ""}`} aria-label={label}>
-                <h3 className="bholes__group">{label}</h3>
-                <ul>
-                  {list.map((s) => (
-                    <li key={s.name}>
-                      <button type="button" className={`bholes__start${s.name === "blank" ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
-                        <span className={`bholes__map${s.name === "blank" ? " bholes__blank" : ""}`}><HoleMap hole={s.map} className="bholes__svg" /></span>
-                        <b>{s.title}</b>
-                        <span className="bholes__line">{s.line}</span>
-                        <span className="bholes__foot" aria-hidden="true">
-                          <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
-                          <span className="bholes__go">Start <i>→</i></span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </section>
-        <section className="bholes__mine" aria-labelledby="bholes-mine">
-          <h2 id="bholes-mine" className="bholes__h">Your holes {drafts.length + elsewhere.length > 0 && <small>{drafts.length + elsewhere.length}</small>}</h2>
-          {got && author && got.rows.length > 0 && <BuilderBadges facts={factsOf(got.rows, got.saved, author)} />}
-          {drafts.length + elsewhere.length ? (
-            <ul className="bholes__list">
-              {drafts.map((d, i) => {
-                const st = draftState(d, keys[i] ?? null), h = rowOf(d);
-                return (
-                  <li key={i} className="bholes__draft">
-                    <span className="bholes__map bholes__map--s"><HoleMap hole={draftMap(d)} className="bholes__svg" /></span>
-                    <span className="bholes__name">
-                      <b>{d.title || "A hole with no name yet"}</b>
-                      <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
-                      {/* (published and not tested here since: its line on the chain says it all) */}
-                      {!(h && st.stage === "new") && <span className={`bholes__state bholes__state--${st.stage}`}>{st.word}</span>}
-                      {h && live(h)}
-                      {/* the author's test round, the record to beat while none of theirs is saved */}
-                      {h && got && author && !statsOf(h, got.saved, author).mine && <SaveTestRound chain={chain} proofs={d.proofs} id={h.id} world={d.world} author={author} onSaved={reload} />}
-                    </span>
-                    <span className="bholes__acts">
-                      <Button size="s" onClick={() => onOpen(i)}>Open</Button>
-                      {h && <a className="linkish" href={playLink(h, keep)}>Play</a>}
-                      <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
-                      <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
-                    </span>
-                  </li>
-                );
-              })}
-              {/* published from another browser (or the draft deleted): on the chain, opened as its next version */}
-              {elsewhere.map((h) => {
-                const m = maps.get(h.id);
-                return (
-                  <li key={h.id} className="bholes__draft">
-                    <span className="bholes__map bholes__map--s">{m ? <HoleMap hole={m} className="bholes__svg" /> : <NoMap className="bholes__svg" />}</span>
-                    <span className="bholes__name">
-                      <b>{h.name || h.slot}</b>
-                      <small>{worldName(h.world)} · par {h.par}</small>
-                      {live(h)}
-                    </span>
-                    <span className="bholes__acts">
-                      <a className={buttonClass({ size: "s" })} href={playLink(h, keep)}>Play</a>
-                      <button type="button" className="linkish" disabled={busy} onClick={() => openHole(h.id)}>Open its next version</button>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="bholes__none">No hole of yours yet: pick a starter above, it opens ready to play.</p>
-          )}
-        </section>
+        {/* a returning builder's holes first, above the fold; none yet, the starters first and the empty list's line after */}
+        {any ? <>{mine}{fresh}</> : <>{fresh}{mine}</>}
         {wipe !== null && drafts[wipe] && (
           // the game's own sheet (focus in, Tab kept, Escape, focus back to the row's Delete)
           <Sheet className="confirm" role="alertdialog" label="Delete this hole" onClose={() => setWipe(null)}>
