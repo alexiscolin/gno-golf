@@ -42,6 +42,7 @@ void test("holeRow and testChain: the engine finds the draft's hole and plays it
   assert.equal(Math.floor(c.now() / RULES.periodMs), p);
   assert.equal(await c.holeData(id), hex, "the page's own previews play the same bytes");
   assert.equal(await c.chainId(), "builder", "no takedown list is another chain's");
+  assert.equal(await c.genesis(), "builder", "a hole judged on it (its verdict kept by chain) asks no node: Hole it plays offline");
   assert.equal(c.realm, base.realm);
 });
 
