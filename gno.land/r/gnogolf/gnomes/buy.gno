@@ -175,4 +175,7 @@ func counts(tree *bptree.BPTree, key string) *[len(tiers)]int64 {
 	return c
 }
 
-func windowKey(wave int, buyer address) string { return itoa(int64(wave)) + " " + buyer.String() }
+// windowKey is buyer's row in inWindow for waves[wi]: under the wave's first
+// id, which no other wave shares, not its place in the list, which
+// CancelWave moves.
+func windowKey(wi int, buyer address) string { return itoa(waves[wi].first) + " " + buyer.String() }

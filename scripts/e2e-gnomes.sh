@@ -517,6 +517,18 @@ ok "waves: 209-310, in a minute and a half" "added" test1 "$GN" AddWave 209 310 
 SEND=40000000ugnot no "waves: not yet" "is not on sale yet" p0 "$GN" Buy 209
 no "close: never before a genesis wave yet to open" "a genesis wave starts on" test1 "$GN" SetCloseAt "$((W209 - 30))"
 SEND=36000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
+# a start from a day back to a year ahead, in seconds (one in milliseconds
+# would hold every close after it); a wave yet to open can be withdrawn
+NOW=$(chaintime)
+no "waves: a start in milliseconds" "a wave starts from a day before now to a year after" test1 "$GN" AddWave 311 320 "$((NOW * 1000))" 0
+no "waves: more than a day back" "a wave starts from a day before now to a year after" test1 "$GN" AddWave 311 320 "$((NOW - 86400 - 60))" 0
+no "waves: more than a year ahead" "a wave starts from a day before now to a year after" test1 "$GN" AddWave 311 320 "$((NOW + 366 * 86400))" 0
+ok "waves: 311-320 tomorrow" "added" test1 "$GN" AddWave 311 320 "$((NOW + 86400))" 0
+no "cancel: owner only" "only the owner" p0 "$GN" CancelWave 311
+no "cancel: no such wave" "no wave starts at id 312" test1 "$GN" CancelWave 312
+no "cancel: a wave under way" "a wave is withdrawn only before it opens" test1 "$GN" CancelWave 1
+ok "cancel: 311-320 withdrawn before it opens" "withdrawn" test1 "$GN" CancelWave 311
+is "cancel: its ids in no wave" "Collection().waves has 311" "False" "$(qg 'Collection()' | jf 'str(any(w["first"] == 311 for w in d["waves"]))')"
 commons=$(awk -F'|' '$1>=105 && $1<=207 && $2=="common"{print $1}' "$ROWS" | head -11 | tr '\n' ' ')
 set -- $commons
 is "price: the new wave at the new price" "Gnome(\"$1\").price" "40000000" "$(qg "Gnome(\"$1\")" | jf 'd["price"]')"

@@ -32,7 +32,9 @@ var (
 )
 
 const (
-	maxHours    = 7 * 24         // the longest player window
+	maxHours      = 7 * 24           // the longest player window
+	maxWaveBehind = 24 * 3600        // the furthest back a wave may start, in seconds: a day
+	maxWaveAhead  = 365 * 24 * 3600  // the furthest ahead: a year
 	minPrice    = 1_000_000      // 1 GNOT, the least SetPrice takes
 	maxPrice    = 10_000_000_000 // 10,000 GNOT, the most
 )

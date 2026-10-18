@@ -38,7 +38,7 @@ var (
 	// bptrees, which pack many rows a node: an avl node was measured at
 	// about 2 KB of deposit a row (z_storage_buy)
 	bought   *bptree.BPTree // buyer -> [len(tiers)]int64, for the lifetime cap
-	inWindow *bptree.BPTree // "<wave> <buyer>" -> [len(tiers)]int64, for the player cap
+	inWindow *bptree.BPTree // "<wave's first id> <buyer>" -> [len(tiers)]int64, for the player cap
 	equipped *bptree.BPTree // player -> token id
 )
 

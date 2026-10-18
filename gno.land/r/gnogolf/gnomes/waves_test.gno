@@ -1,6 +1,7 @@
 package gnomes
 
 import (
+	"strings"
 	"testing"
 
 	"gno.land/p/nt/testutils/v0"
@@ -125,4 +126,84 @@ func TestAWaveKeepsItsPrices(cur realm, t *testing.T) {
 	Buy(cross(cur), itoa(first))
 	testing.SetRealm(asUser(alice, ugnot(45_000_000)))
 	Buy(cross(cur), itoa(second))
+}
+
+// The audit's M1: a start in milliseconds (or any far one) was taken, and a
+// wave is never changed: its start then held every genesis close after it,
+// thousands of years off. A wave starts from a day back to a year ahead, in
+// unix seconds, so the close is never held hostage, and the window's end
+// cannot overflow.
+func TestAWaveStartsWithinADayBackAndAYearAhead(cur realm, t *testing.T) {
+	noWave(t, cur)
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "gnomes: a wave starts from a day before now to a year after (unix seconds)",
+		func() { AddWave(cross(cur), 105, 208, now()*1000, 0) }, "milliseconds")
+	SetCloseAt(cross(cur), now()+3600) // the close is the owner's still
+	for name, w := range map[string][2]int64{
+		"a day and a second back":  {now() - maxWaveBehind - 1, 0},
+		"a year and a second on":   {now() + maxWaveAhead + 1, 0},
+		"negative":                 {-1, 0},
+		"its window overflows":     {1<<63 - 3600, maxHours},
+		"the far end of int64":     {1<<63 - 1, 0},
+		"the far end, backwards":   {-1 << 63, 0},
+	} {
+		uassert.ErrorContains(t, addWave(1, 104, w[0], w[1]), "a wave starts from", name)
+	}
+	uassert.Equal(t, 0, len(waves))
+	closeAt = now() + 2*maxWaveAhead
+	urequire.NoError(t, addWave(1, 104, now()-maxWaveBehind, maxHours), "a day back")
+	urequire.NoError(t, addWave(105, 208, now()+maxWaveAhead, maxHours), "a year on")
+}
+
+// A wave yet to open, which nothing could have sold, can be withdrawn: the
+// owner's way back from a wrong start or range. Its ids are free for another
+// wave, and the close it held is free to come forward. A wave under way
+// never is: a buyer may have counted on it.
+func TestAWaveYetToOpenCanBeCancelled(cur realm, t *testing.T) {
+	noWave(t, cur)
+	soon, later := now()+3600, now()+30*24*3600
+	urequire.NoError(t, addWave(1, 104, now(), 0))
+	urequire.NoError(t, addWave(105, 208, later, 0))
+	urequire.NoError(t, addWave(209, 310, soon, 0))
+	testing.SetRealm(asUser(alice, nil))
+	urequire.AbortsContains(t, cur, "only the owner", func() { CancelWave(cross(cur), 105) })
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "gnomes: no wave starts at id 106", func() { CancelWave(cross(cur), 106) })
+	urequire.AbortsContains(t, cur, "gnomes: ids 1 to 104 are on sale since "+dateOf(waves[0].start)+": a wave is withdrawn only before it opens",
+		func() { CancelWave(cross(cur), 1) })
+	urequire.AbortsContains(t, cur, "a genesis wave starts on", func() { SetCloseAt(cross(cur), now()+7*24*3600) })
+
+	CancelWave(cross(cur), 105)
+	uassert.Equal(t, 2, len(waves))
+	uassert.Equal(t, -1, waveAt(105))
+	uassert.Equal(t, int64(209), waves[1].first, "the waves after it follow on")
+	SetCloseAt(cross(cur), now()+7*24*3600) // held by it no more
+	urequire.NoError(t, addWave(105, 150, now(), 0), "its ids free again")
+	testing.SetRealm(asUser(alice, ugnot(priceOf(105))))
+	Buy(cross(cur), "105")
+
+	skip(3600)
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "a wave is withdrawn only before it opens", func() { CancelWave(cross(cur), 209) }, "opened since")
+}
+
+// A wave's player window is counted under its first id, not its place in
+// the list: withdrawing a wave before it never hands a buyer a fresh window.
+func TestAWindowSurvivesAWaveCancelledBeforeIt(cur realm, t *testing.T) {
+	noWave(t, cur)
+	urequire.NoError(t, addWave(105, 208, now()+24*3600, 0))
+	urequire.NoError(t, addWave(1, 104, now(), 48))
+	testing.SetRealm(testing.NewCodeRealm(rules))
+	store.Set(cross(cur), "totals", "pro "+alice.String(), "1")
+	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/gnomes"))
+	for i := 0; i < int(playerCap[0]); i++ {
+		testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
+		Buy(cross(cur), itoa(nthOfTier(0, i)))
+	}
+	testing.SetRealm(asUser(deployer, nil))
+	CancelWave(cross(cur), 105)
+	next := itoa(nthOfTier(0, int(playerCap[0])))
+	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
+	urequire.AbortsContains(t, cur, "the player window takes 3 common a wallet", func() { Buy(cross(cur), next) })
+	uassert.True(t, strings.Contains(CanBuy(alice, next), `"window":{"until":`+itoa(waves[0].playersUntil)+`,"left":{"common":0,`), CanBuy(alice, next))
 }

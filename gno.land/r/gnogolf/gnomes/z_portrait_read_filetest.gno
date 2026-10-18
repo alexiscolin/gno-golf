@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"gno.land/p/nt/testutils/v0"
 	gnomes "gno.land/r/gnogolf/gnomes"
@@ -28,7 +29,7 @@ func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
 	gnomes.SetCloseAt(cross(cur), 4102444800) // (2100: the genesis sells only once its close is set)
-	gnomes.AddWave(cross(cur), 1, 720, 0, 0)
+	gnomes.AddWave(cross(cur), 1, 720, time.Now().Unix(), 0)
 	gnomes.SetMintOpen(cross(cur), true)
 
 	buyer := testutils.TestAddress("buyer")
@@ -78,4 +79,4 @@ func genesis() string {
 // 199 true 8170
 
 // Gas:
-// 1473170687
+// 1473269576

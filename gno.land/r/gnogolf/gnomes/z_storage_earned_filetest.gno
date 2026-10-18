@@ -49,4 +49,4 @@ func main(cur realm) {
 // gno.land/r/test/storedearned: 0
 
 // Gas:
-// 20181226
+// 20185030

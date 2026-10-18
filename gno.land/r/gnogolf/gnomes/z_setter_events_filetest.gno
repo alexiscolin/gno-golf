@@ -5,17 +5,20 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	gnomes "gno.land/r/gnogolf/gnomes"
 )
 
 // The owner's setters emit the events the spec lists for an indexer to
 // follow, named as it names them and with the new value: here the closing
-// date's and the site's.
+// date's, a wave added then withdrawn, and the site's.
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
 	gnomes.SetCloseAt(cross(cur), 4102444800)
+	gnomes.AddWave(cross(cur), 1, 104, time.Now().Unix()+3600, 0)
+	gnomes.CancelWave(cross(cur), 1)
 	gnomes.SetSiteURL(cross(cur), "https://gnogolf.xyz/")
 }
 
@@ -62,6 +65,46 @@ func genesis() string {
 //       {
 //         "key": "at",
 //         "value": "4102444800"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/gnogolf/gnomes"
+//   },
+//   {
+//     "type": "WaveAdded",
+//     "attrs": [
+//       {
+//         "key": "first",
+//         "value": "1"
+//       },
+//       {
+//         "key": "last",
+//         "value": "104"
+//       },
+//       {
+//         "key": "start",
+//         "value": "1234571490"
+//       },
+//       {
+//         "key": "playersUntil",
+//         "value": "1234571490"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/gnogolf/gnomes"
+//   },
+//   {
+//     "type": "WaveCancelled",
+//     "attrs": [
+//       {
+//         "key": "first",
+//         "value": "1"
+//       },
+//       {
+//         "key": "last",
+//         "value": "104"
+//       },
+//       {
+//         "key": "start",
+//         "value": "1234571490"
 //       }
 //     ],
 //     "pkg_path": "gno.land/r/gnogolf/gnomes"
