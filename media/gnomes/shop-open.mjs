@@ -9,8 +9,8 @@
 // footer over nothing that follows it (its Traits there to click); the
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
 // every card's #number in sight however long its name, the cards of a row one height (the shop's, a player's); the toolbar's controls, on each of its
-// lines, as tall as one another, on one top, their words on one baseline; the search open a row of its own under it (over nothing), and More filters open
-// gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card,
+// lines, as tall as one another, on one top, their words on one baseline; the search (in All alone) open a row of its own under it (over nothing),
+// a tier filter and the view selected gold; the picker's collection between its tile and its aim card,
 // one slim row (its thumbnails of one frame, its line on one line, two on a phone, on its button's baseline), its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
 // and the shop never sideways from 360 to 1440 px wide; the shop, the cups and the menu scrolled to their foot clear
 // of the network chip (at 1440, 1024, 390); About's link cards' words on one left edge. Before, the title screen alone: none of
@@ -92,25 +92,25 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   fs.writeFileSync(path.join(OUT, `strip-${TAG}-${w}.png`), Buffer.from(data, "base64"));
   b2.kill();
 }
-// the toolbar: one height, one top and one baseline a line (the views, the tiers, the search, the look, more filters)
+// the toolbar: one height, one top and one baseline a line (the views, the tiers, the search in All; no look switch, no
+// more filters: those are gone from it)
 for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1280, 800, false], [1024, 700, false], [390, 844, true]])) {
   const b = await launch({ width: w, height: h, mobile, touch: mobile });
   await b.send("Page.navigate", { url: APP + "/g/" });
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".gbar .tierbtn")`)); i++) await sleep(500);
   await sleep(1000);
   const bar = [{ name: "the shop's bar", box: ".gbar .seg, .gbar .btn", by: ".gbar" }];
+  // on sale: no search (it is All's), no look switch, no more filters in the bar
+  const lean = await b.ev(`!document.querySelector(".gbar__find, .gbar .seg--look, .gbar__more, .gfilters")`);
+  await b.js(`[...document.querySelectorAll(".gbar__views button")].find((e) => e.textContent.startsWith("All"))?.click(); true`);
+  for (let i = 0; i < 20 && !(await b.ev(`!!document.querySelector(".gbar__find")`)); i++) await sleep(250);
   const off = await b.ev(misaligned(bar));
-  // more filters open: on (gold, as every on control), its box kept, the bar still in line
-  const shut = await b.ev(footprint(".gbar__more"));
-  await b.js(`document.querySelector(".gbar__more").click(); true`);
-  await sleep(300);
-  const on = { box: JSON.stringify(await b.ev(footprint(".gbar__more"))) === JSON.stringify(shut), gold: await b.ev(gold(".gbar__more")), line: await b.ev(misaligned(bar)) };
   // a tier selected and the view chosen: the one selected look (gold), the tier's box kept, the bar in line
   const tier = await b.ev(footprint(".gbar .tierbtn"));
   await b.js(`document.querySelector(".gbar .tierbtn").click(); true`);
   await sleep(300);
   const sel = { box: JSON.stringify(await b.ev(footprint(".gbar .tierbtn"))) === JSON.stringify(tier), gold: await b.ev(gold(".gbar .tierbtn")), view: await b.ev(gold(".gbar__views button.on")), line: await b.ev(misaligned(bar)) };
-  const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
+  const ok = lean && Array.isArray(off) && off.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
   // the search, between the look and more filters: open, a row of its own under the bar, the gallery's width (its
   // container's, whatever the shelf shows), over nothing (the bar's controls where they were), focused, the gallery's
   // spacing under it; Escape shuts it from the field, its ✕ or its icon, the shop kept; left empty it shuts; left
@@ -127,7 +127,7 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
     await sleep(300); };
   const state = `({ row: !!document.querySelector(".gsearch"), shop: !!document.querySelector(".screen.shop .gbar"), text: document.querySelector(".gsearch input")?.value ?? "", field: document.activeElement === document.querySelector(".gsearch input"), icon: document.activeElement === document.querySelector(".gbar__find"), controls: (() => { const id = document.querySelector(".gbar__find")?.getAttribute("aria-controls"); return !id || !!document.getElementById(id); })() })`;
   const before = await b.ev(boxes), closed = await b.ev(state);
-  const order = await b.ev(`[...document.querySelectorAll(".gbar__end > *")].map((e) => e.matches(".seg--look") ? "look" : e.matches(".gbar__find") ? "search" : e.matches(".gbar__more") ? "filters" : "?").join(" ")`);
+  const order = await b.ev(`[...document.querySelectorAll(".gbar__end > *")].map((e) => e.matches(".seg--look") ? "look" : e.matches(".gbar__find") ? "search" : "?").join(" ")`);
   await tap(".gbar__find");
   const find = await b.ev(`(() => { const row = document.querySelector(".gsearch"); if (!row) return null; const r = row.getBoundingClientRect(), box = row.parentElement, s = getComputedStyle(box), c = box.getBoundingClientRect(), next = row.nextElementSibling?.getBoundingClientRect();
     const over = [...document.querySelectorAll(".gbar .seg, .gbar .btn")].filter((e) => { const q = e.getBoundingClientRect(); return q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom; }).length;
@@ -142,14 +142,14 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await tap(".gbar__find"); const back = await b.ev(state);
   await tap(".gbar__find"); const cleared = await b.ev(state);
   const gone = (s) => !s.row && s.shop && s.controls;
-  const checks = { order: order === "look search filters", closed: gone(closed), open: !!find && find.over === 0 && find.under && find.wide && find.gap && opened.field && opened.controls, kept,
+  const checks = { order: order === "search", closed: gone(closed), open: !!find && find.over === 0 && find.under && find.wide && find.gap && opened.field && opened.controls, kept,
     escField: gone(escField) && escField.icon, escClose: gone(escClose), escIcon: gone(escIcon), leftEmpty: gone(leftEmpty), leftQuery: leftQuery.row && leftQuery.text === "zz",
     back: back.row && back.field && back.text === "zz", cleared: gone(cleared) && cleared.icon };
   const found = Object.values(checks).every(Boolean);
   results.push({ w, ok: found });
   console.log(`${found ? "PASS" : "FAIL"} the search at ${w}×${h}: ${order}; its own row under the bar, over nothing, the gallery's width and spacing, the bar unmoved; Escape, leaving it and its icon`, found ? "" : JSON.stringify({ checks, find }));
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ off, on, sel }));
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, on sale without search, look or more filters: ${lean}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ lean, off, sel }));
   // the picker: the collection between the tile and the aim card, at least as wide, one slim row (about a button
   // high): its thumbnails of one size and one frame, its line on one line on a computer (two at most on a phone),
   // the line and its button on one baseline (one middle on a phone); the head whole
