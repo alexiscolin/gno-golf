@@ -2,8 +2,6 @@
 
 ```sh
 scripts/try-local.sh          # start (Ctrl+C stops it all)
-scripts/try-local.sh wave2    # open the gnomes' wave 2 now
-scripts/try-local.sh all      # open every wave now
 scripts/try-local.sh close 30 # bring the genesis sale's closing date forward, to 30 days (then only earlier)
 scripts/try-local.sh rebuild  # build the site again, served without a break
 scripts/try-local.sh down     # clean up after a crash
@@ -38,7 +36,8 @@ Where to click: "Click to start", then "How do we play?": Solo (the cups),
 Duel, "Builder" (on a computer) and "Gnomes", the collection (also
 atop the gnome picker and on the cups screen). `p1` has a
 record (the players' window lets it buy) and a few gnomes; `p0` has
-neither. Wave 1 (the Garden) is on sale, its players' window one hour, and the
+neither. All 720 gnomes are on sale at once, as at launch (one wave), its
+players' window one hour, and the
 genesis sale closes in a year (the realm sells none of the genesis without
 a closing date; `close [days]` brings it forward, to 30 days by default,
 and only ever earlier). `rebuild` builds the site anew with the
@@ -78,8 +77,8 @@ Où cliquer : « Click to start », puis « How do we play? » : Solo (les
 coupes), Duel, « Builder » (sur un ordinateur) et « Gnomes », la
 collection (aussi en haut du choix du gnome et sur l'écran des coupes).
 `p1` a un record (la fenêtre des joueurs le laisse acheter) et quelques
-gnomes ; `p0` n'a ni l'un ni l'autre. La vague 1 (le Jardin) est en vente,
-fenêtre des joueurs d'une heure, et la vente genesis se clôt dans un an
+gnomes ; `p0` n'a ni l'un ni l'autre. Les 720 gnomes sont en vente d'un coup,
+comme au lancement (une seule vague), fenêtre des joueurs d'une heure, et la vente genesis se clôt dans un an
 (le realm ne vend rien de la genesis sans date de fin ; `close [jours]`
 l'avance, à 30 jours par défaut, et ne fait jamais que l'avancer). `rebuild` reconstruit le site avec le code actuel, à
 côté de celui servi, puis les échange d'un coup : la chaîne et les liens ne

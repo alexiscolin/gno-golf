@@ -372,7 +372,7 @@ test("shop: the wave line: the ball at the share that found a player, each tier'
   // the wave card's two lines: its title, then its count (the Legendary's words beside it)
   assert.equal(line.title, "Wave 1 · Garden");
   assert.equal(line.count, "4 of 104 found a player");
-  assert.equal(line.label, "Wave 1, the Garden: 4 of 104 gnomes found a player");
+  assert.equal(line.label, "Wave 1 · the Garden: 4 of 104 gnomes found a player");
   assert.equal(line.share, 4 / 104);
   assert.deepEqual(line.tiers.map((t) => [t.tier, t.found, t.total, t.price]), [["common", 3, 72, 36e6], ["rare", 1, 21, 72e6], ["epic", 0, 10, 336e6], ["legendary", 0, 1, 1296e6]]);
   assert.equal(line.tiers[0].label, "Common, 36 GNOT: 3 of 72 found a player");
@@ -383,17 +383,40 @@ test("shop: the wave line: the ball at the share that found a player, each tier'
   assert.ok(won.at === "open" && won.legend?.words === "The Miller found a player");
 });
 
+test("shop: the launch, every gnome at once (one wave of every world): named by its worlds, its Legendaries counted at the flag", () => {
+  const c = collection({ waves: [{ ...collection().waves[0], last: 720 }] }), at = T0 + 49 * 3600;
+  const line = waveLine(nowRow(c, isSold([1, 104, 208]), entries, at), c, entries, isSold([1, 104, 208]), at)!;
+  assert.ok(line.at === "open");
+  assert.equal(line.title, "All 7 worlds");
+  assert.equal(line.count, "3 of 720 found a player");
+  assert.equal(line.label, "All 7 worlds: 3 of 720 gnomes found a player");
+  assert.deepEqual(line.tiers.map((t) => t.total), [504, 144, 65, 7]);
+  // the first Legendary still waiting stands for them (104 and 208 found a player: 311, the Town's)
+  assert.deepEqual(line.legend, { id: 311, name: "5 of 7 Legendaries", words: "5 of 7 Legendaries wait at the flag" });
+  const fresh = waveLine(nowRow(c, isSold([]), entries, at), c, entries, isSold([]), at)!;
+  assert.ok(fresh.at === "open" && fresh.legend?.words === "7 Legendaries wait at the flag" && fresh.legend.id === 104);
+  const legends = entries.filter((e) => e.tier === "legendary").map((e) => e.id), oneLeft = isSold(legends.slice(0, 6));
+  const last = waveLine(nowRow(c, oneLeft, entries, at), c, entries, oneLeft, at)!;
+  assert.ok(last.at === "open" && last.legend?.words === "1 of 7 Legendaries waits at the flag");
+  const gone = isSold(legends), won = waveLine(nowRow(c, gone, entries, at), c, entries, gone, at)!;
+  assert.ok(won.at === "open" && won.legend?.words === "All 7 Legendaries found a player");
+  // the menu's and the finish card's words, the same name
+  const p = promoOf(nowRow(c, isSold([]), entries, at), c, entries)!;
+  assert.equal(promoWords(p, at).title, "All 7 worlds");
+  assert.equal(promoWords(p, at).line, "720 gnomes, from 36 GNOT");
+});
+
 test("shop: the wave line's edges: none sold, all sold, not started, players first, paused, closed, no wave", () => {
   const c = collection(), all = Array.from({ length: 104 }, (_, i) => i + 1), none = isSold([]);
   const zero = waveLine(nowRow(c, none, entries, T0 + 49 * 3600), c, entries, none, T0 + 49 * 3600)!;
   assert.ok(zero.at === "open" && zero.share === 0 && zero.count === "0 of 104 found a player" && zero.tiers.every((t) => t.found === 0));
   const full = waveLine(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries, isSold(all), T0 + 49 * 3600)!;
   assert.ok(full.at === "soldout" && full.share === 1 && full.count === "All 104 found a player");
-  assert.equal(full.label, "Wave 1, the Garden: all 104 gnomes found a player");
+  assert.equal(full.label, "Wave 1 · the Garden: all 104 gnomes found a player");
   assert.ok(full.tiers.every((t) => t.found === t.total));
   const teaser = waveLine(nowRow(c, none, entries, T0 - 60), c, entries, none, T0 - 60)!;
   assert.ok(teaser.at === "teaser" && teaser.share === 0);
-  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", short: "Opens 18:00 UTC", full: "Wave 1 opens today, 18:00 UTC." });
+  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", short: "Opens 18:00 UTC", full: "Wave 1 · Garden opens today, 18:00 UTC." });
   const players = waveLine(nowRow(c, none, entries, T0 + 60), c, entries, none, T0 + 60)!;
   assert.deepEqual(players.chip, { text: "Players first · until Sun 18:00 UTC", short: "Players first · Sun 18:00 UTC", full: "Players first until Sun 18:00 UTC: save one round on-chain to buy now." });
   const p = collection({ open: false }), paused = waveLine(nowRow(p, none, entries, T0 + 60), p, entries, none, T0 + 60)!;

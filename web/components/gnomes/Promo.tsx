@@ -9,8 +9,7 @@
 import "@/app/gnomes.css";
 import type { ReactNode } from "react";
 import type { Chain } from "@/lib/chain";
-import { gnot, promoWords, type Promo } from "@/lib/gnomes/shop";
-import { worldName } from "@/lib/card";
+import { gnot, promoWords, waveName, type Promo } from "@/lib/gnomes/shop";
 import { know } from "@/lib/gnomes/wear";
 import type { Skin } from "@/lib/scene/gnome";
 import { readSale } from "@/lib/gnomes/promo";
@@ -38,7 +37,7 @@ export const shopLine = (promo: Promo | null | undefined) => `${SHOP_LINE}${prom
  *  the whole collection a tap away; else one slim band that is the gallery's door: the wave's Legendary and three of
  *  its gnomes, one line ("The collection · Wave 1 · Garden · from 36 GNOT"), "See ›". */
 export function CollectionSection({ promo, owned, onOpen }: { promo: Promo | null | undefined; owned: ReactNode; onOpen: () => void }) {
-  const said = promo ? [`Wave ${promo.n}`, promo.home ? worldName(promo.home) : "", promo.from > 0 ? `from ${gnot(promo.from)} GNOT` : ""].filter(Boolean) : ["720 gnomes, each one of a kind"];
+  const said = promo ? [waveName(promo), promo.from > 0 ? `from ${gnot(promo.from)} GNOT` : ""].filter(Boolean) : ["720 gnomes, each one of a kind"];
   const open = () => (sound("blip"), onOpen());
   if (owned) return <section className="gcollect" aria-label="Your gnomes">{owned}<button className="linkish gcollect__all" onClick={open}>See the whole collection →</button></section>;
   const faces: { id: number; tier: Tier }[] = [...(promo?.legendary ? [{ id: promo.legendary.id, tier: "legendary" as const }] : []), ...(promo?.faces || [])];

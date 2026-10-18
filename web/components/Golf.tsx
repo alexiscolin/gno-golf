@@ -719,7 +719,15 @@ export default function Golf() {
         .then((to) => {
           if (cancelled) return;
           if (cfg.play) play();
-          else if (cfg.screen === "shop") (setShopView(cfg.shop), setScreen("shop"));
+          else if (cfg.screen === "shop") {
+            // landed on the shop (its link, a reload): the menu under it in the history, the browser's Back goes there as the shop's does
+            const q = chainQuery(), here = window.location.pathname + window.location.search;
+            q.set("screen", "modes");
+            window.history.replaceState({ screen: "modes" }, "", `/?${q}`);
+            window.history.pushState({ screen: "shop" }, "", here);
+            setShopView(cfg.shop);
+            setScreen("shop");
+          }
           else if (cfg.screen && cfg.screen !== "pick" && !dare) setScreen(cfg.screen);
           else if (cfg.hole || cfg.cup) {
             // a shared link: straight to that hole (a first-time player picks a
@@ -1004,7 +1012,7 @@ export default function Golf() {
   const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string; home: string }[]>([]);
   const [worn, setWorn] = useState<Worn | null>(null);
   const [shopView, setShopView] = useState<ShopView>({});
-  const shopFrom = useRef<Screen>("worlds"); // the screen the shop's Back returns to
+  const shopFrom = useRef<Screen>("modes"); // the screen the shop's Back returns to: the menu, unless opened from another
   const gnomeNow = useRef(gnome);
   gnomeNow.current = gnome;
   useEffect(() => void (SHOP && region === null && shopInRegion().then(setRegion)), [screen]); // eslint-disable-line react-hooks/exhaustive-deps -- (asked while unanswered)
@@ -1045,7 +1053,7 @@ export default function Golf() {
   }, [dare]);
   const openShop = (v: ShopView = {}) => {
     if (!shopOn) return; // (no door to the shop where it is not offered, nor before the region has answered)
-    if (screen !== "shop") shopFrom.current = screen === "title" ? "worlds" : screen;
+    if (screen !== "shop") shopFrom.current = screen === "title" ? "modes" : screen;
     setShopView(v);
     setScreen("shop");
   };

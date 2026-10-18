@@ -1,9 +1,9 @@
 // scripts/try-local.sh's commands on a playground running, in a copy of the
 // script beside a stand-in node (its /status) and gnokey (what the realm
 // says): "rebuild" keeps the build served and the new one alone, its numbers
-// only growing; "all" says which waves opened and fails on a refusal other
-// than "already in a wave"; "close" writes the date in seed.env; and no
-// command goes on when the chain does not answer.
+// only growing; "close" writes the date in seed.env; no command goes on when
+// the chain does not answer; the waves' commands are gone (the launch opens
+// every gnome at once).
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -75,29 +75,6 @@ void test("try-local rebuild: the build served and the new one kept, nothing els
   }
 });
 
-void test("try-local all: says each wave opened, keeps quiet on those open already, fails on any other refusal", async () => {
-  const { s, rpc } = await node();
-  try {
-    // the realm: wave 1 open already, wave 4 refused for another reason, the rest opened
-    const says = `case "$*" in *"-args 1 "*) echo 'Error: "gnomes: ids 1 to 104 are in a wave already"';; *"-args 312 "*) echo 'Error: "gnomes: at most 64 waves"';; *) echo "OK!";; esac`;
-    const p = playground(rpc, says);
-    const r = await p.run("all");
-    assert.notEqual(r.code, 0, r.out);
-    assert.match(r.out, /wave 2 \(105-208\) on sale/);
-    assert.match(r.out, /wave 7 \(619-720\) on sale/);
-    assert.match(r.out, /wave 4.*at most 64 waves/);
-    assert.doesNotMatch(r.out, /in a wave already/);
-    assert.equal(p.calls().split("\n").filter((l) => l.includes("AddWave")).length, 7);
-    assert.match(p.calls(), new RegExp(`-args 105 -args 208 -args ${NOW} -args 48`));
-    // all open already: nothing to do, no failure
-    const q = playground(rpc, `echo 'Error: "gnomes: ids 1 to 104 are in a wave already"'`);
-    const all = await q.run("all");
-    assert.equal(all.code, 0, all.out);
-  } finally {
-    s.close();
-  }
-});
-
 void test("try-local close: the date set on the chain and in seed.env; no command goes on when the chain does not answer", async () => {
   const { s, rpc } = await node();
   const p = playground(rpc, 'echo "OK!"');
@@ -109,10 +86,13 @@ void test("try-local close: the date set on the chain and in seed.env; no comman
   } finally {
     s.close();
   }
-  for (const cmd of [["close", "10"], ["wave2"], ["all"]]) {
-    const r = await p.run(...cmd);
-    assert.notEqual(r.code, 0, cmd.join(" "));
-    assert.match(r.out, /chain/i, cmd.join(" "));
+  const gone = await p.run("close", "10");
+  assert.notEqual(gone.code, 0);
+  assert.match(gone.out, /chain/i);
+  for (const cmd of ["wave2", "all"]) {
+    const r = await p.run(cmd);
+    assert.notEqual(r.code, 0, cmd);
+    assert.match(r.out, /usage/, cmd);
   }
-  assert.doesNotMatch(p.calls(), /AddWave/, "nothing sent once the chain is gone");
+  assert.doesNotMatch(p.calls(), /AddWave/, "no wave sent from here");
 });

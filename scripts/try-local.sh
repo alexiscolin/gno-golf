@@ -5,8 +5,6 @@
 # server. Ctrl+C stops everything. docs/try-local.md says what to try.
 #
 #   scripts/try-local.sh          start it all (a new chain each time)
-#   scripts/try-local.sh wave2    open the gnomes' wave 2 now, on the chain running
-#   scripts/try-local.sh all      open every wave not yet open, now (testing only)
 #   scripts/try-local.sh close [days]  bring the genesis's closing date forward, to days from now (30);
 #                                 it is a year off at start
 #   scripts/try-local.sh rebuild  build the site again from this checkout and swap it in, the chain and the
@@ -17,8 +15,8 @@
 # toolchain's) and deploys physics, course, weblink, jsonq, store, golf/v2 and
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
 # genesis series, its closing date a year off (the realm sells none of the
-# genesis without one: "close" brings it forward), wave 1 open (its players'
-# window an hour); community publishing open; the treasury moved to a test key; p1 and
+# genesis without one: "close" brings it forward), the whole genesis on sale
+# in one wave, as at launch (its players' window an hour); community publishing open; the treasury moved to a test key; p1 and
 # b1 with a record and a few gnomes; all the course, the four classic cups
 # and the Crystal Mines. Then the site built as the real one is (next build:
 # no dev server's compiles or reloads over a proxied link), with the shop,
@@ -57,7 +55,7 @@ GNOKEY=${GNOKEY:-$toolchain/gnokey}
 PREVIEW=${TAILNET_PREVIEW:-$HOME/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh}
 NAME=gnogolf-try # the Serve entries' name in tailnet-preview
 cache=${XDG_CACHE_HOME:-$HOME/.cache}/gnogolf-try-local
-last=$cache/last # the WORK of the playground running, for `wave2` and `down`
+last=$cache/last # the WORK of the playground running, for its commands
 log() { printf '%s\n' "$*" >&2; }
 die() { log "try-local: $*"; exit 1; }
 # shellcheck source=lib/e2e.sh
@@ -109,38 +107,7 @@ owner() {
 	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$TXOUT" | tail -1)
 	return 1
 }
-# a wave of data/gnomes.json (index from 0) on sale from NOW, its players' window as the catalogue says
-open_wave() {
-	local first lastid hours
-	read -r first lastid hours < <(python3 -I -c 'import json,sys; s=json.load(open(sys.argv[1]))["series"][0]; w=s["plan"][int(sys.argv[2])]; print(w["first"], w["last"], s["sale"]["playerWindowHours"])' "$root/data/gnomes.json" "$1")
-	owner AddWave "$first" "$lastid" "$NOW" "$hours" || return 1
-	log "try-local: wave $(($1 + 1)) ($first-$lastid) on sale from now, its players' window ${hours} h"
-}
-
 case "${1:-}" in
-wave2)
-	running
-	chainnow
-	open_wave 1 || die "wave 2 was refused: $REFUSED"
-	exit 0
-	;;
-all)
-	# every wave not yet open, now: a wave open already is left as it is; any other refusal fails the command
-	running
-	chainnow
-	n=$(python3 -I -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["series"][0]["plan"]))' "$root/data/gnomes.json")
-	failed=0 already=0
-	for k in $(seq 0 $((n - 1))); do
-		open_wave "$k" && continue
-		case $REFUSED in
-		*"in a wave already"*) already=$((already + 1)) ;;
-		*) log "try-local: wave $((k + 1)) was refused: $REFUSED" && failed=$((failed + 1)) ;;
-		esac
-	done
-	log "try-local: $already of $n waves were open already"
-	[ "$failed" = 0 ] || die "$failed refused"
-	exit 0
-	;;
 close)
 	running
 	days=${2:-30}
@@ -171,7 +138,7 @@ down)
 	exit 0
 	;;
 "") ;;
-*) die "usage: scripts/try-local.sh [wave2|all|close [days]|rebuild|down]" ;;
+*) die "usage: scripts/try-local.sh [close [days]|rebuild|down]" ;;
 esac
 
 # a port listened on, on any address (netstat sees tailscaled's own too, which lsof run as a user does not)
@@ -221,7 +188,7 @@ MNEMONIC_p1=$("$GNOKEY" generate 2>/dev/null | tail -1) MNEMONIC_p0=$("$GNOKEY" 
 [ "$(printf %s "$MNEMONIC_p1" | wc -w)" -ge 12 ] && [ "$(printf %s "$MNEMONIC_p0" | wc -w)" -ge 12 ] || die "gnokey generate made no seed phrase"
 log "try-local: a local chain ($CHAINID), the realms under $NS and the course's 90 holes (a few minutes; its log: $WORK/seed.log)"
 MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
-	SEED=1 SEED_WAVE2=0 SEED_CLOSE=365 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
+	SEED=1 SEED_LAUNCH=1 SEED_CLOSE=365 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
 	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT \
 	bash "$root/scripts/e2e-gnomes.sh" >"$WORK/seed.out" 2>"$WORK/seed.log" ||
 	{ DEV_PID=$(sed -n 's/^DEV_PID=//p' "$WORK/seed.env" 2>/dev/null); tail -5 "$WORK/seed.log" >&2; die "the seed failed (its steps: $WORK/e2e.md)"; }
@@ -312,9 +279,9 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
     4. The region gate: add ?geo=blocked to the gnomes' page (/g/?geo=blocked).
     5. The Builder: the "Builder" card on a computer (a phone gets the
        community holes to play): the three hints (again with "?"), make a hole,
-       Test it (hole it in each weather), Publish.
+       Play it (hole it in each weather), Publish.
     6. Find it: Solo, the cups screen's "Community holes", under the cups.
-  Wave 2 on sale now:  scripts/try-local.sh wave2   (every wave: all; a closing date: close [days])
+  The genesis's closing date nearer:  scripts/try-local.sh close [days]
   This checkout's changes in, the site running all along:  scripts/try-local.sh rebuild
   Logs: $WORK   Ctrl+C stops everything (after a crash: scripts/try-local.sh down).
 ================================================================================

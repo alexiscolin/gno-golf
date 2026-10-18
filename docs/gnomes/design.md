@@ -472,7 +472,7 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   "seed": "gnogolf/genesis/1", "released": false,
   "sale": { "prices": { "common": 36, "rare": 72, "epic": 336, "legendary": 1296 },
             "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1, "legendary": 1 },
-            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 }, "nextWaveWhenSold": 0.7 } }
+            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 }, "launch": "all" } }
 ```
 
 - **Waves are id ranges.** `planSeries` lays each wave out as one run of
@@ -500,7 +500,11 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   user's decisions: prices in GNOT, every tier at a fixed price (golf's
   numbers, ADR-007; no auction), the player window
   (wallets with a record in `store` first), its caps, the lifetime caps,
-  and when to open the next wave. The realm's owner changes them between
+  and how it opens: `"launch": "all"`, the user's call (2026-10-18), every
+  gnome at once, in one wave of all the series' ids (`AddWave 1 720`), its
+  player window first. The waves above stay the catalogue's layout (each
+  world's run of ids, its art); the realm still takes waves of any range,
+  for a later series. The realm's owner changes them between
   waves, never during one, and never lower on what is on sale. Nothing in the client
   reads them as truth: the realm's `Collection()` is.
 - **A new drop is data, not code.** Add a series to `series.json` (its

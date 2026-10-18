@@ -52,7 +52,7 @@
 # this machine), CHAINID (dev), WORK (a
 # new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
 # end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WAVE2=0 adds
-# no wave 2, SEED_WORLDS publishes every course hole of those worlds too
+# no wave 2, SEED_LAUNCH=1 opens the whole genesis in wave 1 (the launch: no wave 2), SEED_WORLDS publishes every course hole of those worlds too
 # ("garden island": garden/3 alone by default), SEED_CLOSE sets the closing
 # date that many days off (30; more than 2 with wave 2, which starts before
 # it; never none: the genesis is not sold without one), SEED_PUBLISHING=1 opens
@@ -375,6 +375,8 @@ if [ "${SEED:-}" = 1 ]; then
 		is "seed: $k holes garden/3 (a record)" "store.Has(\"totals\",\"assisted <$k>\")" "true" "$(recorded "$a")"; must
 	done
 	NOW=$(chaintime)
+	# (SEED_LAUNCH=1: the launch, as the series' sale says it (launch all): one wave of every id, no wave 2)
+	[ "${SEED_LAUNCH:-}" = 1 ] && W1L=$(pl -1 "['last']") SEED_WAVE2=0
 	ok "seed: wave 1 ($W1F-$W1L) open, 1 h player window" "added" test1 "$GN" AddWave "$W1F" "$W1L" "$((NOW - 60))" 1; must
 	W1UNTIL=$((NOW - 60 + 3600)) W2AT=$((NOW + 2 * 86400))
 	if [ "${SEED_WAVE2:-1}" = 1 ]; then

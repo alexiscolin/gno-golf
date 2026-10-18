@@ -167,7 +167,12 @@ const waveOf = (c: Collection, id: number) => c.waves.find((w) => id >= w.first 
 
 // ------------------------------------------------------------ the sale's life (A9)
 type Some = Pick<Listed, "id" | "tier" | "home">;
-export interface WaveInfo { n: number; row: WaveRow; home: Home | ""; size: number; sold: number }
+/** home: its one world's ("": several, the launch's every world at once: worlds says how many) */
+export interface WaveInfo { n: number; row: WaveRow; home: Home | ""; worlds: number; size: number; sold: number }
+/** A wave's name: "Wave 2 · Island" (the, "Wave 2 · the Island"), a wave of several worlds by how many ("All 7 worlds":
+ *  the launch, every gnome at once). */
+export const waveName = (w: Pick<WaveInfo, "n" | "home" | "worlds">, the = false) =>
+  w.home ? `Wave ${w.n} · ${(the ? theWorld : worldName)(w.home)}` : w.worlds > 1 ? `All ${w.worlds} worlds` : `Wave ${w.n}`;
 /** The gallery's "now" row: closed (made and never made: the genesis closed, no later series' wave), or the wave
  *  of the moment (the last started, else the next: a teaser) and what it is at, with the next wave once it is sold out. */
 export type Now =
@@ -181,8 +186,8 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
   const waves = c.waves.map((w, i) => [w, i + 1] as const).filter(([w]) => !closedOut(c, w.first));
   if (genesis && genesis.closed && !waves.length) return { at: "closed", closesAt: c.closesAt, made: genesis.sold, never: genesis.last - genesis.first + 1 - genesis.sold };
   const info = (n: number): WaveInfo => {
-    const row = c.waves[n - 1], ids = entries.filter((e) => e.id >= row.first && e.id <= row.last);
-    return { n, row, home: entries.find((e) => e.id === row.first)?.home || "", size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
+    const row = c.waves[n - 1], ids = entries.filter((e) => e.id >= row.first && e.id <= row.last), homes = new Set(ids.map((e) => e.home));
+    return { n, row, home: homes.size === 1 ? ids[0].home : "", worlds: homes.size, size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
   };
   const started = waves.filter(([w]) => w.start <= now).pop();
   if (!started) {
@@ -218,20 +223,28 @@ export function waveLine(row: Now, c: Collection, entries: readonly Pick<Listed,
     const of = inWave.filter((e) => e.tier === tier), found = of.filter((e) => sold(e.id)).length, price = wave.row.prices[tierIndex(c, tier)] ?? 0;
     return { tier, found, total: of.length, price, label: `${label(tier)}${price > 0 ? `, ${gnot(price)} GNOT` : ""}: ${found} of ${of.length} found a player` };
   }).filter((t) => t.total > 0);
-  const legend = inWave.find((e) => e.tier === "legendary"), until = utcDate(wave.row.playersUntil, now, true), opens = utcDate(wave.row.start, now, true);
+  const legends = inWave.filter((e) => e.tier === "legendary"), waiting = legends.filter((e) => !sold(e.id)), until = utcDate(wave.row.playersUntil, now, true), opens = utcDate(wave.row.start, now, true);
   // (short: a phone's, the day said only when it is not today's)
   const bare = (s: string) => s.replace(/^today, /, "");
-  const chip = row.at === "teaser" ? { text: `Opens ${opens}`, short: `Opens ${bare(opens)}`, full: `Wave ${wave.n} opens ${opens}.` }
+  const chip = row.at === "teaser" ? { text: `Opens ${opens}`, short: `Opens ${bare(opens)}`, full: `${waveName(wave)} opens ${opens}.` }
     : row.at === "players" ? { text: `Players first · until ${until}`, short: `Players first · ${bare(until)}`, full: `Players first until ${until}: save one round on-chain to buy now.` }
     : row.at === "paused" ? { text: "Paused for a moment", short: "Paused", full: "Paused for a moment: the sale picks up where it stopped." } : null;
   return {
     at: row.at, n: wave.n, chip, tiers,
-    title: `Wave ${wave.n}${wave.home ? ` · ${worldName(wave.home)}` : ""}`,
+    title: waveName(wave),
     count: `${wave.size && wave.sold >= wave.size ? `All ${wave.size}` : `${wave.sold} of ${wave.size}`} found a player`,
-    label: `Wave ${wave.n}${wave.home ? `, ${theWorld(wave.home)}` : ""}: ${wave.size && wave.sold >= wave.size ? `all ${wave.size}` : `${wave.sold} of ${wave.size}`} ${plural("gnome", wave.size)} found a player`,
+    label: `${waveName(wave, true)}: ${wave.size && wave.sold >= wave.size ? `all ${wave.size}` : `${wave.sold} of ${wave.size}`} ${plural("gnome", wave.size)} found a player`,
     share: wave.size ? Math.min(1, wave.sold / wave.size) : 0,
-    legend: legend ? { id: legend.id, name: legend.name, words: `${legend.name} ${sold(legend.id) ? "found a player" : "waits at the flag"}` } : null,
+    // (the launch's several: the first still waiting stands for them, the words their count)
+    legend: legends.length > 1 ? legendsWords(legends.length, waiting.length, (waiting[0] ?? legends[0]).id)
+      : legends[0] ? { id: legends[0].id, name: legends[0].name, words: `${legends[0].name} ${sold(legends[0].id) ? "found a player" : "waits at the flag"}` } : null,
   };
+}
+
+/** Several Legendaries at the flag, in words that start with their name (the card bolds it): "5 of 7 Legendaries wait at the flag". */
+function legendsWords(all: number, waiting: number, id: number) {
+  const name = waiting === all ? `${all} Legendaries` : waiting ? `${waiting} of ${all} Legendaries` : `All ${all} Legendaries`;
+  return { id, name, words: `${name} ${waiting ? (waiting === 1 ? "waits at the flag" : "wait at the flag") : "found a player"}` };
 }
 
 // ------------------------------------------------------------ the collection on the game's screens
@@ -243,6 +256,7 @@ export interface Promo {
   at: "open" | "players" | "paused" | "teaser";
   n: number;
   home: Home | "";
+  worlds: number;
   size: number;
   sold: number;
   /** ugnot: the lowest price of the tiers the wave holds (0: none above 0, no price said) */
@@ -260,7 +274,7 @@ export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, 
   const priceOf = (t: string) => row.prices[tierIndex(c, t)] ?? 0, legend = inWave.find((e) => e.tier === "legendary");
   const prices = [...new Set(inWave.map((e) => e.tier))].map(priceOf).filter((p) => p > 0);
   return {
-    at: shown.at, n: shown.wave.n, home: shown.wave.home, size: shown.wave.size, sold: shown.wave.sold,
+    at: shown.at, n: shown.wave.n, home: shown.wave.home, worlds: shown.wave.worlds, size: shown.wave.size, sold: shown.wave.sold,
     from: prices.length ? Math.min(...prices) : 0, start: row.start, playersUntil: row.playersUntil,
     legendary: legend ? { id: legend.id, name: legend.name, price: priceOf("legendary") } : null,
     faces: (["epic", "rare", "common"] as const).flatMap((t) => inWave.filter((e) => e.tier === t).slice(0, 1).map((e) => ({ id: e.id, tier: t }))),
@@ -269,7 +283,7 @@ export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, 
 /** A promo in words: its title ("Wave 1 · the Garden"), what it holds ("104 gnomes, from 36 GNOT") and where it is. */
 export function promoWords(p: Promo, now: number) {
   return {
-    title: `Wave ${p.n}${p.home ? ` · ${theWorld(p.home)}` : ""}`,
+    title: waveName(p, true),
     line: `${p.size} ${plural("gnome", p.size)}${p.from > 0 ? `, from ${gnot(p.from)} GNOT` : ""}`,
     state: p.at === "teaser" ? `Opens ${utcDate(p.start, now, true)}` : p.at === "paused" ? "Paused for a moment"
       : p.at === "players" ? `Players first until ${utcDate(p.playersUntil, now, true)}` : `${p.sold} of ${p.size} found a player`,

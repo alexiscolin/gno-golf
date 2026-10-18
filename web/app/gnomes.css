@@ -77,7 +77,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
    gallery's width, 720 at most, compact: the wave's Legendary on the left, its title with the state's chip at its
    right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
    (fixed tracks: the slot while it is read is the same room) */
-.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 24px 22px 48px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: var(--sp-1) var(--sp-4); padding: var(--sp-6); color: var(--ink); font-style: normal; text-align: left; } /* (32 round its words) */
+.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: var(--sp-4) var(--sp-5); color: var(--ink); font-style: normal; text-align: left; } /* (16 above and under its words, 24 at its sides) */
 .wcard__legend { grid-area: legend; align-self: center; width: 48px; height: 48px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
 .wcard__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
 .wcard__title { grid-area: title; min-width: 0; font-size: 17px; font-weight: 800; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -89,10 +89,10 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .wcard__chip svg { width: 14px; height: 14px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
 .wcard__short { display: none; }
 /* the sale's closing date, the card's last line, under its fairway: its words flat (no pill of its own) */
-.wcard--closes { grid-template-rows: 24px 22px 48px 34px; } /* (its date's line in its padding's room) */
+.wcard--closes { grid-template-rows: 22px 20px 36px 26px; } /* (its date's line in its padding's room) */
 .wcard .wcard__closes { grid-column: 1 / -1; align-self: end; justify-self: start; display: block; padding: 0; border: 0; background: none; font-size: 13px; text-align: left; }
 .wcard--closed { grid-template-areas: "title title title" "count count count" "fw fw fw"; justify-items: center; text-align: center; }
-/* the fairway, from the tee to the flag, the ball at the share that found a player, 24 under the words (its track 48) */
+/* the fairway, from the tee to the flag, the ball at the share that found a player, 12 under the words (its track 36) */
 .fw { grid-area: fw; align-self: end; position: relative; width: 100%; height: 24px; margin-top: var(--sp-3); }
 .fw__lane { position: absolute; left: 0; right: 0; top: 2px; height: 20px; border: var(--edge); border-radius: var(--pill); background: var(--turf); overflow: hidden; }
 /* the way rolled, tee to ball, a deeper green: the share sold reads at a glance (no stripes: never a loader's) */
