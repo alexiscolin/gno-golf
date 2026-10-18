@@ -16,7 +16,7 @@ import { worldName } from "@/lib/builder/rules";
 import { Button } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import { makeChain } from "@/lib/chain";
-import { authorOf, cupsLink, endpoints, holeByline, knownAuthor, listHoles, playLink } from "@/lib/builder/holes";
+import { authorOf, cupsLink, endpoints, holeByline, knownAuthor, listHoles, menuLink, playLink } from "@/lib/builder/holes";
 import { knownOnly } from "@/lib/community";
 import { isFresh, statsLine, statsOf } from "@/lib/builder/rewards";
 import { NO_TAKEN, takedownOf } from "@/lib/takedown";
@@ -60,7 +60,7 @@ export default function PhoneBuilder() {
   };
   return (
     <div className="screen worlds front bphone tint--garden">
-      <BackButton label="Back to the game" onClick={() => window.location.assign("/")} />
+      <BackButton label="Back to the game" onClick={() => window.location.assign(menuLink(keep))} />
       <div className="worlds__in bphone__in">
         <div className="front__head">
           <span className="eyebrow">The Builder</span>

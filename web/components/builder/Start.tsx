@@ -23,7 +23,7 @@ import { draftFile, fromFile, openPublished, type Opened } from "@/lib/builder/i
 import { census } from "@/lib/builder/drawn";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
-import { endpoints, playLink } from "@/lib/builder/holes";
+import { endpoints, menuLink, playLink } from "@/lib/builder/holes";
 import { proofKey } from "@/lib/builder/proof";
 import { FIELD, weatherName, worldName } from "@/lib/builder/rules";
 import { factsOf, isFresh, statsLine, statsOf, versusLine, type HoleStats } from "@/lib/builder/rewards";
@@ -186,7 +186,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   );
   return (
     <div className={`screen worlds front bholes tint--${world}`}>
-      <BackButton label="Back to the game" onClick={() => window.location.assign("/")} />
+      <BackButton label="Back to the game" onClick={() => window.location.assign(menuLink(keep))} />
       <div className="worlds__in bholes__in">
         <Workshop />
         {/* a returning builder's holes first, above the fold; none yet, the starters first and the empty list's line after */}

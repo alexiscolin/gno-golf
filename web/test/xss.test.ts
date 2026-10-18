@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { isAddress } from "../lib/chain.ts";
-import { cupsLink, playLink } from "../lib/builder/holes.ts";
+import { cupsLink, menuLink, playLink } from "../lib/builder/holes.ts";
 import type { HoleRow } from "../lib/types.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
@@ -52,4 +52,6 @@ void test("a link to a community hole: its id or alias encoded, a hostile one st
   assert.doesNotMatch(link.slice("/?hole=".length).replace(/&rpc=x$/, ""), /[<>"'#?&: ]/, "nothing of it unencoded");
   assert.equal(new URL(link, "https://gnogolf.example").searchParams.get("hole"), evil, "read back as it was: text");
   assert.equal(cupsLink(), "/?screen=cups");
+  assert.equal(menuLink(), "/?screen=modes", "the Builder's Back: the menu, not the title");
+  assert.equal(menuLink("rpc=x"), "/?screen=modes&rpc=x");
 });

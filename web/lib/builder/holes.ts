@@ -26,6 +26,8 @@ export function listHoles(rows: readonly HoleRow[], me: string | null, taken: Re
 export const playLink = (h: HoleRow, keep = "") => `/?hole=${encodeURIComponent(h.slot || h.id)}${keep && `&${keep}`}`;
 /** The game's cups screen, where every community hole is judged and listed (keep: as playLink's). */
 export const cupsLink = (keep = "") => `/?screen=cups${keep && `&${keep}`}`;
+/** The game's menu, where the Builder is opened from (keep: as playLink's): its Back goes there, not to the title. */
+export const menuLink = (keep = "") => `/?screen=modes${keep && `&${keep}`}`;
 /** The Builder's page, from the game (keep: as playLink's). */
 export const buildLink = (keep = "") => `/build/${keep && `?${keep}`}`;
 /** The Builder's page opening a community hole's version as a new draft of the player's (keep: as playLink's). */

@@ -333,7 +333,7 @@ export type Bill = ReturnType<typeof bill>;
 // ------------------------------------------------------------ the shelf (A1)
 /** A page of the gallery's grid. */
 export const PAGE = 48;
-export type View = "sale" | "mine" | "all" | "made";
+export type View = "mine" | "all";
 interface Seen { c: Collection; sold: (id: number) => boolean; mine: ReadonlySet<number>; now: number }
 /** Whether a gnome is on sale now: his series' sale started, not sold, not the closed genesis's. */
 export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, now: number) {
@@ -344,7 +344,7 @@ export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, no
 export const neverMade = (e: Some, s: Seen) => closedOut(s.c, e.id) && !s.sold(e.id);
 /** The gallery's list for a view and its filters, in id order (a number searched comes first), and each tier's count in the view. */
 export function shelf<E extends Listed>(entries: readonly E[], f: Query & { view: View }, s: Seen) {
-  const inView = entries.filter((e) => (f.view === "sale" ? onSale(e, s.c, s.sold, s.now) : f.view === "mine" ? s.mine.has(e.id) : f.view === "made" ? s.sold(e.id) : true));
+  const inView = f.view === "mine" ? entries.filter((e) => s.mine.has(e.id)) : entries;
   const tiers = { common: 0, rare: 0, epic: 0, legendary: 0 };
   for (const e of inView) if (e.tier in tiers) tiers[e.tier as keyof typeof tiers]++;
   const num = /^#?(\d{1,7})$/.exec((f.text || "").trim());

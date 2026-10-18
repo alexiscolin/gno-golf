@@ -14,7 +14,7 @@
 import "@/app/gnomes.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FrontScreen } from "@/components/About";
-import { Button, Segmented, Sheet } from "@/components/ui";
+import { Button, Sheet } from "@/components/ui";
 import { CUP_NAMES, UNLOCKS, type Cup, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
@@ -22,7 +22,7 @@ import { canBuyCard, cardFact, closingSlot, theirTitle, makeShop, neverMade, now
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
-import { Closes, EarnedTile, GnomeCard, SaleLine, SearchButton, SearchRow, ShareOne, TierChip, TierFilter, useSearch } from "./parts";
+import { Closes, EarnedTile, GnomeCard, LookSwitch, SaleLine, SearchButton, SearchRow, ShareOne, TierChip, TierFilter, useSearch } from "./parts";
 import { BlankShelf, SaleSlot, SHOP_HEAD, ShopPitch } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
@@ -68,7 +68,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [mineFailed, setMineFailed] = useState(false);
   const [theirs, setTheirs] = useState<{ who: string; ids: number[]; name: string; rows: Held["rows"]; failed?: true } | null>(null);
   const [now, setNow] = useState(() => Math.floor(chain.now() / 1000));
-  const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; text: string }>({ view: "sale", text: "" });
+  const [f, setF] = useState<{ tier?: Listed["tier"]; text: string }>({ text: "" });
   const [shown, setShown] = useState(PAGE);
   const search = useSearch(f.text, (text) => setF((x) => ({ ...x, text })));
   // the look the viewer picked, kept in this browser: on chain, the portraits read as the cards come into view
@@ -116,11 +116,11 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const mineSet = useMemo(() => new Set(mine), [mine]);
   const myAlbum = useMemo(() => (cat && held ? album(cat.gnomes, cat.earned, held) : null), [cat, held]);
   const seen = useMemo(() => (c && sold ? { c, sold, mine: mineSet, now } : null), [c, sold, mineSet, now]);
-  const viewing = theirs ? "theirs" : view.who === me && me ? "mine" : f.view;
+  const viewing = theirs ? "theirs" : view.who === me && me ? "mine" : "all";
   const list = useMemo(() => {
     if (!cat || !seen) return [];
     if (theirs) return theirs.ids.map((id) => cat.gnomes.find((g) => g.id === id)).filter((g): g is Listed => !!g);
-    const v: View = viewing === "mine" ? "mine" : f.view;
+    const v: View = viewing === "mine" ? "mine" : "all";
     const out = shelf(cat.gnomes, { view: v, tier: f.tier, text: v === "all" ? f.text : "" }, seen).list;
     return v === "mine" ? teamOrder(out.map((g) => ({ ...g, id: String(g.id) }))).map((g) => ({ ...g, id: Number(g.id) })) : out;
   }, [cat, seen, theirs, viewing, f]);
@@ -133,7 +133,6 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const earned = view.open && cat && !open ? cat.earned.find((e) => e.unlock === view.open) : undefined;
   const row = c && sold && cat ? nowRow(c, sold, cat.gnomes, now, cat.series) : null;
   const line = row && c && sold && cat ? saleLine(row, c, cat.gnomes, sold, now) : null;
-  const closed = !!row && row.at === "closed"; // (the genesis closed, no later series' sale: what was made, not on sale)
   const nameOf = (id: string) => (id.startsWith("t") ? cat?.gnomes.find((g) => `t${g.id}` === id)?.name || "a gnome" : "a gnome of the game");
   const playingName = nameOf(playing), wornSkin = worn ? tokenSkin(worn).id : null;
 
@@ -144,8 +143,6 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
   const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
-  // Mine, the album's count its badge: the one way to the player's own
-  const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", myAlbum && myAlbum.have ? `Mine · ${myAlbum.have}` : "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
   const searching = viewing === "all";
   const albumOf = (owned: Held["rows"], player: string, mine: boolean) => cat && albumShown(SHOP, region ?? null) && (
     <Album cat={cat} owned={owned} given={mine ? myAlbum : null} chain={chain} player={player} mine={mine} onOpen={(o) => onView({ ...view, open: o })} />
@@ -182,14 +179,17 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       {theirs && <Button variant="gold" className="btn--cta" onClick={() => onRace(theirs.who)}>Race their ghost</Button>}
       {/* their album (ADR-011), under their Race, folded; the player's own comes under their team */}
       {theirs && theirs.rows.length > 0 && albumOf(theirs.rows, theirs.who, false)}
-      {/* one toolbar: which gnomes, the tiers (their prices and what is left, once), the search in All (open, a row of
-          its own under it) */}
+      {/* one toolbar: the tiers (their prices and what is left, once), the search (open, a row of its own under it) and
+          Mine (the album's count its badge: the one way to the player's own) at its left; how the gnomes are drawn at its right */}
       {!theirs && (
         <>
           <div className="gbar">
-            <Segmented label="Which gnomes" className="gbar__views" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
-            <div className="gbar__end">{searching && <SearchButton search={search} />}</div>
+            <div className="gbar__tools">
+              {searching && <SearchButton search={search} />}
+              {me && <Button size="s" type="button" aria-pressed={viewing === "mine"} onClick={() => onView(viewing === "mine" ? {} : { who: me })}>{myAlbum && myAlbum.have ? `Mine · ${myAlbum.have}` : "Mine"}</Button>}
+            </div>
+            <div className="gbar__end"><LookSwitch look={look} onLook={onLook} /></div>
           </div>
           {searching && <SearchRow search={search} />}
         </>
@@ -202,7 +202,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       ) : !list.length ? (
         <div className="gempty">
           {viewing === "mine" ? <p>None yet. You play with the free gnomes and the ones you earn on the course.</p> : theirs ? <p>No gnome yet.</p> : <p>No gnome like that one.</p>}
-          {!theirs && viewing !== "mine" && <Button variant="secondary" onClick={() => setF({ view: f.view, text: "" })}>Clear the filters</Button>}
+          {!theirs && viewing !== "mine" && <Button variant="secondary" onClick={() => setF({ text: "" })}>Clear the filters</Button>}
         </div>
       ) : (
         <>

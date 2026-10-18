@@ -197,10 +197,10 @@ export function useSearch(value: string, onChange: (text: string) => void) {
 }
 type Search = ReturnType<typeof useSearch>;
 
-/** The search's icon, in the toolbar's right group, pressed (gold) while the search shows. */
+/** The search's icon, in the toolbar's left group, pressed (gold) while the search shows. */
 export function SearchButton({ search: s }: { search: Search }) {
   return (
-    <Button ref={s.icon} variant="icon" size="s" type="button" className={`gbar__icon gbar__find${s.shown ? " btn--on" : ""}`} aria-label="Find a gnome by name or number"
+    <Button ref={s.icon} variant="icon" size="s" type="button" className={`gbar__icon${s.shown ? " btn--on" : ""}`} aria-label="Find a gnome by name or number"
       aria-expanded={s.shown} aria-controls={s.shown ? "gsearch" : undefined} onClick={s.press} onKeyDown={s.key} onBlur={s.blur}
       onMouseDown={(e) => s.open && e.preventDefault()} /* (open, the field keeps the focus: a press closes it) */>
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>

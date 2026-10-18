@@ -289,23 +289,18 @@ test("shop: the bill: each cost, at most their sum, its total said up to the hun
 });
 
 // ------------------------------------------------------------ the shelf
-test("shop: the gallery's shelf: on sale, mine, all; tier counts; filters; a page of 48", () => {
+test("shop: the gallery's shelf: all, mine; tier counts; filters; a page of 48", () => {
   const c = collection();
   const sold = isSold([1, 2, 3]);
   const now = T0 + 49 * 3600;
-  const sale = shelf(entries, { view: "sale" }, { c, sold, mine: new Set(), now });
-  assert.equal(sale.list.length, 717); // the genesis, less the sold
-  assert.ok(sale.list.every((e) => onSale(e, c, sold, now)));
-  assert.deepEqual(sale.tiers, { common: 501, rare: 144, epic: 65, legendary: 7 });
-  assert.equal(shelf(entries, { view: "all" }, { c, sold, mine: new Set(), now }).list.length, 720);
+  const all = shelf(entries, { view: "all" }, { c, sold, mine: new Set(), now });
+  assert.equal(all.list.length, 720, "every gnome on the one shelf, the sold ones too (their card says it)");
+  assert.deepEqual(all.tiers, { common: 504, rare: 144, epic: 65, legendary: 7 });
   assert.deepEqual(shelf(entries, { view: "mine" }, { c, sold, mine: new Set([94, 3]), now }).list.map((e) => e.id), [3, 94]);
   assert.deepEqual(shelf(entries, { view: "all", text: "#94" }, { c, sold, mine: new Set(), now }).list.map((e) => e.id), [94]);
   assert.deepEqual(shelf(entries, { view: "all", text: "94" }, { c, sold, mine: new Set(), now }).list.map((e) => e.id).slice(0, 1), [94]);
   assert.equal(shelf(entries, { view: "all", tier: "legendary" }, { c, sold, mine: new Set(), now }).list.length, 7);
   assert.equal(PAGE, 48);
-  // closed: "made" is what was sold
-  const closedC = collection({ series: [genesis({ sold: 3, closed: true })] });
-  assert.deepEqual(shelf(entries, { view: "made" }, { c: closedC, sold, mine: new Set(), now }).list.map((e) => e.id), [1, 2, 3]);
 });
 
 test("shop: a card's one fact: the price, the player, Yours, Never made, when it opens, not on sale yet", () => {
