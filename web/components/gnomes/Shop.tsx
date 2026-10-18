@@ -130,6 +130,9 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   useEffect(() => setShown(PAGE), [f, viewing]);
 
   const open = view.open && cat ? cat.gnomes.find((g) => String(g.id) === view.open) : undefined;
+  // the open gnome's place in the series, and what he brings the player's album (each worked out once a gnome opened)
+  const series = useMemo(() => (open ? seriesLine(open, cat ? cat.gnomes : [open]) : ""), [open, cat]);
+  const albumNote = useMemo(() => (open && myAlbum && held ? albumNext(myAlbum, { total: held.length, rows: held }, open.home) : null), [open, myAlbum, held]);
   const earned = view.open && cat && !open ? cat.earned.find((e) => e.unlock === view.open) : undefined;
   const row = c && sold && cat ? nowRow(c, sold, cat.gnomes, now) : null;
   const line = row && c && sold && cat ? waveLine(row, c, cat.gnomes, sold, now) : null;
@@ -148,7 +151,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", myAlbum && myAlbum.have ? `Mine · ${myAlbum.have}` : "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
   const searching = viewing === "all";
   const albumOf = (owned: Held["rows"], player: string, mine: boolean) => cat && albumShown(SHOP, region ?? null) && (
-    <Album cat={cat} owned={owned} chain={chain} player={player} mine={mine} home={row && row.at !== "none" && row.at !== "closed" ? row.wave.home : undefined} onOpen={(o) => onView({ ...view, open: o })} />
+    <Album cat={cat} owned={owned} given={mine ? myAlbum : null} chain={chain} player={player} mine={mine} home={row && row.at !== "none" && row.at !== "closed" ? row.wave.home : undefined} onOpen={(o) => onView({ ...view, open: o })} />
   );
   const cup = earned && (UNLOCKS[earned.unlock as UnlockId] as { cup?: Cup } | undefined)?.cup;
 
@@ -168,7 +171,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     <FrontScreen className={`front--fit shop${theirs || viewing === "mine" ? "" : " shop--sale"}`} back="Back" onBack={onBack} onAbout={onAbout} eyebrow={theirs || viewing === "mine" ? SHOP_HEAD.page : SHOP_HEAD.eyebrow} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch /> : undefined}>
       {/* the wave's card in its place from the first frame (ShopFrame), its closing line's room kept until the sale is
           read (none when it says no date): nothing moves as they are read */}
-      {!theirs && viewing !== "mine" && !row && <WaveSlot closing={closingSlot(c)} />}
+      {!theirs && viewing !== "mine" && !row && <WaveSlot closes={closingSlot(c) !== "none"} />}
       {/* the sale in one line, a little fairway: the wave of the moment, or the sale's end (none: no wave yet); the
           closing date its card's last line */}
       {!theirs && viewing !== "mine" && line && <SaleLine line={line} closes={c && closingSlot(c) === "line" && <Closes at={c.closesAt} now={now} />} />}
@@ -224,8 +227,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       {open && c && (
         <GnomeSheet g={open} shop={shop} chain={chain} c={c} account={account} region={region === true} now={now} wallet={wallet} onConnect={onConnect}
           onClose={() => onView({ who: view.who })} playing={playing} worn={wornSkin} onPlay={onPlay} onRound={onRound} onTheirs={(who) => onView({ who })} onChanged={mineLoad}
-          look={look} onLook={onLook} series={seriesLine(open, cat ? cat.gnomes : [open])}
-          albumNote={myAlbum && held ? albumNext(myAlbum, { total: held.length, rows: held }, open.home) : null} />
+          look={look} onLook={onLook} series={series} albumNote={albumNote} />
       )}
       {earned && (
         <Sheet label={earned.name} onClose={() => onView({ who: view.who })} className="gsheet">

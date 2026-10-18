@@ -12,7 +12,7 @@ import "@/app/collection.css";
 import { useMemo, useState } from "react";
 import { Segmented } from "@/components/ui";
 import type { Chain } from "@/lib/chain";
-import { ALBUM_WORDS, album, albumSummary, howRanks, rankLine, type Progress } from "@/lib/gnomes/collection";
+import { ALBUM_WORDS, album, albumSummary, howRanks, rankLine, type Album as AlbumOf, type Progress } from "@/lib/gnomes/collection";
 import type { Served } from "@/lib/gnomes/served";
 import Collector from "./Rank";
 import { thumb } from "./parts";
@@ -22,10 +22,12 @@ type Group = "worlds" | "tiers" | "sets";
 const LEAF = <path d="M3 13C3 7 7 3 13 3c0 6-4 10-10 10z" />;
 const SILHOUETTE = <path d="M20 3 11 19h18L20 3Zm0 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z" />;
 
-export default function Album({ cat, owned, chain, player, mine, home, onOpen }: {
+export default function Album({ cat, owned, given = null, chain, player, mine, home, onOpen }: {
   cat: Served;
   /** what they hold (GnomesOf's rows, every page) */
   owned: readonly { id: string; tier: string; traits?: string }[];
+  /** their album worked out already (the shop's own, for the player's badge): not again */
+  given?: AlbumOf | null;
   chain: Chain;
   player: string;
   /** the player's own (their next rank said), or another's */
@@ -35,7 +37,7 @@ export default function Album({ cat, owned, chain, player, mine, home, onOpen }:
   /** a slot tapped: its gnome's number, or an earned kind */
   onOpen: (open: string) => void;
 }) {
-  const a = useMemo(() => album(cat.gnomes, cat.earned, owned), [cat, owned]);
+  const a = useMemo(() => given ?? album(cat.gnomes, cat.earned, owned), [given, cat, owned]);
   const [group, setGroup] = useState<Group>("worlds");
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const rows: Progress[] = a[group];

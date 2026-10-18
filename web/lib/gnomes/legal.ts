@@ -6,9 +6,9 @@
 // trust strip. The seller is the build's (NEXT_PUBLIC_SELLER_*,
 // next.config.mjs refuses a production shop without it); a placeholder shows
 // what is missing anywhere else.
-import { aboutGnot as about, upToHundredth as up } from "../adena";
+import { aboutGnot as about } from "../adena";
 import { shortAddr } from "../chain";
-import { dateParts, gnot, utcDate } from "./shop";
+import { dateParts, gnot, totalOf, utcDate, type Bill } from "./shop";
 
 const env = (v: string | undefined, placeholder: string) => (v && v.trim()) || placeholder;
 /** Who sells (特定商取引法に基づく表記; the EU's trader): name, geographical address, e-mail. */
@@ -59,17 +59,15 @@ const stamp = (unix: number) => {
 const salePeriod = (closesAt: number, now: number) =>
   closesAt ? `The genesis sale closes on ${utcDate(closesAt, now)} (${jstDate(closesAt)}).` : "The genesis sale has no closing date set yet: the Contract sells none of the genesis until one is set.";
 
-interface Order { name: string; id: number; tier: string; n: number; price: number; deposit: number; fee: number; address: string; closesAt: number; now: number }
-/** The order's total, in ugnot: its price, deposit and fee up to the hundredth of a GNOT, never under what the wallet
- *  may be asked (both are the bill's most). The one figure the review's Total and the order's button both say. */
-export const orderTotal = (o: Pick<Order, "price" | "deposit" | "fee">) => up(o.price + o.deposit + o.fee);
+/** An order: the gnome, the address, the sale's closing, and its bill's figures (shop.ts bill: its total the one the button says too). */
+interface Order extends Pick<Bill, "price" | "deposit" | "fee" | "total"> { name: string; id: number; tier: string; n: number; address: string; closesAt: number; now: number }
 type Term = [label: string, term: string];
 /** The order, term by term (§1.1), grouped for reading and none left out: its total first; what is paid (the item,
  *  its price, the deposit and fee "about", the payment); then the terms (delivery, sale period, cancellation, nature,
  *  seller). */
 export function review(o: Order): { total: Term; pay: Term[]; terms: Term[] } {
   return {
-    total: ["Total", `${gnot(orderTotal(o))} GNOT at most`],
+    total: ["Total", `${gnot(o.total)} GNOT at most`],
     pay: [
       ["Item", `${o.name} (#${o.id}, ${TIER[o.tier] || o.tier}), ${o.n} ${o.n === 1 ? "item" : "items"}`],
       ["Price", `${gnot(o.price)} GNOT`],
@@ -85,11 +83,11 @@ export function review(o: Order): { total: Term; pay: Term[]; terms: Term[] } {
     ],
   };
 }
-/** The order's button (§1.3), the total in it, up to the hundredth (orderTotal's: the review's own figure). */
-export const orderButton = (total: number) => `Order with obligation to pay (${gnot(up(total))} GNOT): sign in wallet`;
-/** The chain's part of a buy in one line, under a sheet's price, from the review's own estimate: "+ ≈0.5 GNOT chain
- *  costs, 0.43 back if you burn it" (the deposit held by the chain, never paid to us). */
-export const chainCosts = (deposit: number, fee: number) => `+ ≈${gnot(up(deposit + fee))} GNOT chain costs, ${gnot(up(deposit))} back if you burn it`;
+/** The order's button (§1.3), the bill's total in it (the review's own figure). */
+export const orderButton = (total: number) => `Order with obligation to pay (${gnot(total)} GNOT): sign in wallet`;
+/** The chain's part of a buy in one line, under a sheet's price, from the review's own bill: "+ ≈0.5 GNOT chain
+ *  costs, 0.43 back if you burn it" (the deposit held by the chain, never paid to us), said as the bill says a figure. */
+export const chainCosts = ({ deposit, fee }: Pick<Bill, "deposit" | "fee">) => `+ ≈${gnot(totalOf(deposit, fee))} GNOT chain costs, ${gnot(totalOf(deposit))} back if you burn it`;
 
 interface Receipt extends Order { at: number; hash: string; realm: string; chainId: string; consents: readonly string[] }
 /** The receipt (§3), a line each: what the buyer prints or saves. consents: the boxes shown and ticked, word for word. */

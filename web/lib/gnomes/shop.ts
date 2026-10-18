@@ -4,7 +4,7 @@
 // state: the sale's phase, why a gnome can't be bought in plain words, the
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
-import { depositFor, feeFor } from "../adena";
+import { depositFor, feeFor, upToHundredth } from "../adena";
 import { GNOMES_REALM, isAddress, isObj, nums, shortAddr, strs, type Chain, type Obj } from "../chain";
 import { theWorld, worldName } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
@@ -309,15 +309,18 @@ export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "id" | "tier" |
 export const landing = (row: GnomeRow | null, me: string) => (!row || !row.owner ? null : row.owner === me ? "mine" : "taken");
 
 // ------------------------------------------------------------ the bill (shared pieces)
-/** What a signature costs, each line in ugnot: the price, the storage deposit for bytes, the network fee for
- *  gas, both as the wallet is asked them (adena.ts depositFor, feeFor); most: their sum; short: what the
- *  balance lacks (0 enough, null unknown). */
+/** A bill's figure as it is said, in ugnot: its parts' sum up to the hundredth of a GNOT, never under what the wallet
+ *  may be asked. The one rounding rule: the review's Total, the order's button and a sheet's chain costs all say it. */
+export const totalOf = (...ugnot: number[]) => upToHundredth(ugnot.reduce((a, b) => a + b, 0));
+/** What a signature costs, in ugnot: the price, the storage deposit for bytes, the network fee for gas, both as
+ *  the wallet is asked them (adena.ts depositFor, feeFor); most: their sum; total: that sum as said (totalOf);
+ *  short: what the balance lacks (0 enough, null unknown). */
 export function bill({ price, bytes, storagePrice, gas, gasPrice, balance }: { price: number; bytes: number; storagePrice: number; gas: number; gasPrice: number; balance: number | null }) {
   const deposit = depositFor(bytes, storagePrice), fee = feeFor(gas, gasPrice);
-  const lines: [string, number][] = [["Price", price], ["Storage deposit", deposit], ["Network fee", fee]];
   const most = price + deposit + fee;
-  return { lines: lines.filter(([k, v]) => v > 0 || k !== "Price"), most, short: balance == null ? null : Math.max(0, most - balance) };
+  return { price, deposit, fee, most, total: totalOf(price, deposit, fee), short: balance == null ? null : Math.max(0, most - balance) };
 }
+export type Bill = ReturnType<typeof bill>;
 
 // ------------------------------------------------------------ the shelf (A1)
 /** A page of the gallery's grid. */

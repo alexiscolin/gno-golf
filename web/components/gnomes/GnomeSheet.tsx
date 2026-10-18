@@ -23,12 +23,29 @@ import { worldName } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
 import { bill, gnot, landing, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
-import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, chainCosts, orderButton, orderTotal, parLine, receipt, review } from "@/lib/gnomes/legal";
+import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, chainCosts, orderButton, parLine, receipt, review } from "@/lib/gnomes/legal";
 import { tokenSkin } from "@/lib/gnomes/wear";
 import { portraitsOf, type Look } from "@/lib/gnomes/onchain";
 import { LookSwitch, ShareOne, TierChip, Tile, tierName } from "./parts";
 
 type Account = { address: string; chainId: string };
+
+/** A chain's own figures for a bill (its gas and storage prices, its id): read once for each chain (the shop's, for the
+ *  visit), a read that failed read again the next time; the balance and Adena's node are read each time. */
+const fixed = new WeakMap<Chain, Promise<{ price: number; storage: number; chainId: string | null }>>();
+function chainFigures(chain: Chain) {
+  let got = fixed.get(chain);
+  if (!got) {
+    let failed = false;
+    const or = <T,>(read: Promise<T>, none: T) => read.catch(() => ((failed = true), none));
+    got = Promise.all([or(chain.gasPrice(), PRICE), or(chain.storagePrice(), BYTE_PRICE), or(chain.chainId(), null)]).then(([price, storage, chainId]) => {
+      if (failed) fixed.delete(chain);
+      return { price, storage, chainId };
+    });
+    fixed.set(chain, got);
+  }
+  return got;
+}
 type Step =
   | { at: "view" } | { at: "review"; note?: ReactNode } | { at: "sign" } | { at: "read"; hash: string; height: number }
   | { at: "done"; hash: string; height: number; when: number | null } | { at: "receipt"; hash: string; when: number | null }
@@ -73,10 +90,8 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const [want, setWant] = useState(false);
 
   const readCosts = () =>
-    void Promise.all([
-      chain.gasPrice().catch(() => PRICE), chain.storagePrice().catch(() => BYTE_PRICE),
-      me ? chain.balance(me) : Promise.resolve(null), chain.chainId().catch(() => null), onOurNode(chain.rpc),
-    ]).then(([p, storage, balance, chainId, ours]) => setCosts({ price: p, storage, balance, chainId, ours }));
+    void Promise.all([chainFigures(chain), me ? chain.balance(me) : Promise.resolve(null), onOurNode(chain.rpc)])
+      .then(([f, balance, ours]) => setCosts({ ...f, balance, ours }));
   const read = () => {
     setUnread(false);
     void shop.gnome(g.id).then(setRow, () => (setRow(null), setUnread(true)));
@@ -89,9 +104,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const price = row ? row.price : 0;
   const tx = gnomeCall.buy([g.id], Math.max(1, price));
   const cost = costs && bill({ price, bytes: tx.bytes, storagePrice: costs.storage, gas: tx.gas, gasPrice: costs.price, balance: costs.balance });
-  const part = (k: string) => (cost && cost.lines.find(([x]) => x === k)?.[1]) || 0; // (by name: a price not read yet has no line)
-  const deposit = part("Storage deposit"), fee = part("Network fee");
-  const order = me && cost && { name: g.name, id: g.id, tier: g.tier, n: 1, price, deposit, fee, address: me, closesAt: c.closesAt, now };
+  const order = me && cost && { name: g.name, id: g.id, tier: g.tier, n: 1, price, deposit: cost.deposit, fee: cost.fee, total: cost.total, address: me, closesAt: c.closesAt, now };
   const why = can && row && !row.sold ? whyNot(can, c, g, now) : null;
 
   const toReview = () => (setStep({ at: "review" }), readCosts());
@@ -199,7 +212,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           ) : !mine && !unread && region ? (
             <div className="gsheet__offer">
               {/* his price, its chain costs from the order's own estimate, the golf number it is */}
-              {row && <p className="gsheet__price">{gnot(price)} GNOT <small>{cost ? chainCosts(deposit, fee) : "+ chain costs"}</small></p>}
+              {row && <p className="gsheet__price">{gnot(price)} GNOT <small>{cost ? chainCosts(cost) : "+ chain costs"}</small></p>}
               {row && parLine(g.tier, price) && <p className="gsheet__par">{parLine(g.tier, price)}</p>}
               <ul className="trust">{TRUST.slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
             </div>
@@ -265,8 +278,9 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           ) : (
             <>
               <p className="review__total"><span>{terms.total[0]}</span><b>{terms.total[1]}</b></p>
-              <section className="review__group" aria-label="What you pay"><h3>What you pay</h3><dl className="review">{terms.pay.map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl></section>
-              <section className="review__group review__group--terms" aria-label="Terms"><h3>Terms</h3><dl className="review">{terms.terms.map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl></section>
+              {([["What you pay", terms.pay, ""], ["Terms", terms.terms, " review__group--terms"]] as const).map(([label, rows, more]) => (
+                <section key={label} className={`review__group${more}`} aria-label={label}><h3>{label}</h3><dl className="review">{rows.map(([k, v]) => <Term key={k} k={k} v={v} />)}</dl></section>
+              ))}
               <p className="legal"><a href={LINKS.terms} target="_blank" rel="noopener noreferrer">Terms of Sale</a> · <a href={LINKS.seller} target="_blank" rel="noopener noreferrer">Seller information (特定商取引法に基づく表記)</a> · <a href={LINKS.privacy} target="_blank" rel="noopener noreferrer">Privacy</a></p>
               <div className="gsheet__foot gsheet__foot--order">
                 <label className="box"><input ref={boxA} type="checkbox" checked={ticks.a} onChange={(e) => setTicks((t) => ({ ...t, a: e.target.checked }))} /><span>{BOX_A}</span></label>
@@ -282,7 +296,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                     {/* off, but pressable: a press finds the box left (a disabled button hears nothing) */}
                     <Button variant="chain" className="btn--wide" aria-disabled={ticks.a && ticks.b ? undefined : true} aria-describedby={ticks.a && ticks.b ? undefined : "order-ticks"}
                       onClick={() => (ticks.a && ticks.b ? void buy() : toBox())}>
-                      {orderButton(orderTotal(order))}
+                      {orderButton(order.total)}
                     </Button></>
                 )}
                 <p className="gsheet__fine">{SIGN_NOTE}</p>

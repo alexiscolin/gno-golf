@@ -278,16 +278,16 @@ test("shop: a buy with no hash to read, by the gnome read again: landed (the buy
 });
 
 // ------------------------------------------------------------ the bill
-test("shop: the bill: each cost on a line, at most their sum, short by what the balance lacks", () => {
+test("shop: the bill: each cost, at most their sum, its total said up to the hundredth, short by what the balance lacks", () => {
   const b = bill({ price: 333_330_000, bytes: 3849, storagePrice: 100, gas: 50e6, gasPrice: 0.001, balance: 120e6 });
-  assert.deepEqual(b.lines.map(([k]) => k), ["Price", "Storage deposit", "Network fee"]);
-  assert.equal(b.lines[0][1], 333_330_000);
-  assert.equal(b.lines[1][1], 423_391); // 3,849 bytes at 100 ugnot, and a tenth more, rounded up
-  assert.equal(b.lines[2][1], 75_000); // 50M gas at 0.001, half again
+  assert.equal(b.price, 333_330_000);
+  assert.equal(b.deposit, 423_391); // 3,849 bytes at 100 ugnot, and a tenth more, rounded up
+  assert.equal(b.fee, 75_000); // 50M gas at 0.001, half again
   // the wallet's own rules, the Builder's bill's too (adena.ts): never a copy that drifts from what Adena is asked
-  assert.equal(b.lines[1][1], depositFor(3849, 100));
-  assert.equal(b.lines[2][1], feeFor(50e6, 0.001));
+  assert.equal(b.deposit, depositFor(3849, 100));
+  assert.equal(b.fee, feeFor(50e6, 0.001));
   assert.equal(b.most, 333_330_000 + 423_391 + 75_000);
+  assert.equal(b.total, 333_830_000, "the sum up to the hundredth: never under the most");
   assert.equal(b.short, b.most - 120e6);
   assert.equal(bill({ price: 0, bytes: 100, storagePrice: 100, gas: 1e6, gasPrice: 0.001, balance: null }).short, null);
   assert.equal(bill({ price: 0, bytes: 100, storagePrice: 100, gas: 1e6, gasPrice: 0.001, balance: 10e6 }).short, 0);

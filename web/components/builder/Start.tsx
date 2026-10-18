@@ -60,7 +60,8 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   const [busy, setBusy] = useState(false);
   const [wipe, setWipe] = useState<number | null>(null); // the draft asked to be deleted, before the sheet's yes
   const file = useRef<HTMLInputElement>(null);
-  const starts = useMemo(() => startsIn(world).map((s) => ({ ...s, map: draftMap(s.draft) })), [world]);
+  // each starter's map, and whether it is the blank lane (its own group, its own card)
+  const starts = useMemo(() => startsIn(world).map((s) => ({ ...s, map: draftMap(s.draft), blank: s.name === "blank" })), [world]);
   const keys = useKeys(drafts, host);
   const { chain, keep } = useMemo(() => {
     const { rpc, web, keep } = endpoints(window.location.search);
@@ -87,7 +88,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     setBusy(true);
     void openPublished(chain, host, census, id, author).then(take).finally(() => setBusy(false));
   };
-  const any = drafts.length + elsewhere.length > 0;
+  const count = drafts.length + elsewhere.length, any = count > 0;
   const fresh = (
     <section className="bholes__new" aria-labelledby="bholes-new">
       <div className="bholes__bar">
@@ -103,14 +104,14 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
       </div>
       {/* the starters are templates, ready-made holes to change; the blank lane one card of the same row, under its own label */}
       <div className="bholes__starts">
-        {[{ label: "Start from a template", list: starts.filter((s) => s.name !== "blank") }, { label: "Or start blank", list: starts.filter((s) => s.name === "blank") }].map(({ label, list }) => (
-          <section key={label} className={`bholes__set${list[0]?.name === "blank" ? " bholes__set--blank" : ""}`} aria-label={label}>
+        {([["Start from a template", false], ["Or start blank", true]] as const).map(([label, blank]) => (
+          <section key={label} className={`bholes__set${blank ? " bholes__set--blank" : ""}`} aria-label={label}>
             <h3 className="bholes__group">{label}</h3>
             <ul>
-              {list.map((s) => (
+              {starts.filter((s) => s.blank === blank).map((s) => (
                 <li key={s.name}>
-                  <button type="button" className={`bholes__start${s.name === "blank" ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
-                    <span className={`bholes__map${s.name === "blank" ? " bholes__blank" : ""}`}><HoleMap hole={s.map} className="bholes__svg" /></span>
+                  <button type="button" className={`bholes__start${s.blank ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
+                    <span className={`bholes__map${s.blank ? " bholes__blank" : ""}`}><HoleMap hole={s.map} className="bholes__svg" /></span>
                     <b>{s.title}</b>
                     <span className="bholes__line">{s.line}</span>
                     <span className="bholes__foot" aria-hidden="true">
@@ -128,9 +129,9 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   );
   const mine = (
     <section className="bholes__mine" aria-labelledby="bholes-mine">
-      <h2 id="bholes-mine" className="bholes__h">Your holes {drafts.length + elsewhere.length > 0 && <small>{drafts.length + elsewhere.length}</small>}</h2>
+      <h2 id="bholes-mine" className="bholes__h">Your holes {any && <small>{count}</small>}</h2>
       {got && author && got.rows.length > 0 && <BuilderBadges facts={factsOf(got.rows, got.saved, author)} />}
-      {drafts.length + elsewhere.length ? (
+      {any ? (
         <ul className="bholes__list">
           {drafts.map((d, i) => {
             const st = draftState(d, keys[i] ?? null), h = rowOf(d);

@@ -740,6 +740,8 @@ const ADDR = /^g1[0-9a-z]{38}$/;
 const SLUG = "[a-z0-9-]{1,32}", ONE_SLUG = new RegExp(`^${SLUG}$`);
 /** Whether s is a community hole's short name: 1 to 32 lower-case letters, digits and dashes (golf's validSlug). */
 export const isSlug = (s: unknown) => typeof s === "string" && ONE_SLUG.test(s);
+/** A text's length as a realm counts it (a Go string's len): its UTF-8 bytes. */
+export const utf8Bytes = (s: string) => new TextEncoder().encode(s).length;
 // a data hole: a course slot "garden/7" or its version "garden/7/v2", a
 // community hole "<address>/<slug>" or its version
 const DATA = new RegExp(`^([a-z]{1,16}/[1-9]\\d{0,2}|g1[0-9a-z]{38}/${SLUG})(/v[1-9]\\d*)?$`);

@@ -5,7 +5,7 @@
 // warm-up's), the bill shown before any signature, and the command for
 // gnokey, whose every argument reaches the realm as the page shows it.
 import { depositFor, feeFor, gnokeyCall, gnokeyOn, MAX_GAS, PER_CALL, publishArgs, upToHundredth } from "../adena";
-import { isAddress } from "../chain";
+import { isAddress, utf8Bytes as utf8 } from "../chain";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
 import { makeLocalChain } from "./localchain";
@@ -25,8 +25,6 @@ import type { BuilderHost } from "./wasm";
  * hole pays no more (the warm-up's 139 bytes over, within the deposit's tenth).
  */
 export const STORED = { overhead: 2189, newAuthor: 454, version: -960 } as const;
-
-const utf8 = (s: string) => new TextEncoder().encode(s).length;
 
 /** What a publish stores: the data's bytes (course.Encode's), the name and note as the chain keeps them, its entry and index rows. */
 export function publishBytes({ bytes, name, note, v, newAuthor }: { bytes: number; name: string; note: string; v: number; newAuthor: boolean }) {

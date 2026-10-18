@@ -4,7 +4,7 @@
 // game is one of these, so they all hover, press, focus and disable alike.
 // Their look is in globals.css under "shared controls".
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 import { vsPar } from "@/lib/card";
 import { vsParWords } from "@/components/common";
 import { buttonClass, type ButtonLook } from "@/components/button";
@@ -127,8 +127,15 @@ export function SheetClose({ onClose, inline = false }: { onClose: () => void; i
 }
 
 // Dialogs open over one another (a confirm over the menu): only the top one
-// hears Escape and keeps Tab inside it.
-const open: object[] = [];
+// hears Escape and keeps Tab inside it. Each opened or closed is told to
+// whoever watches (useDialogOpen): a modal one open holds the page's news.
+const open: { modal: boolean }[] = [];
+const watchers = new Set<() => void>();
+const told = () => watchers.forEach((f) => f());
+const watch = (f: () => void) => (watchers.add(f), () => void watchers.delete(f));
+const anyModal = () => open.some((d) => d.modal);
+/** Whether a modal dialog is open over the page (an order, a receipt, the menu): what must never sit under a toast waits for it. */
+export const useDialogOpen = () => useSyncExternalStore(watch, anyModal, () => false);
 // the control last pressed: a click does not focus a button everywhere
 // (Safari, a scripted click), so a dialog knows what opened it all the same
 let pressed: HTMLElement | null = null;
@@ -143,13 +150,14 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * Escape closes it (when it can be closed), and focus goes back to what
  * opened it once it is gone. Returns the ref for the dialog's element.
  */
-function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => void) | null | undefined) {
+function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => void) | null | undefined, modal = true) {
   const ref = useRef<T>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    const me = {};
+    const me = { modal };
     open.push(me);
+    told();
     const active = document.activeElement, el = ref.current;
     // what opened it: the focused control, else the one last pressed (never one
     // of its own: a dev remount finds its own control focused already)
@@ -171,6 +179,7 @@ function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => void) | 
     return () => {
       document.removeEventListener("keydown", onKey, true);
       open.splice(open.indexOf(me), 1);
+      told();
       // on the next task: the page's styles have caught up by then (a trigger
       // hidden while the dialog was open can take focus again), and a dialog
       // opened meanwhile (the menu's About) keeps its own focus
@@ -180,7 +189,7 @@ function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => void) | 
           if (back.isConnected && (!now || now === document.body)) back.focus({ preventScroll: true });
         }, 0);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- (modal: as it opened)
   return ref;
 }
 
@@ -211,7 +220,7 @@ interface DialogProps extends HTMLAttributes<HTMLElement> {
   as?: "div" | "aside";
 }
 export function Dialog({ onClose = null, as: Tag = "div", children, ...props }: DialogProps) {
-  const ref = useDialog<HTMLDivElement>(onClose);
+  const ref = useDialog<HTMLDivElement>(onClose, props["aria-modal"] === true || props["aria-modal"] === "true");
   return (
     <Tag ref={ref} tabIndex={-1} {...props}>
       {children}

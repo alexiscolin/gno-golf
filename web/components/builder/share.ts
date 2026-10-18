@@ -3,7 +3,7 @@
 // holeLink: a community hole by its id), and its card is the 3D preview
 // with its name, world, par and author over it, and the author's own score
 // to beat (proof.ts builderScore).
-import { holeLink } from "@/components/common";
+import { holeLink, strokesWord } from "@/components/common";
 import { MAX_TITLE } from "@/lib/builder/draft";
 import { holeByline } from "@/lib/builder/holes";
 
@@ -17,7 +17,7 @@ export function saveFile(blob: Blob, name: string) {
 }
 
 /** The author's score as a dare: "Beat the builder: 2 strokes" ("" with none). */
-export const beatLine = (strokes: number) => (strokes ? `Beat the builder: ${strokes} stroke${strokes === 1 ? "" : "s"}` : "");
+export const beatLine = (strokes: number) => (strokes ? `Beat the builder: ${strokesWord(strokes)}` : "");
 
 /** What the game's Share (components/Share.tsx) sends for a published hole: its words (a dare, with the author's score), and its link (Share puts it on the site's address). */
 export const holeShare = (name: string, id: string, strokes = 0) => ({ text: `${name}, a mini-golf hole on gno.land${strokes ? `. ${beatLine(strokes)}` : ""}`, link: holeLink({ id, place: 0 }, "", "", "hole") });

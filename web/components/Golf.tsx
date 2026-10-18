@@ -29,7 +29,7 @@ import { Badges, CardStamps, ChainSeal, EarnedBadges, NewBadges } from "@/compon
 import Tip, { readOwner } from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
-import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
+import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar, useDialogOpen } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import { CUPS, backFromChain, fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -324,19 +324,13 @@ function Retry({ onRetry }: { onRetry: () => void }) {
   return <p className="banner__retry" aria-live="polite">Trying again in {Math.max(0, left)} s…</p>;
 }
 
-/** Whether a dialog is open over the page (an order, a receipt, the menu): its words are never under a toast. */
-const dialogOpen = () => !!document.querySelector('[aria-modal="true"]');
 /** A word over the course for a moment. Taken away by a timer, not by its animation: with reduced motion there is none.
  *  News (center: not about the shot, e.g. a card filled from the chain) waits while a dialog is open, then has its whole time. */
 function Toast({ text, onDone, ms = 3200, center }: { text: string; onDone: () => void; ms?: number; center?: boolean }) {
   const done = useRef(onDone);
   done.current = onDone;
-  const [held, setHeld] = useState(() => !!center && dialogOpen());
-  useEffect(() => {
-    if (!center) return;
-    const t = setInterval(() => setHeld(dialogOpen()), 250);
-    return () => clearInterval(t);
-  }, [center]);
+  // (a dialog's words are never under the news: it waits while one is open over the page)
+  const dialog = useDialogOpen(), held = !!center && dialog;
   useEffect(() => {
     if (held) return;
     const t = setTimeout(() => done.current(), ms);

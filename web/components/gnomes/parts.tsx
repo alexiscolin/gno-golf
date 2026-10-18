@@ -9,10 +9,8 @@ import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type 
 import { Button, Segmented } from "@/components/ui";
 import { useCopied } from "@/components/common";
 import { retryIn } from "@/lib/retry";
-import { sound } from "@/lib/feel";
-import { isTouch } from "@/lib/device";
 import { siteURL } from "@/lib/site";
-import { track } from "@/lib/analytics";
+import { shareOrCopy } from "@/components/Share";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
 import { comingFact, gnot, utcDate, localDate, type TierShare, type WaveLine } from "@/lib/gnomes/shop";
@@ -237,14 +235,7 @@ export function SearchRow({ search: s }: { search: Search }) {
  *  "Copied" said (a computer's share sheet is a bare panel without the networks people mean: Share.tsx). */
 export function ShareOne({ text, link, label = "Share" }: { text: string; link: string; label?: string }) {
   const [copied, copy] = useCopied();
-  const url = siteURL(link);
-  const go = () => {
-    sound("blip");
-    const sheet = typeof navigator !== "undefined" && !!navigator.share && isTouch();
-    track("share", { target: sheet ? "sheet" : "copy", what: "hole", kind: "share" });
-    if (sheet) void navigator.share({ title: "Gnogolf", text, url }).catch(() => {}); // (cancelled: nothing to say)
-    else void copy(url);
-  };
+  const go = () => shareOrCopy(text, siteURL(link), copy);
   return (
     <Button size="s" type="button" className="gshare" onClick={go} aria-label={copied ? "Link copied" : label}>
       <svg viewBox="0 0 24 24" aria-hidden="true">{copied ? <path d="M5 12l5 5 9-10" /> : <path d="M12 3v12M7 8l5-5 5 5M5 13v6h14v-6" />}</svg>
