@@ -29,10 +29,12 @@ async function qg(expr) {
   return m ? JSON.parse(`"${m[1]}"`) : raw;
 }
 
-/** A page as key (a seed key, or "" for none), at width; its stand-in wallet. @param {string} key @param {number} width */
-async function open(key, width = 1280) {
-  const b = await launch({ width, height: width < 600 ? 844 : 860, mobile: width < 600, touch: width < 600 });
+/** A page as key (a seed key, or "" for none), at width (a computer 800 high, a phone 844); its stand-in wallet; off:
+ *  the wallet there but not connected (as after Disconnect). @param {string} key @param {number} width */
+async function open(key, width = 1280, off = false) {
+  const b = await launch({ width, height: width < 600 ? 844 : 800, mobile: width < 600, touch: width < 600 });
   const w = key ? await fakeAdena(b, env, key) : null;
+  if (off) await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("gnogolf.adenaOff", "1"); } catch {}` });
   return { b, w };
 }
 /** Waits for expr to be true in the page, answering the wallet meanwhile. @param {any} b @param {any} w @param {string} expr */
@@ -78,14 +80,18 @@ for (const width of WIDTHS) {
   const ok = await until(b, w, `document.querySelectorAll(${JSON.stringify(cards)}).length >= 12`, 90e3);
   say(ok, `gallery at ${width}: the cards`);
   await sleep(800);
+  // one way to each thing: no look switch, more filters, search (All's) nor album link on sale; the tiers say what is left
+  const lean = await b.ev(`!document.querySelector(".gbar .seg--look, .gbar__more, .gfilters, .gbar__find, .galbum-line")`);
+  const left = await b.ev(`[...document.querySelectorAll(".gbar .tierbtn__left")].map((e) => e.textContent).join(" ")`);
+  say(lean && /^(\d+\/\d+ left ?)+$/.test(left), `gallery at ${width}: a lean bar, the tiers' counts`, left);
   await shot(b, `gallery-${width}`);
   b.kill();
 }
 
 
-/** A gnome's sheet open at its own page (/g/<id>/), as key, at width. @param {string} key @param {number | string} id @param {number} width */
-async function sheet(key, id, width = 1280) {
-  const o = await open(key, width);
+/** A gnome's sheet open at its own page (/g/<id>/), as key, at width (off: the wallet not connected). @param {string} key @param {number | string} id @param {number} width */
+async function sheet(key, id, width = 1280, off = false) {
+  const o = await open(key, width, off);
   await o.b.send("Page.navigate", { url: `${APP}/g/${id}/` });
   say(await until(o.b, o.w, `document.querySelector(".gsheet h2") && !document.querySelector(".gsheet h2").textContent.includes("Reading")`, 90e3), `sheet #${id} as ${key || "nobody"} at ${width}`);
   await sleep(1200);
@@ -94,6 +100,16 @@ async function sheet(key, id, width = 1280) {
 const owner = async (/** @type {number} */ id) => JSON.parse(await qg(`Gnome("${id}")`)).owner;
 const button = (/** @type {any} */ b, /** @type {string} */ words) => b.ev(`(() => { const el = [...document.querySelectorAll(".gsheet button, .gsheet a.btn")].find((e) => e.textContent.includes(${JSON.stringify(words)})); return el ? { text: el.textContent, off: el.disabled || el.getAttribute("aria-disabled") === "true" } : null; })()`);
 const tick = (/** @type {any} */ b) => b.js(`[...document.querySelectorAll(".gsheet .box input")].forEach((i) => { if (!i.checked) i.click(); })`);
+/** The order on its first screen: its total first, the two boxes unticked and the button in view (nothing scrolled),
+ *  the total and the button one figure, to the hundredth. @param {any} b @param {number} width */
+async function firstScreen(b, width) {
+  const r = await b.ev(`(() => { const s = document.querySelector(".gsheet"), inView = (e) => { const q = e && e.getBoundingClientRect(); return !!q && q.top >= 0 && q.bottom <= innerHeight; };
+    const boxes = [...s.querySelectorAll(".box input")], btn = [...s.querySelectorAll("button")].find((e) => e.textContent.includes("Order with obligation to pay"));
+    return { boxes: boxes.length === 2 && boxes.every((i) => !i.checked && inView(i.closest(".box"))), button: inView(btn),
+      total: (/([\\d,.]+) GNOT/.exec(s.querySelector(".review__total b")?.textContent || "") || [])[1], said: (/\\(([\\d,.]+) GNOT\\)/.exec(btn?.textContent || "") || [])[1] }; })()`);
+  say(r.boxes && r.button, `the order at ${width}: both boxes, unticked, and the button on the first screen`, JSON.stringify(r));
+  say(!!r.total && r.total === r.said && /^[\d,]+(\.\d{1,2})?$/.test(r.total), `the order at ${width}: the total and the button one figure, to the hundredth`, `${r.total} / ${r.said}`);
+}
 
 // a player with no record, in the players' window: the button says why, off
 for (const width of [390, 1280]) {
@@ -114,6 +130,7 @@ for (const width of [390, 1280]) {
   const off = await button(b, "Order with obligation to pay");
   say(!!off && off.off, "the order button waits for both boxes", off ? off.text : "none");
   say((await b.ev(`document.querySelector(".gsheet__foot")?.textContent || ""`)).includes("Tick both boxes above to order"), "the footer says why: tick both boxes");
+  await firstScreen(b, width);
   await click(b, ".gsheet button", "Order with obligation to pay");
   await sleep(600);
   say(await b.ev(`document.activeElement === document.querySelector(".gsheet .box input") && !document.activeElement.checked`), "the order pressed early: the first box focused, never ticked for them");
@@ -127,6 +144,8 @@ for (const width of [390, 1280]) {
   await click(b, ".gsheet button", "Order with obligation to pay");
   say(await until(b, w, `document.querySelector(".gsheet h2")?.textContent.includes("yours!")`, 60e3), "signed, read back: yours");
   say((await owner(5)) === env.p1, "the chain: p1 holds #5");
+  const done = await b.ev(`({ series: document.querySelector(".gsheet__meta")?.textContent || "", shares: document.querySelectorAll(".gsheet .gshare").length, icons: document.querySelectorAll(".gsheet .share__icon").length, first: document.querySelector(".gsheet__foot .btn")?.textContent || "" })`);
+  say(/#5 · (the only|one of \d+) \w+ of [\w ]+ · 1 of \d+/.test(done.series) && done.shares === 1 && !done.icons && done.first.startsWith("Play with"), "yours: his place in the series, one share button, Play first", JSON.stringify(done));
   await shot(b, "bought-1280");
   await click(b, ".gsheet button", "Your receipt");
   await until(b, w, `document.querySelector(".receipt")`);
@@ -143,13 +162,15 @@ for (const width of [390, 1280]) {
   await shot(b, "sheet-wave-cap-390");
   b.kill();
 }
-// a Legendary at its price, as any gnome (b1 has a record)
+// a Legendary at its price, as any gnome (b1 has a record), the wallet not connected yet: its button connects and
+// goes straight on to the order
 {
-  const { b, w } = await sheet("b1", 104, 390);
+  const { b, w } = await sheet("b1", 104, 390, true);
   await shot(b, "sheet-legendary-390");
-  await click(b, ".gsheet button", "Buy ");
-  await until(b, w, `document.querySelector(".gsheet .review")`);
+  say(!!(await click(b, ".gsheet button", "Connect Adena to buy")), "not connected: Connect Adena to buy");
+  say(await until(b, w, `document.querySelector(".gsheet .review")`), "connected: straight on to the order");
   await sleep(500);
+  await firstScreen(b, 390);
   await shot(b, "review-390");
   await tick(b);
   await click(b, ".gsheet button", "Order with obligation to pay");
@@ -179,6 +200,9 @@ for (const width of [390, 1280]) {
   await sleep(1000);
   const line = await b.ev(`[...document.querySelectorAll(".shop .wave__note")].map((e) => e.textContent).join(" ")`);
   say(/Everyone sees|You play/.test(line || ""), "who sees what, one line", line);
+  await until(b, w, `document.querySelector(".galbum__line")`, 20e3);
+  const team = await b.ev(`(() => { const shelf = document.querySelector(".gshelf"), album = document.querySelector(".galbum"); return { first: !!shelf && !!album && !!(shelf.compareDocumentPosition(album) & 4), folded: !!album && !album.open, line: document.querySelector(".galbum__line")?.textContent || "", mine: document.querySelector(".gbar__views button.on")?.textContent || "" }; })()`);
+  say(team.first && team.folded && /Your album \S.* \d+\/\d+ · \w+/.test(team.line) && /^Mine · \d+$/.test(team.mine), "my gnomes: the team first, the album one line under it, its count Mine's badge", JSON.stringify(team));
   await shot(b, `mine-${width}`);
   b.kill();
 }
@@ -232,6 +256,7 @@ for (const width of [390, 1280]) {
 // an earned gnome's page, a later wave's gnome
 {
   const { b } = await sheet("", "wizard", 390);
+  say(!!(await button(b, "Play the Garden Cup")) && (await b.ev(`!!document.querySelector(".gsheet .gtile--earned")`)), "an earned gnome: his tile, Play the Garden Cup");
   await shot(b, "sheet-earned-390");
   b.kill();
   const o = await sheet("p0", 150, 1280);

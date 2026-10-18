@@ -7,29 +7,29 @@
 // NEXT_PUBLIC_GNOMES), with its styles: the title and the holes' pages carry
 // none of it. Everything it shows is read: the catalogue the site serves, the
 // realm's Collection, Sold, GnomesOf and Worn, the region; each gnome drawn
-// as the thumbnails show him, or as the chain does (the look switch). On
-// sale, each wave's Legendary to come shows too, to look at.
+// as the thumbnails show him, or as the chain does (the look a sheet's switch
+// picked). On sale, each wave's Legendary to come shows too, to look at. One
+// way to each thing: the player's own under Mine (their album its badge, the
+// album itself one line under their team), the search in All alone, a share
+// one button.
 import "@/app/gnomes.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FrontScreen } from "@/components/About";
 import { Button, Segmented, Sheet } from "@/components/ui";
-import Share from "@/components/Share";
-import { UNLOCKS, worldName, type UnlockId } from "@/lib/card";
+import { CUP_NAMES, UNLOCKS, type Cup, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
 import { canBuyCard, cardFact, closingSlot, theirTitle, comingLegends, makeShop, neverMade, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
-import type { Home } from "@/lib/gnomes/vocab";
-import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchButton, SearchRow, TierChip, TierFilter, useSearch } from "./parts";
+import { Closes, ComingCard, EarnedTile, GnomeCard, SaleLine, SearchButton, SearchRow, ShareOne, TierChip, TierFilter, useSearch } from "./parts";
 import { BlankShelf, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
 import Album from "./Album";
-import Collector from "./Rank";
-import { ALBUM_WORDS, album, albumLine, albumShown, collectorsOf } from "@/lib/gnomes/collection";
+import { album, albumNext, albumShown, collectorsOf, seriesLine } from "@/lib/gnomes/collection";
 
 /** What the shop shows: a player's gnomes (who: their address, theirs read-only) and a gnome open (its id, or an earned kind). */
 export interface ShopView { who?: string; open?: string }
@@ -49,8 +49,8 @@ export interface ShopProps {
   onPlay: (skinId: string) => void;
   /** race a player's ghost */
   onRace: (player: string) => void;
-  /** to the holes, for a round */
-  onRound: () => void;
+  /** to the holes, for a round (a cup's, when one is named) */
+  onRound: (cup?: Cup) => void;
 }
 
 export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace, onRound }: ShopProps) {
@@ -69,9 +69,8 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [mineFailed, setMineFailed] = useState(false);
   const [theirs, setTheirs] = useState<{ who: string; ids: number[]; name: string; rows: Held["rows"]; failed?: true } | null>(null);
   const [now, setNow] = useState(() => Math.floor(chain.now() / 1000));
-  const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; home?: Home; text: string }>({ view: "sale", text: "" });
+  const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; text: string }>({ view: "sale", text: "" });
   const [shown, setShown] = useState(PAGE);
-  const [more, setMore] = useState(false);
   const search = useSearch(f.text, (text) => setF((x) => ({ ...x, text })));
   // the look the viewer picked, kept in this browser: on chain, the portraits read as the cards come into view
   const [look, setLook] = useState<Look>(savedLook);
@@ -123,11 +122,11 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     if (!cat || !seen) return [];
     if (theirs) return theirs.ids.map((id) => cat.gnomes.find((g) => g.id === id)).filter((g): g is Listed => !!g);
     const v: View = viewing === "mine" ? "mine" : f.view;
-    const out = shelf(cat.gnomes, { view: v, tier: f.tier, home: f.home, text: f.text }, seen).list;
+    const out = shelf(cat.gnomes, { view: v, tier: f.tier, text: v === "all" ? f.text : "" }, seen).list;
     return v === "mine" ? teamOrder(out.map((g) => ({ ...g, id: String(g.id) }))).map((g) => ({ ...g, id: Number(g.id) })) : out;
   }, [cat, seen, theirs, viewing, f]);
   // on sale, the Legendary of each wave not open yet, to look at, after the page of gnomes on sale (the same filters)
-  const coming = useMemo(() => (cat && seen && viewing === "sale" ? shelf(comingLegends(cat.gnomes, seen.c, seen.now), { view: "all", tier: f.tier, home: f.home, text: f.text }, seen).list : []), [cat, seen, viewing, f]);
+  const coming = useMemo(() => (cat && seen && viewing === "sale" ? shelf(comingLegends(cat.gnomes, seen.c, seen.now), { view: "all", tier: f.tier }, seen).list : []), [cat, seen, viewing, f]);
   useEffect(() => setShown(PAGE), [f, viewing]);
 
   const open = view.open && cat ? cat.gnomes.find((g) => String(g.id) === view.open) : undefined;
@@ -145,7 +144,13 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
   const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
-  const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
+  // Mine, the album's count its badge: the one way to the player's own
+  const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", myAlbum && myAlbum.have ? `Mine · ${myAlbum.have}` : "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
+  const searching = viewing === "all";
+  const albumOf = (owned: Held["rows"], player: string, mine: boolean) => cat && albumShown(SHOP, region ?? null) && (
+    <Album cat={cat} owned={owned} chain={chain} player={player} mine={mine} home={row && row.at !== "none" && row.at !== "closed" ? row.wave.home : undefined} onOpen={(o) => onView({ ...view, open: o })} />
+  );
+  const cup = earned && (UNLOCKS[earned.unlock as UnlockId] as { cup?: Cup } | undefined)?.cup;
 
   if (region === null)
     return (
@@ -160,7 +165,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       </FrontScreen>
     );
   return (
-    <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={theirs || viewing === "mine" ? SHOP_HEAD.page : SHOP_HEAD.eyebrow} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch /> : undefined}>
+    <FrontScreen className={`front--fit shop${theirs || viewing === "mine" ? "" : " shop--sale"}`} back="Back" onBack={onBack} onAbout={onAbout} eyebrow={theirs || viewing === "mine" ? SHOP_HEAD.page : SHOP_HEAD.eyebrow} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch /> : undefined}>
       {/* the wave's card in its place from the first frame (ShopFrame), its closing line's room kept until the sale is
           read (none when it says no date): nothing moves as they are read */}
       {!theirs && viewing !== "mine" && !row && <WaveSlot closing={closingSlot(c)} />}
@@ -171,44 +176,23 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       {viewing === "mine" && me && mine.length > 0 && (
         <>
           <p className="wave__note" style={{ textAlign: "center" }}>{wornSkin === playing ? `Everyone sees ${playingName}` : `You play ${playingName} · everyone sees ${worn ? worn.name : "a gnome of the game"}`}</p>
-          <Share text={shareWords.team(mine.length, worn ? worn.name : list[0]?.name || "")} link={`g/?who=${me}`} label="Share my team" kind="share" />
+          <span className="gshare-row"><ShareOne text={shareWords.team(mine.length, worn ? worn.name : list[0]?.name || "")} link={`g/?who=${me}`} label="Share my team" /></span>
         </>
       )}
       {theirs && <Button variant="gold" className="btn--cta" onClick={() => onRace(theirs.who)}>Race their ghost</Button>}
-      {/* the album (ADR-011): the player's own, or theirs (under their Race), a row a world, a tier, a set */}
-      {cat && albumShown(SHOP, region ?? null) && (viewing === "mine" && me ? <Album cat={cat} owned={held || []} chain={chain} player={me} mine onOpen={(o) => onView({ ...view, open: o })} />
-        : theirs && theirs.rows.length > 0 && <Album cat={cat} owned={theirs.rows} chain={chain} player={theirs.who} mine={false} onOpen={(o) => onView({ ...view, open: o })} />)}
-      {/* one toolbar: which gnomes, the tiers (their prices, once), the look, the search, more filters folded; the
-          search open and more filters each a row of their own under it */}
+      {/* their album (ADR-011), under their Race, folded; the player's own comes under their team */}
+      {theirs && theirs.rows.length > 0 && albumOf(theirs.rows, theirs.who, false)}
+      {/* one toolbar: which gnomes, the tiers (their prices and what is left, once), the search in All (open, a row of
+          its own under it) */}
       {!theirs && (
         <>
           <div className="gbar">
             <Segmented label="Which gnomes" className="gbar__views" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
-            <div className="gbar__end">
-              <LookSwitch look={look} onLook={onLook} />
-              <SearchButton search={search} />
-              <Button variant="icon" size="s" type="button" className={`gbar__icon gbar__more${f.home ? " btn--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
-              </Button>
-            </div>
+            <div className="gbar__end">{searching && <SearchButton search={search} />}</div>
           </div>
-          <SearchRow search={search} />
-          {more && (
-            <div className="gfilters" id="gmore">
-              <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>
-                <option value="">Every world</option>
-                {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{worldName(h)}</option>)}
-              </select>
-            </div>
-          )}
+          {searching && <SearchRow search={search} />}
         </>
-      )}
-      {/* the player's album in one line, its room kept from the first frame (ADR-011): a tap to it */}
-      {!theirs && viewing !== "mine" && me && (
-        <p className="galbum-line">{myAlbum && albumShown(SHOP, region ?? null) && (
-          <button className="linkish" onClick={() => onView({ who: me })}>{ALBUM_WORDS.open}{myAlbum.have > 0 && <> · {albumLine(myAlbum, row && row.at !== "none" && row.at !== "closed" ? row.wave.home : undefined)}<Collector chain={chain} player={me} /></>} ›</button>
-        )}</p>
       )}
       {/* a read that failed is said, never shown as an empty shelf: the sale's, the player's own, another's */}
       {error || (viewing === "mine" && mineFailed) || theirs?.failed ? (
@@ -231,20 +215,24 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
           {list.length > shown && <Button variant="secondary" className="gshelf__more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, list.length - shown)} more · {shown} of {list.length}</Button>}
         </>
       )}
+      {/* the player's album, under their team: one line, opening on a tap */}
+      {viewing === "mine" && me && held && held.length > 0 && albumOf(held, me, true)}
       <details className="more">
         <summary>How the gnomes work</summary>
-        <p>Each gnome is one of a kind: you pick the exact one, nothing is random, and it is yours on the chain the moment you buy it. The prices are golf numbers: 36 GNOT a Common (the par of nine holes), 72 a Rare (the par of a course), 336 an Epic (the dimples on a ball), 1,296 a Legendary (eighteen holes times par 72). Cosmetic only: same ball, same physics. Not an investment, no promise of value or resale. The shop is for adults (18+); playing stays free for everyone. Earned gnomes are free: prove the feat on the course. They can&apos;t be bought or sold.</p>
+        <p>Each gnome is one of a kind: you pick the exact one, nothing is random, and it is yours on the chain the moment you buy it. The prices are golf numbers: each gnome&apos;s sheet says which. Cosmetic only: same ball, same physics. Not an investment, no promise of value or resale. The shop is for adults (18+); playing stays free for everyone. Earned gnomes are free: prove the feat on the course. They can&apos;t be bought or sold.</p>
       </details>
       {open && c && (
         <GnomeSheet g={open} shop={shop} chain={chain} c={c} account={account} region={region === true} now={now} wallet={wallet} onConnect={onConnect}
           onClose={() => onView({ who: view.who })} playing={playing} worn={wornSkin} onPlay={onPlay} onRound={onRound} onTheirs={(who) => onView({ who })} onChanged={mineLoad}
-          look={look} onLook={onLook} />
+          look={look} onLook={onLook} series={seriesLine(open, cat ? cat.gnomes : [open])}
+          albumNote={myAlbum && held ? albumNext(myAlbum, { total: held.length, rows: held }, open.home) : null} />
       )}
       {earned && (
         <Sheet label={earned.name} onClose={() => onView({ who: view.who })} className="gsheet">
-          <div className="gsheet__head"><TierChip tier="earned" /><h2>{earned.name}</h2></div>
+          <div className="gsheet__head"><EarnedTile /><div className="gsheet__id"><TierChip tier="earned" /><h2>{earned.name}</h2></div></div>
           <p className="gsheet__line">{earned.line}</p>
           <p className="gsheet__fine">Earned in play: {UNLOCKS[earned.unlock as UnlockId]?.need || "a feat on the course"}. Free: the chain proves the feat. It can&apos;t be bought or sold.</p>
+          <div className="gsheet__foot"><Button variant="gold" className="btn--wide" onClick={() => (onView({ who: view.who }), onRound(cup || undefined))}>{cup ? `Play ${cup === "town" ? "" : "the "}${CUP_NAMES[cup]}` : "Play a round"}</Button></div>
         </Sheet>
       )}
     </FrontScreen>
