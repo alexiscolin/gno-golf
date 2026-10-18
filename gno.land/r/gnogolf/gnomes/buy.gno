@@ -11,8 +11,8 @@ import (
 
 // Buy sells the caller the gnomes ids names, 1 to 5 catalogue ids
 // separated by commas ("217,301"), and returns them as given. Each must be
-// in a wave under way and unsold; the caller's caps hold for the whole list. Exactly the sum of
-// their wave prices must be sent with the call (-send "<sum>ugnot"); it
+// in a sale under way and unsold; the caller's caps hold for the whole list. Exactly the sum of
+// their sale prices must be sent with the call (-send "<sum>ugnot"); it
 // goes to the treasury before the call returns. Any refusal reverts the call,
 // coins included.
 //
@@ -42,8 +42,8 @@ func Buy(cur realm, ids string) string {
 		o.had[i] += o.count[i]
 	}
 	bought.Set(buyer.String(), *o.had)
-	for wi, c := range o.windowCount {
-		inWindow.Set(windowKey(wi, buyer), *c)
+	for k, c := range o.windowCount {
+		inWindow.Set(k, *c)
 	}
 	for i, g := range o.gnomes {
 		mintTo(buyer, g)
@@ -62,9 +62,9 @@ func Buy(cur realm, ids string) string {
 type order struct {
 	gnomes      []gnome
 	paid        []int64
-	count       [len(tiers)]int64          // per tier, in the list
-	had         *[len(tiers)]int64         // the buyer's lifetime counts before it
-	windowCount map[int]*[len(tiers)]int64 // per wave in its player window, the list included
+	count       [len(tiers)]int64             // per tier, in the list
+	had         *[len(tiers)]int64            // the buyer's lifetime counts before it
+	windowCount map[string]*[len(tiers)]int64 // per sale in its player window (windowKey), the list included
 	total       int64
 }
 
@@ -81,18 +81,18 @@ func check(buyer address, ids string, t int64) (o order, code, why string) {
 		return o, "ids", why
 	}
 	player := false // asked of store once, only when a window needs it
-	o.windowCount = map[int]*[len(tiers)]int64{}
+	o.windowCount = map[string]*[len(tiers)]int64{}
 	for _, id := range list {
 		g, ok := gnomeAt(id)
 		if !ok {
 			return o, "unknown", errNoGnome
 		}
-		wi := waveAt(id)
-		if wi < 0 {
+		si := saleAt(id)
+		if si < 0 {
 			return o, "unlisted", "gnomes: gnome " + itoa(id) + " is not on sale"
 		}
-		w := waves[wi]
-		if t < w.start {
+		s := sales[si]
+		if t < s.start {
 			return o, "later", "gnomes: gnome " + itoa(id) + " is not on sale yet"
 		}
 		if isSold(id) {
@@ -101,22 +101,23 @@ func check(buyer address, ids string, t int64) (o order, code, why string) {
 		if isClosed(id) {
 			return o, "closed", errClosedOn()
 		}
-		if t < w.playersUntil {
+		if t < s.playersUntil {
 			if !player && !hasRecord(buyer) {
-				return o, "players-only", "gnomes: players only until " + itoa(w.playersUntil) + ": finish a hole first"
+				return o, "players-only", "gnomes: players only until " + itoa(s.playersUntil) + ": finish a hole first"
 			}
 			player = true
-			if o.windowCount[wi] == nil {
-				o.windowCount[wi] = counts(inWindow, windowKey(wi, buyer))
+			k := windowKey(s.series, buyer)
+			if o.windowCount[k] == nil {
+				o.windowCount[k] = counts(inWindow, k)
 			}
-			o.windowCount[wi][g.tier]++
-			if o.windowCount[wi][g.tier] > playerCap[g.tier] {
-				return o, "wave-cap", "gnomes: the player window takes " + itoa(playerCap[g.tier]) + " " + tiers[g.tier].name + " a wallet"
+			o.windowCount[k][g.tier]++
+			if o.windowCount[k][g.tier] > playerCap[g.tier] {
+				return o, "window-cap", "gnomes: the player window takes " + itoa(playerCap[g.tier]) + " " + tiers[g.tier].name + " a wallet"
 			}
 		}
 		o.count[g.tier]++
-		o.total += w.prices[g.tier] // at most 5 times maxPrice: no overflow
-		o.gnomes, o.paid = append(o.gnomes, g), append(o.paid, w.prices[g.tier])
+		o.total += s.prices[g.tier] // at most 5 times maxPrice: no overflow
+		o.gnomes, o.paid = append(o.gnomes, g), append(o.paid, s.prices[g.tier])
 	}
 	o.had = counts(bought, buyer.String())
 	for i := range tiers {
@@ -175,7 +176,7 @@ func counts(tree *bptree.BPTree, key string) *[len(tiers)]int64 {
 	return c
 }
 
-// windowKey is buyer's row in inWindow for waves[wi]: under the wave's first
-// id, which no other wave shares, not its place in the list, which
-// CancelWave moves.
-func windowKey(wi int, buyer address) string { return itoa(waves[wi].first) + " " + buyer.String() }
+// windowKey is buyer's row in inWindow for series name's sale: under the
+// series, which has one sale, not the sale's place in the list, which
+// CancelSale moves.
+func windowKey(name string, buyer address) string { return name + " " + buyer.String() }

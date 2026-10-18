@@ -16,7 +16,8 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	fresh(t, cur)
 	home := Render("")
 	has(t, home, "# Gnogolf Gnomes")
-	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 0 of 720 |")
+	has(t, home, "## Sale")
+	has(t, home, "| genesis | 1–720 | "+dateOf(sales[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 0 of 720 |")
 
 	g := Render("104")
 	has(t, g, "# Gnome 104")
@@ -36,7 +37,7 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	has(t, p, "Equipped: [Gnome 1](/r/gnogolf/gnomes:1)")
 	has(t, p, "[#1](/r/gnogolf/gnomes:1)")
 	has(t, Render("1"), "Owner: "+alice.String())
-	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 1 of 720 |")
+	has(t, Render(""), "| genesis | 1–720 | "+dateOf(sales[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 1 of 720 |")
 }
 
 func TestTheHomeSaysTheClose(cur realm, t *testing.T) {

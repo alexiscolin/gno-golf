@@ -12,10 +12,10 @@ import (
 )
 
 // The gnomes of Gnogolf as GRC721 tokens. The ball is a gnome: a player
-// buys the one they choose from the catalogue, at its wave's price, and
+// buys the one they choose from the catalogue, at its sale's price, and
 // equips it. The realm holds no funds: a sale's payment goes to the treasury
 // in the same call. The catalogue is data the owner publishes a series at a time
-// (catalogue.gno), sold in waves (waves.gno). This file is the state.
+// (catalogue.gno), each sold in one sale (sale.gno). This file is the state.
 var (
 	Token     *grc721.Token    // the read side: name, symbol, owners, balances, approvals
 	Royalties *royalty.Royalty // EIP-2981, read side
@@ -31,14 +31,13 @@ var (
 	mintOpen bool // the owner's switch over every sale; starts closed
 
 	catalogue []series          // in publishing order, ids following on
-	waves     []wave            // in publishing order
 	soldTier  [len(tiers)]int64 // sold per tier, every series
 	sold      []byte            // a bit per catalogue id, bit id-1 set once sold, for good (a burn does not clear it)
 
 	// bptrees, which pack many rows a node: an avl node was measured at
 	// about 2 KB of deposit a row (z_storage_buy)
 	bought   *bptree.BPTree // buyer -> [len(tiers)]int64, for the lifetime cap
-	inWindow *bptree.BPTree // "<wave's first id> <buyer>" -> [len(tiers)]int64, for the player cap
+	inWindow *bptree.BPTree // "<series> <buyer>" -> [len(tiers)]int64, for the player cap
 	equipped *bptree.BPTree // player -> token id
 )
 
@@ -63,7 +62,7 @@ func setUp(_ int, rlm realm, deployer address) {
 	for i, tr := range tiers {
 		prices[i] = tr.price
 	}
-	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
+	catalogue, sales, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
 	closeAt, rules = 0, rulesAtDeploy
 	bought, inWindow, equipped, held = seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, earnedOpen, rows = seeded(), seeded(), firstEarned, true, storeReader{}

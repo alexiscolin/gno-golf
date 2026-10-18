@@ -20,11 +20,11 @@ var (
 
 // `gno test` runs init with no signer: each test starts from a fresh
 // collection owned by the deployer, the placeholder genesis published, its
-// close a year off, one wave over all of it on sale now with no player
-// window, the mint open.
+// close a year off, its sale under way from now with no player window, the
+// mint open.
 func fresh(t *testing.T, rlm realm) {
-	noWave(t, rlm)
-	if err := addWave(1, genesisTotal(), now(), 0); err != nil {
+	noSale(t, rlm)
+	if err := openSale(genesisName, now(), 0); err != nil {
 		panic(err)
 	}
 }
@@ -42,29 +42,29 @@ func published(_ *testing.T, rlm realm) {
 func skip(seconds int64) { testing.SkipHeights(seconds/5 + 1) }
 
 // placeholderGenesis stands in for the designer's catalogue (data/gnomes.json),
-// laid out as it is: seven waves, one world each, each its 72 Commons, then
+// laid out as it is: seven worlds, each its 72 Commons, then
 // its Rares, its Epics and its Legendary (the first worlds take what is left
 // over: 21 Rares, then 20; 10 Epics, then 9). Names "Gnome <id>", traits
 // "v0.<id>", as opaque here as on chain.
 func placeholderGenesis() string {
 	var b strings.Builder
 	id := int64(1)
-	for w := int64(0); w < genesisWaves; w++ {
-		var wave [len(tiers)]int64
+	for w := int64(0); w < genesisWorlds; w++ {
+		var world [len(tiers)]int64
 		for i, s := range genesisSupply {
-			wave[i] = s / genesisWaves
-			if w < s%genesisWaves {
-				wave[i]++
+			world[i] = s / genesisWorlds
+			if w < s%genesisWorlds {
+				world[i]++
 			}
 		}
-		b.WriteString(placeholderRows(id, wave) + "\n")
-		id += wave[0] + wave[1] + wave[2] + wave[3]
+		b.WriteString(placeholderRows(id, world) + "\n")
+		id += world[0] + world[1] + world[2] + world[3]
 	}
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
-// genesisWaves is the genesis's worlds, one wave each.
-const genesisWaves = 7
+// genesisWorlds is the genesis's worlds.
+const genesisWorlds = 7
 
 // placeholderRows is a series' rows from id first, each tier's in turn,
 // Commons first.
@@ -140,11 +140,11 @@ func nthOfTier(i, n int) int64 {
 
 // priceOf is what Buy charges for id now.
 func priceOf(id int64) int64 {
-	w := waveAt(id)
-	if w < 0 {
-		panic("not in a wave: " + itoa(id))
+	si := saleAt(id)
+	if si < 0 {
+		panic("on no sale: " + itoa(id))
 	}
-	return waves[w].prices[mustGnome(id).tier]
+	return sales[si].prices[mustGnome(id).tier]
 }
 
 func common() int64 { return nthOfTier(0, 0) }

@@ -14,11 +14,11 @@ import (
 // it must never refuse what Buy takes, nor take what Buy refuses, and it
 // must say Buy's reason.
 
-// windowOf republishes the genesis as one wave from start with a player
-// window of hours.
+// windowOf opens the genesis's sale anew from start with a player window of
+// hours.
 func windowOf(start, hours int64) {
-	waves = nil
-	if err := addWave(1, genesisTotal(), start, hours); err != nil {
+	sales = nil
+	if err := openSale(genesisName, start, hours); err != nil {
 		panic(err)
 	}
 }
@@ -57,8 +57,8 @@ func TestCanBuyAndBuyNeverDisagree(cur realm, t *testing.T) {
 		{"ids", "not a gnome id: +1", alice, func() string { return "+1" }, nil},
 		{"paused", "the sale is closed", alice, func() string { return "1,1" }, func() { mintOpen = false }},
 		{"unknown", "no such gnome", alice, func() string { return itoa(lastID() + 1) }, nil},
-		{"unlisted", "gnome 200 is not on sale", alice, func() string { return "1,200" },
-			func() { waves = nil; addWave(1, 100, now(), 0) }},
+		{"unlisted", "gnome 721 is not on sale", alice, func() string { return "1,721" },
+			func() { addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})) }},
 		{"later", "gnome 1 is not on sale yet", alice, func() string { return "1" },
 			func() { windowOf(now()+3600, 0) }},
 		{"taken", "this gnome is already sold", alice, func() string { return "1" },
@@ -67,7 +67,7 @@ func TestCanBuyAndBuyNeverDisagree(cur realm, t *testing.T) {
 			func() { closeAt = now() }},
 		{"players-only", "players only until " + itoa(now()+48*3600) + ": finish a hole first", bob,
 			func() string { return "1" }, func() { windowOf(now(), 48) }},
-		{"wave-cap", "the player window takes 3 common a wallet", player,
+		{"window-cap", "the player window takes 3 common a wallet", player,
 			func() string { return idsOf(0, 4) }, func() { windowOf(now(), 48) }},
 		{"cap", "the cap is 2 epic a wallet", alice, func() string { return idsOf(2, 3) }, nil},
 	} {
@@ -114,7 +114,7 @@ func TestCanBuySaysWhatToSend(cur realm, t *testing.T) {
 }
 
 // "left" is the lifetime caps less what was bought; "window" the first id's
-// wave's player window, its caps less what was bought in it, until it ends.
+// sale's player window, its caps less what was bought in it, until it ends.
 func TestCanBuyShowsTheCapsLeft(cur realm, t *testing.T) {
 	player := testutils.TestAddress("canbuy window") // store is not reset between tests
 	testing.SetRealm(testing.NewCodeRealm(rules))
@@ -122,7 +122,7 @@ func TestCanBuyShowsTheCapsLeft(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/gnomes"))
 	fresh(t, cur)
 	windowOf(now(), 48)
-	until := itoa(waves[0].playersUntil)
+	until := itoa(sales[0].playersUntil)
 	ids := idsOf(0, 2)
 	testing.SetRealm(asUser(player, ugnot(2*priceOf(common()))))
 	Buy(cross(cur), ids)

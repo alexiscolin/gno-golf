@@ -89,7 +89,7 @@ func TestAGnomeSellsOnce(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), id) })
 }
 
-// A Legendary is bought as any gnome, at its wave's price, by the first who
+// A Legendary is bought as any gnome, at its sale's price, by the first who
 // buys it; one a wallet, ever.
 func TestALegendaryIsBoughtOneAWallet(cur realm, t *testing.T) {
 	fresh(t, cur)
@@ -135,7 +135,7 @@ func TestSetUpStartsClosedAndEmpty(cur realm, t *testing.T) {
 	setUp(0, cur, deployer)
 	uassert.False(t, MintOpen())
 	uassert.Equal(t, int64(0), lastID())
-	uassert.Equal(t, 0, len(waves))
+	uassert.Equal(t, 0, len(sales))
 }
 
 func TestAnEmptyOwnerHoldsNoPower(cur realm, t *testing.T) {
@@ -143,7 +143,7 @@ func TestAnEmptyOwnerHoldsNoPower(cur realm, t *testing.T) {
 	testing.SetRealm(asUser("", nil))
 	urequire.AbortsContains(t, cur, "only the owner", func() { SetMintOpen(cross(cur), true) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { AddSeries(cross(cur), genesisName, placeholderGenesis()) })
-	urequire.AbortsContains(t, cur, "only the owner", func() { AddWave(cross(cur), 1, 2, 0, 0) })
+	urequire.AbortsContains(t, cur, "only the owner", func() { OpenSale(cross(cur), genesisName, 0, 0) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { SetPrice(cross(cur), "common", minPrice) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { Sweep(cross(cur)) })
 }

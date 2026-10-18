@@ -68,19 +68,18 @@ func TestTheSaleClosesAtItsDateToTheBlock(cur realm, t *testing.T) {
 }
 
 func TestAClosedGnomeIsNeverSold(cur realm, t *testing.T) {
-	noWave(t, cur)
-	urequire.NoError(t, addWave(1, 1, now(), 0))
+	fresh(t, cur)
 	testing.SetRealm(asUser(alice, ugnot(priceOf(1))))
 	Buy(cross(cur), "1")
 	testing.SetRealm(asUser(deployer, nil))
 	SetCloseAt(cross(cur), now()+5)
 	skip(5)
-	// nor put in a wave afterwards
-	urequire.ErrorContains(t, addWave(2, 104, now(), 0), "closed")
 	uassert.True(t, strings.Contains(Gnome("1"), `"sold":true,"closed":false`), "a sold gnome is not closed")
 	uassert.True(t, strings.Contains(Gnome("2"), `"sold":false,"closed":true`))
-	uassert.True(t, strings.Contains(Collection(), `"series":[{"name":"genesis","first":1,"last":720,"sold":1,"closed":true}]`))
+	uassert.True(t, strings.Contains(Collection(), `"series":[{"name":"genesis","first":1,"last":720,"sold":1,"closed":true,"sale":{`))
 	uassert.True(t, strings.Contains(Collection(), `"closesAt":`+itoa(closeAt)))
+	// nor put on sale again: the close is said first
+	urequire.ErrorContains(t, openSale(genesisName, now(), 0), "gnomes: the genesis sale closed on")
 }
 
 // A later series has its own sale: the genesis's date does not close it.
@@ -91,7 +90,7 @@ func TestTheCloseIsTheGenesissOnly(cur realm, t *testing.T) {
 		best(f, id, "assisted", alice.String(), 3)
 	}
 	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
-	urequire.NoError(t, addWave(721, 723, now(), 0))
+	urequire.NoError(t, openSale("winter-2027", now(), 0))
 	testing.SetRealm(asUser(deployer, nil))
 	SetCloseAt(cross(cur), now()+5)
 	skip(5)
@@ -106,49 +105,49 @@ func TestTheCloseDateReads(t *testing.T) {
 }
 
 // The genesis is sold only once its closing date is set: before it, the
-// sale does not open and no genesis wave is added (a buyer always knows
+// sale does not open and the genesis's is not opened (a buyer always knows
 // when its sale ends). A later series is not held to it. Once one is set,
-// no genesis wave starts at or after it, which nobody could buy from.
+// the genesis's sale does not start at or after it, which nobody could buy
+// from.
 func TestTheGenesisSellsOnlyOnceItsCloseIsSet(cur realm, t *testing.T) {
 	setUp(0, cur, deployer)
 	testing.SetRealm(asUser(deployer, nil))
 	urequire.AbortsContains(t, cur, errNoClose, func() { SetMintOpen(cross(cur), true) }, "nothing published")
 	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
 	urequire.AbortsContains(t, cur, errNoClose, func() { SetMintOpen(cross(cur), true) })
-	urequire.AbortsContains(t, cur, errNoClose, func() { AddWave(cross(cur), 1, 104, now(), 0) })
+	urequire.AbortsContains(t, cur, errNoClose, func() { OpenSale(cross(cur), genesisName, now(), 0) })
 	uassert.False(t, MintOpen())
-	uassert.Equal(t, 0, len(waves))
+	uassert.Equal(t, 0, len(sales))
 	SetMintOpen(cross(cur), false) // closing it is always taken
 	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
-	urequire.NoError(t, addWave(721, 723, now(), 0), "a later series is not the genesis's")
+	urequire.NoError(t, openSale("winter-2027", now(), 0), "a later series is not the genesis's")
 
 	at := now() + 3600
 	SetCloseAt(cross(cur), at)
-	AddWave(cross(cur), 1, 104, now(), 0)
 	SetMintOpen(cross(cur), true)
 	uassert.True(t, MintOpen())
-	urequire.ErrorContains(t, addWave(105, 208, at, 0), "before the genesis sale closes")
-	urequire.ErrorContains(t, addWave(105, 208, at+5, 0), "before the genesis sale closes")
-	urequire.NoError(t, addWave(105, 208, at-5, 0))
+	urequire.ErrorContains(t, openSale(genesisName, at, 0), "gnomes: the genesis sale starts before it closes, on "+dateOf(at))
+	urequire.ErrorContains(t, openSale(genesisName, at+5, 0), "starts before it closes")
+	OpenSale(cross(cur), genesisName, at-5, 0)
 }
 
 // From the other side: a close is never set, nor brought forward, to at or
-// before a genesis wave yet to open, which nobody could then buy from.
-func TestTheCloseNeverComesBeforeAGenesisWaveYetToOpen(cur realm, t *testing.T) {
-	noWave(t, cur)
+// before the start of the genesis's sale yet to open, which nobody could
+// then buy from.
+func TestTheCloseNeverComesBeforeTheGenesisSaleOpens(cur realm, t *testing.T) {
+	noSale(t, cur)
 	start := now() + 2*24*3600
-	urequire.NoError(t, addWave(1, 104, now(), 0))
-	urequire.NoError(t, addWave(105, 208, start, 0))
+	urequire.NoError(t, openSale(genesisName, start, 0))
 	testing.SetRealm(asUser(deployer, nil))
-	urequire.AbortsContains(t, cur, "gnomes: a genesis wave starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start) })
-	urequire.AbortsContains(t, cur, "gnomes: a genesis wave starts on "+dateOf(start), func() { SetCloseAt(cross(cur), now()+3600) })
+	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start) })
+	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), now()+3600) })
 	SetCloseAt(cross(cur), start+3600)
-	urequire.AbortsContains(t, cur, "gnomes: a genesis wave starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start-5) })
+	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start-5) })
 	uassert.Equal(t, start+3600, CloseAt())
 
-	// a later series' wave does not hold the genesis's date
+	// a later series' sale does not hold the genesis's date
 	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
-	urequire.NoError(t, addWave(721, 723, start+7200, 0))
+	urequire.NoError(t, openSale("winter-2027", start+7200, 0))
 	SetCloseAt(cross(cur), start+5)
 	uassert.Equal(t, start+5, CloseAt())
 }

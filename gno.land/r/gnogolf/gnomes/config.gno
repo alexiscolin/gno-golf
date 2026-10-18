@@ -2,12 +2,12 @@ package gnomes
 
 // The collection's numbers, in one place. The genesis supply is decided:
 // 720 gnomes, ten times a par-72 course. The prices are the defaults the
-// owner starts from (SetPrice moves them, between waves). A later drop
-// needs nothing here: its size is its rows (catalogue.gno), its sale a wave
-// (waves.gno).
+// owner starts from (SetPrice moves them, for the sales yet to open). A
+// later drop needs nothing here: its size is its rows (catalogue.gno), its
+// sale one OpenSale (sale.gno).
 
 // A tier: its name, and its price at deploy, in ugnot. Every tier is sold
-// at its wave's price, the first buyer's (Buy): there is no auction.
+// at its sale's price, the first buyer's (Buy): there is no auction.
 type tier struct {
 	name  string
 	price int64
@@ -25,7 +25,7 @@ var tiers = [...]tier{
 var genesisSupply = [len(tiers)]int64{504, 144, 65, 7}
 
 // Per wallet: how many of each tier it may buy over its lifetime, and in a
-// wave's player window: one Legendary a wallet, ever.
+// sale's player window: one Legendary a wallet, ever.
 var (
 	lifetimeCap = [len(tiers)]int64{10, 5, 2, 1}
 	playerCap   = [len(tiers)]int64{3, 2, 1, 1}
@@ -33,8 +33,8 @@ var (
 
 const (
 	maxHours      = 7 * 24          // the longest player window
-	maxWaveBehind = 24 * 3600       // the furthest back a wave may start, in seconds: a day
-	maxWaveAhead  = 365 * 24 * 3600 // the furthest ahead: a year
+	maxSaleBehind = 24 * 3600       // the furthest back a sale may start, in seconds: a day
+	maxSaleAhead  = 365 * 24 * 3600 // the furthest ahead: a year
 	minPrice      = 1_000_000       // 1 GNOT, the least SetPrice takes
 	maxPrice      = 10_000_000_000  // 10,000 GNOT, the most
 )

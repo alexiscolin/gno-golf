@@ -42,7 +42,7 @@ func TestTheFirstSeriesIsTheGenesisAsConfigured(cur realm, t *testing.T) {
 }
 
 // A drop is data: a later series, of any size, continues the ids, and its
-// gnomes sell, in a wave of their own, like the genesis's.
+// gnomes sell, in a sale of their own, like the genesis's.
 func TestALaterDropContinuesTheIDs(cur realm, t *testing.T) {
 	fresh(t, cur)
 	drop := placeholderRows(721, [len(tiers)]int64{3, 2, 0, 1})
@@ -60,7 +60,7 @@ func TestALaterDropContinuesTheIDs(cur realm, t *testing.T) {
 	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
 	urequire.AbortsContains(t, cur, "not on sale", func() { Buy(cross(cur), "721") })
 	testing.SetRealm(asUser(deployer, nil))
-	AddWave(cross(cur), 721, 726, now(), 0)
+	OpenSale(cross(cur), "winter-2027", now(), 0)
 	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
 	uassert.Equal(t, "721", Buy(cross(cur), "721"))
 }

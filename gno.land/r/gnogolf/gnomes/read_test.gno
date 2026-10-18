@@ -13,7 +13,7 @@ import (
 
 func TestCollectionSaysWhatTheMintPageShows(cur realm, t *testing.T) {
 	fresh(t, cur)
-	w := waves[0]
+	s := sales[0]
 	uassert.Equal(t,
 		`{"version":1,"open":true,"earnedOpen":true,"closesAt":`+itoa(closeAt)+`,"owner":"`+deployer.String()+`","treasury":"`+deployer.String()+
 			`","pendingTreasury":"","site":"","royaltyBps":500,`+
@@ -21,9 +21,9 @@ func TestCollectionSaysWhatTheMintPageShows(cur realm, t *testing.T) {
 			`{"name":"rare","price":72000000,"cap":5,"playerCap":2,"sold":0},`+
 			`{"name":"epic","price":336000000,"cap":2,"playerCap":1,"sold":0},`+
 			`{"name":"legendary","price":1296000000,"cap":1,"playerCap":1,"sold":0}],`+
-			`"series":[{"name":"genesis","first":1,"last":720,"sold":0,"closed":false}],`+
-			`"waves":[{"first":1,"last":720,"start":`+itoa(w.start)+`,"playersUntil":`+itoa(w.playersUntil)+
-			`,"prices":[36000000,72000000,336000000,1296000000]}]}`,
+			`"series":[{"name":"genesis","first":1,"last":720,"sold":0,"closed":false,`+
+			`"sale":{"start":`+itoa(s.start)+`,"playersUntil":`+itoa(s.playersUntil)+
+			`,"prices":[36000000,72000000,336000000,1296000000]}}]}`,
 		Collection())
 }
 

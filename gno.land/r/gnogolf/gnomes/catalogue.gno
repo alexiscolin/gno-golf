@@ -62,10 +62,8 @@ func addSeries(name, data string) error {
 	if !validSlug(name) {
 		return errors.New("gnomes: a series name is 1 to 32 of [a-z0-9-]")
 	}
-	for _, s := range catalogue {
-		if s.name == name {
-			return errors.New("gnomes: series " + name + " is already published")
-		}
+	if seriesNamed(name) >= 0 {
+		return errors.New("gnomes: series " + name + " is already published")
 	}
 	if (len(catalogue) == 0) != (name == genesisName) {
 		return errors.New("gnomes: the genesis first, and once")
@@ -131,6 +129,16 @@ func gnomeAt(id int64) (gnome, bool) {
 func seriesAt(id int64) int {
 	for i, s := range catalogue {
 		if id >= s.first && id <= s.last {
+			return i
+		}
+	}
+	return -1
+}
+
+// seriesNamed returns the index of series name, -1 when none.
+func seriesNamed(name string) int {
+	for i, s := range catalogue {
+		if s.name == name {
 			return i
 		}
 	}

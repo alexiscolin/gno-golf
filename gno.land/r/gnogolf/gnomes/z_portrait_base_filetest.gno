@@ -29,7 +29,7 @@ func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
 	gnomes.SetCloseAt(cross(cur), 4102444800) // (2100: the genesis sells only once its close is set)
-	gnomes.AddWave(cross(cur), 1, 720, time.Now().Unix(), 0)
+	gnomes.OpenSale(cross(cur), "genesis", time.Now().Unix(), 0)
 	gnomes.SetMintOpen(cross(cur), true)
 
 	buyer := testutils.TestAddress("buyer")
@@ -44,7 +44,7 @@ func main(cur realm) {
 }
 
 // genesis is z_storage_genesis's, gnome 199 at its real row (an Epic of
-// wave 2, Figurehead Fen, its traits as data/gnomes.json has them).
+// the second world, Figurehead Fen, its traits as data/gnomes.json has them).
 func genesis() string {
 	var b strings.Builder
 	id := 1
@@ -78,4 +78,4 @@ func genesis() string {
 // 199
 
 // Gas:
-// 1397293891
+// 1397263498

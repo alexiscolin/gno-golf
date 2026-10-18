@@ -80,7 +80,7 @@ func TestAnEarnedTokensMetadataNamesItsKind(cur realm, t *testing.T) {
 func TestMetadataQuotesTheName(cur realm, t *testing.T) {
 	fresh(t, cur)
 	urequire.NoError(t, addSeries("odd", `721|common|Pip O'Brien Jr.|v0.a`))
-	urequire.NoError(t, addWave(721, 721, now(), 0))
+	urequire.NoError(t, openSale("odd", now(), 0))
 	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
 	Buy(cross(cur), "721")
 	md, _ := TokenMetadata("721")

@@ -38,7 +38,7 @@ func Render(path string) string {
 func renderHome() string {
 	var b strings.Builder
 	b.WriteString("# Gnogolf Gnomes\n\nThe ball you play Gnogolf with, as a token: chosen by its number, seen before it is paid for, cosmetic only. " +
-		"Every gnome sells at its wave's fixed price, to the first who buys it; the nine earned gnomes are minted free once the chain proves the feat.\n\n")
+		"Every gnome sells at its sale's fixed price, to the first who buys it; the nine earned gnomes are minted free once the chain proves the feat.\n\n")
 	if !mintOpen {
 		b.WriteString("Sales are paused.\n\n")
 	}
@@ -52,12 +52,12 @@ func renderHome() string {
 		}
 		b.WriteString("The genesis sale " + verb + " on " + dateOf(closeAt) + ".\n\n")
 	}
-	b.WriteString("## Waves\n\n| wave | gnomes | opens | common / rare / epic / legendary | found a player |\n|---|---|---|---|---|\n")
-	for i, w := range waves {
-		sold := soldIn(w.first, w.last)
-		b.WriteString("| " + itoa(int64(i+1)) + " | " + itoa(w.first) + "–" + itoa(w.last) + " | " + dateOf(w.start) + " | " +
-			wholeGNOT(w.prices[0]) + " / " + wholeGNOT(w.prices[1]) + " / " + wholeGNOT(w.prices[2]) + " / " + gnot(w.prices[3]) + " | " +
-			itoa(sold) + " of " + itoa(w.last-w.first+1) + " |\n")
+	b.WriteString("## Sale\n\n| series | gnomes | opens | common / rare / epic / legendary | found a player |\n|---|---|---|---|---|\n")
+	for _, s := range sales {
+		c := catalogue[seriesNamed(s.series)]
+		b.WriteString("| " + s.series + " | " + itoa(c.first) + "–" + itoa(c.last) + " | " + dateOf(s.start) + " | " +
+			wholeGNOT(s.prices[0]) + " / " + wholeGNOT(s.prices[1]) + " / " + wholeGNOT(s.prices[2]) + " / " + gnot(s.prices[3]) + " | " +
+			itoa(soldIn(c.first, c.last)) + " of " + itoa(c.last-c.first+1) + " |\n")
 	}
 	return b.String()
 }

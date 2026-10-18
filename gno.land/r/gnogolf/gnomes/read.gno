@@ -16,9 +16,9 @@ const pageSize = 100
 
 // Collection is the mint page's header: the sale's switch ("open") and the
 // earned gnomes' ("earnedOpen"), the genesis's closing date (0 for none), the owner, the treasury and the one offered it, the
-// site, the tiers (the price of the next wave, the
-// caps, how many sold), the series (how many sold; "closed" once the sale
-// closed, so its final supply is "sold") and the waves.
+// site, the tiers (the price of the next sale, the caps, how many sold) and
+// the series (how many sold; "closed" once the sale closed, so its final
+// supply is "sold"; its "sale", null before one is opened).
 func Collection() string {
 	var b strings.Builder
 	b.WriteString(`{"version":1,"open":` + strconv.FormatBool(mintOpen) + `,"earnedOpen":` + strconv.FormatBool(earnedOpen) + `,"closesAt":` + itoa(closeAt) +
@@ -38,30 +38,33 @@ func Collection() string {
 			b.WriteString(",")
 		}
 		b.WriteString(`{"name":"` + s.name + `","first":` + itoa(s.first) + `,"last":` + itoa(s.last) +
-			`,"sold":` + itoa(soldIn(s.first, s.last)) + `,"closed":` + strconv.FormatBool(i == 0 && genesisClosed()) + `}`)
-	}
-	b.WriteString(`],"waves":[`)
-	for i, w := range waves {
-		if i > 0 {
-			b.WriteString(",")
-		}
-		b.WriteString(`{"first":` + itoa(w.first) + `,"last":` + itoa(w.last) + `,"start":` + itoa(w.start) +
-			`,"playersUntil":` + itoa(w.playersUntil) + `,"prices":[`)
-		for j, p := range w.prices {
-			if j > 0 {
-				b.WriteString(",")
-			}
-			b.WriteString(itoa(p))
-		}
-		b.WriteString(`]}`)
+			`,"sold":` + itoa(soldIn(s.first, s.last)) + `,"closed":` + strconv.FormatBool(i == 0 && genesisClosed()) +
+			`,"sale":` + saleJSON(saleOf(s.name)) + `}`)
 	}
 	b.WriteString(`]}`)
 	return b.String()
 }
 
+// saleJSON writes sales[i] as {"start":…,"playersUntil":…,"prices":[…]},
+// per tier in ugnot; null for i -1.
+func saleJSON(i int) string {
+	if i < 0 {
+		return "null"
+	}
+	s := sales[i]
+	out := `{"start":` + itoa(s.start) + `,"playersUntil":` + itoa(s.playersUntil) + `,"prices":[`
+	for j, p := range s.prices {
+		if j > 0 {
+			out += ","
+		}
+		out += itoa(p)
+	}
+	return out + `]}`
+}
+
 // Gnome is gnome tid, of the catalogue or earned, `{"version":1,"id":""}`
-// when there is none: its owner ("" while unsold) and its price (its wave's;
-// the next wave's when in none yet; 0 for an earned one).
+// when there is none: its owner ("" while unsold) and its price (its sale's;
+// the next sale's when its series is on none yet; 0 for an earned one).
 //
 //	{"version":1,"id":"217","series":"genesis","name":"…","tier":"common",
 //	 "traits":"…","owner":"","price":36000000,"sold":false}
@@ -73,8 +76,8 @@ func Gnome(tid string) string {
 	price := int64(0)
 	if g.tier != earnedTier {
 		price = prices[g.tier]
-		if wi := waveAt(g.id); wi >= 0 {
-			price = waves[wi].prices[g.tier]
+		if si := saleAt(g.id); si >= 0 {
+			price = sales[si].prices[g.tier]
 		}
 	}
 	owner, err := Token.OwnerOf(grc721.TokenID(tid))
@@ -136,17 +139,17 @@ func GnomesOf(owner address, offset int64) string {
 // buy ids (as Buy takes them) now, and if not why. It asks Buy's own checks
 // (check), so it never says other than Buy would. "reason" is a code for
 // the screen, the first refusal Buy would meet ("" when ok): ids, paused,
-// unknown, unlisted, later, taken, closed, players-only, wave-cap,
+// unknown, unlisted, later, taken, closed, players-only, window-cap,
 // cap; "said" is Buy's sentence for it, "" when ok. "total" is the ugnot to
 // send, 0 when not ok. Neither the payment nor the direct call is checked: a
 // read has no coins and no caller. "left" is what buyer's lifetime caps
 // leave per tier Buy sells, this list not counted. "window" is the player
-// window of the first id's wave until it ends (a wave yet to start
+// window of the first id's sale until it ends (a sale yet to start
 // included): its end and what its caps leave buyer per tier, this list not
 // counted; with no such window (none, over, or no id read) "until" is 0 and
 // its "left" all 0, the lifetime caps alone holding.
 //
-//	{"version":1,"ok":false,"reason":"wave-cap","said":"the player window takes 3 common a wallet",
+//	{"version":1,"ok":false,"reason":"window-cap","said":"the player window takes 3 common a wallet",
 //	 "total":0,"left":{"common":7,"rare":5,"epic":2,"legendary":1},
 //	 "window":{"until":1767225600,"left":{"common":0,"rare":2,"epic":1,"legendary":1}}}
 func CanBuy(buyer address, ids string) string {
@@ -159,8 +162,8 @@ func CanBuy(buyer address, ids string) string {
 	until := int64(0)
 	var inWin *[len(tiers)]int64 // nil: no window
 	if list, _ := readIDs(ids); len(list) > 0 {
-		if wi := waveAt(list[0]); wi >= 0 && t < waves[wi].playersUntil {
-			until, inWin = waves[wi].playersUntil, counts(inWindow, windowKey(wi, buyer))
+		if si := saleAt(list[0]); si >= 0 && t < sales[si].playersUntil {
+			until, inWin = sales[si].playersUntil, counts(inWindow, windowKey(sales[si].series, buyer))
 		}
 	}
 	return `{"version":1,"ok":` + strconv.FormatBool(code == "") + `,"reason":"` + code +
