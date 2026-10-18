@@ -148,13 +148,13 @@ export const dateParts = (unix: number) => {
   const d = new Date(unix * 1000);
   return { weekday: DAYS[d.getUTCDay()], day: `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`, hm: `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`, year: d.getUTCFullYear() };
 };
-/** A time as a date in UTC, as the screens say it ("Mon 14 Dec, 18:00 UTC"; on its own day "today, 18:00 UTC";
- *  short: the weekday alone within the week). Never a countdown. */
+/** A time as a date in UTC, as the screens say it ("Mon 14 Dec, 18:00 UTC"; another year's, its year: "Mon 18 Oct 2027";
+ *  on its own day "today, 18:00 UTC"; short: the weekday alone within the week). Never a countdown. */
 export function utcDate(unix: number, now: number, short = false) {
   const p = dateParts(unix), hm = `${p.hm} UTC`;
   if (new Date(now * 1000).toISOString().slice(0, 10) === new Date(unix * 1000).toISOString().slice(0, 10)) return `today, ${hm}`;
   if (short && unix > now && unix - now < 6 * 86400) return `${p.weekday} ${hm}`;
-  return `${p.weekday} ${p.day}, ${hm}`;
+  return `${p.weekday} ${p.day}${p.year === dateParts(now).year ? "" : ` ${p.year}`}, ${hm}`;
 }
 /** The same time in the player's own clock, for a hover and a screen reader. */
 export const localDate = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });

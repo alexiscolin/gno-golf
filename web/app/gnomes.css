@@ -309,7 +309,8 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .owned__row::-webkit-scrollbar { display: none; }
 .owned__face { flex: none; width: 44px; height: 44px; padding: 0; border: var(--edge); border-radius: 50%; overflow: hidden; background: #f6ead2; cursor: pointer; }
 .owned__face img { width: 100%; height: 100%; object-fit: cover; }
-.owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }
+.owned__face[aria-pressed="true"] { padding: 3px; background: var(--gold); } /* (the game's "on": gold inside its edge; a ring outside is focus alone) */
+.owned__face[aria-pressed="true"] img { border-radius: 50%; }
 
 /* ---------------------------------------------------------------- the collection on the game's screens (Promo.tsx) */
 /* the picker's Collection section, between the tile and the aim card (the GUI spec's A3), at least the aim card's

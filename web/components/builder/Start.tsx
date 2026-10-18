@@ -95,7 +95,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   const fresh = (
     <section className="bholes__new" aria-labelledby="bholes-new">
       <div className="bholes__bar">
-        <h2 id="bholes-new" className="h-section">Start a new hole</h2>
+        <h3 id="bholes-new" className="h-section">Start a new hole</h3>
         {/* the worlds as the game's choices side by side, each with its emblem (the cups' own) */}
         <Segmented label="Its world" className="bholes__worlds" options={WORLDS.map((w) => [w, <><Emblem id={w} />{worldName(w)}</>] as const)} value={world} onChange={setWorld} />
       </div>
@@ -103,7 +103,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
       <div className="bholes__starts">
         {([["Start from a template", false], ["Or start blank", true]] as const).map(([label, blank]) => (
           <section key={label} className={`bholes__set${blank ? " bholes__set--blank" : ""}`} aria-label={label}>
-            <h3 className="h-sub bholes__group">{label}</h3>
+            <h4 className="h-sub bholes__group">{label}</h4>
             <ul>
               {starts.filter((s) => s.blank === blank).map((s) => (
                 <li key={s.name}>
@@ -126,7 +126,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   );
   const mine = (
     <section className="bholes__mine" aria-labelledby="bholes-mine">
-      <h2 id="bholes-mine" className="h-section bholes__h">Your holes {any && <small>{count}</small>}</h2>
+      <h3 id="bholes-mine" className="h-section bholes__h">Your holes {any && <small>{count}</small>}</h3>
       {got && author && got.rows.length > 0 && <BuilderBadges facts={factsOf(got.rows, got.saved, author)} />}
       {any ? (
         <ul className="bholes__list">
@@ -247,7 +247,7 @@ function Workshop() {
     <header className="bholes__sign" onPointerEnter={() => setHot(true)} onPointerLeave={() => setHot(false)}>
       <span ref={stage} className="bholes__gnome"><Emblem id="build" /></span>
       <div className="bholes__say">
-        <FrontHead eyebrow="The Builder" title="Hard hats on!" h1 />
+        <FrontHead eyebrow="The Builder" title="Hard hats on!" />
         <p>Build your own hole, sink it in every weather, put your name on it.</p>
       </div>
     </header>

@@ -142,6 +142,7 @@ test("shop: a date is a date in UTC, today said as today; never a countdown", ()
   assert.equal(utcDate(closes, T0), "Mon 14 Dec, 18:00 UTC");
   assert.equal(utcDate(closes, closes - 3600), "today, 18:00 UTC");
   assert.equal(utcDate(T0 + 86400, T0, true), "Sat 18:00 UTC"); // short: within the week
+  assert.equal(utcDate(Date.UTC(2027, 9, 18, 11, 46) / 1000, T0), "Mon 18 Oct 2027, 11:46 UTC", "another year's: its year");
 });
 
 // ------------------------------------------------------------ the gallery's "now" row

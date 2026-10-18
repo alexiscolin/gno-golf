@@ -93,7 +93,8 @@
 .screen--title:has(.title__film:not(.title__film--off))::after, .screen--title:has(.title__stage--on)::after { display: none; }
 
 /* a display heading: paper, inked thick, standing on its shadow */
-.front .worlds__title, .front .pick__name { margin: 2px 0 0; font-size: var(--fs-display); line-height: 1.05; font-weight: 700; color: var(--paper); --ink-w: 7px; --ink-drop: 5px; }
+.front .pick__name { font-size: var(--fs-display); }
+.front .worlds__title, .front .pick__name { margin: 2px 0 0; line-height: 1.05; font-weight: 700; color: var(--paper); --ink-w: 7px; --ink-drop: 5px; }
 /* a pill: the eyebrows, and the title's tag */
 .front .eyebrow, .newgnome .eyebrow {
   display: inline-block; padding: 4px 14px; border-radius: var(--pill);
@@ -425,7 +426,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: calc(var(--chip-room) 
 @media (min-height: 880px) { body:has(.netbanner) .screen.front--fit { padding-top: calc(var(--chip-room) + 16px); } } /* (room to spare: the block in the page's middle, not just above the banner) */
 .worlds__in.rival { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 3.4vh, 40px); width: min(var(--front-w), 100%); } /* (the parts apart, less so on a short window) */ /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
 .rival .front__head { margin: 0; }
-.front--fit .worlds__title { font-size: var(--fs-fit); } /* (the picker's own, .screen--pick .pick__name) */
+.front .worlds__title { font-size: var(--fs-fit); } /* every screen's title one size (the picker's gnome name its own: .pick__name) */
 @media (max-height: 720px) { .front--fit .front__head > .eyebrow { display: none; } }
 /* where the cups' screen scrolls from its top (globals.css): the head under the
    corner row as there, the network banner's room the screen's own (90px) */
@@ -570,7 +571,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 @media (max-width: 600px) {
   /* a phone: the head under the corner row, its title alone; the friend's bar one row, its heading said to a reader only */
   .front--fit .front__head > .eyebrow { display: none; }
-  .front--fit .worlds__title { font-size: 34px; }
+  .front .worlds__title { font-size: 34px; }
   .rival__friend { flex-wrap: wrap; gap: 6px; padding: 6px; }
   .rival__friend > .rival__h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .rival__friend .friends__add { flex: 1 1 0; min-width: 0; gap: 6px; }

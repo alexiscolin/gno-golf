@@ -106,7 +106,6 @@ export default function Header({ title, world, worlds = [], step, steps, action,
   const waits = !!action?.off && action.off !== CHECKING;
   return (
     <header className="bhead">
-      <h1 className="sr-only">The Builder</h1>
       <div className="bhead__start">
         <Button variant="icon" size="m" type="button" aria-label="Back to your holes (the draft is kept)" title="Back to your holes" onClick={onBack}>
           <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>

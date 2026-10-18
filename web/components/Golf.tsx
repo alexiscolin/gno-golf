@@ -1691,7 +1691,7 @@ export default function Golf() {
                 <span className="eyebrow">
                   {!s.official ? "Community hole · not ranked" : s.archived || !s.place ? "Archived hole · not in the cup" : <>Hole {s.place} of {s.holes.length}</>}
                 </span>
-                <h1>{s.name}</h1>
+                <h2 className="card__name">{s.name}</h2>
                 <a className="src" href={s.source} target="_blank" rel="noopener noreferrer">
                   read its code ↗
                 </a>

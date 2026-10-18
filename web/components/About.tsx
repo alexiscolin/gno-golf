@@ -113,13 +113,12 @@ export function FrontScreen({ className, tint = "garden", inner = "", back, onBa
   );
 }
 
-/** A front screen's head: the pill, the outlined title, what stands under them (dare); h1 on a page of its own (the Builder's). */
-export function FrontHead({ eyebrow, title, dare, h1 = false }: { eyebrow?: string; title: ReactNode; dare?: ReactNode; h1?: boolean }) {
-  const H = h1 ? "h1" : "h2";
+/** A front screen's head: the pill, the outlined title (an h2: the page's h1 is its name, off screen), what stands under them (dare). */
+export function FrontHead({ eyebrow, title, dare }: { eyebrow?: string; title: ReactNode; dare?: ReactNode }) {
   return (
     <div className="front__head">
       {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-      <H className="worlds__title">{title}</H>
+      <h2 className="worlds__title">{title}</h2>
       {dare}
     </div>
   );

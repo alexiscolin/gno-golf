@@ -91,7 +91,7 @@
 /* a look (the Inspector's, for the piece selected): the game's picture of it, the one the piece has gold */
 .look { aspect-ratio: 1; min-width: 0; padding: 3px; border: var(--edge); border-radius: 10px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font: inherit; cursor: grab; touch-action: none; }
 .look img { display: block; width: 100%; height: 100%; border-radius: 7px; pointer-events: none; }
-.look[aria-pressed="true"] { background: var(--gold); outline: 3px solid var(--gold); outline-offset: 1px; }
+.look[aria-pressed="true"] { background: var(--gold); } /* (the game's "on": gold inside its edge; a ring outside is focus alone) */
 .look:disabled { opacity: .45; cursor: not-allowed; }
 .palette__more { display: grid; gap: var(--sp-3); }
 /* what opens in place (More pieces, Details, Open a file, gnokey): a dashed link, the game's (.linkish) at the panel's size */
@@ -226,7 +226,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the screen's head (the game's: its pill and outlined title) at the sign's start, what the Builder is for under it */
 .bholes__say { display: grid; justify-items: start; gap: 6px; min-width: 0; }
 .bholes__say .front__head { justify-items: start; margin: 0; }
-.front .bholes__say .worlds__title { font-size: var(--fs-fit); }
 .bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
 
 /* a new hole: its world as the game's choices (Segmented, each its emblem), its starters as cards */

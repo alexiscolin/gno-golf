@@ -30,5 +30,11 @@ export default function Gate() {
       </main>
     );
   }
-  return where === "computer" ? <Builder /> : where === "phone" ? <PhoneBuilder /> : null;
+  // the page's name, off screen (a screen's title is its h2, as the game's: app/intro.tsx)
+  return (
+    <>
+      <h1 className="sr-only">The Builder</h1>
+      {where === "computer" ? <Builder /> : where === "phone" ? <PhoneBuilder /> : null}
+    </>
+  );
 }

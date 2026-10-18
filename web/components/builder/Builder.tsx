@@ -107,7 +107,7 @@ export default function Builder() {
     setHints(false);
   }, []);
 
-  if (failed) return <main className="builder-off" role="alert"><h1>The Builder could not load.</h1><p>{failed}</p><Button onClick={() => window.location.reload()}>Try again</Button></main>;
+  if (failed) return <main className="builder-off" role="alert"><h2>The Builder could not load.</h2><p>{failed}</p><Button onClick={() => window.location.reload()}>Try again</Button></main>;
   if (!host) return <main className="builder-off" aria-busy="true"><p>Loading the Builder…</p></main>;
   const d = open && drafts.find((k) => k.key === open.at)?.draft;
   // the open draft changed or deleted in another tab: open it as kept there (gone: back to the holes), or keep this tab's
