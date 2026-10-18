@@ -96,19 +96,18 @@ func CancelWave(cur realm, first int64) {
 }
 
 func cancelWave(first int64) (wave, error) {
-	for i, w := range waves {
-		if w.first != first {
-			continue
-		}
-		if now() >= w.start || soldIn(w.first, w.last) > 0 {
-			return w, errors.New("gnomes: ids " + itoa(w.first) + " to " + itoa(w.last) + " are on sale since " +
-				dateOf(w.start) + ": a wave is withdrawn only before it opens")
-		}
-		rest := make([]wave, 0, len(waves)-1)
-		waves = append(append(rest, waves[:i]...), waves[i+1:]...)
-		return w, nil
+	i := waveAt(first)
+	if i < 0 || waves[i].first != first {
+		return wave{}, errors.New("gnomes: no wave starts at id " + itoa(first))
 	}
-	return wave{}, errors.New("gnomes: no wave starts at id " + itoa(first))
+	w := waves[i]
+	if now() >= w.start || soldIn(w.first, w.last) > 0 {
+		return w, errors.New("gnomes: ids " + itoa(w.first) + " to " + itoa(w.last) + " are on sale since " +
+			dateOf(w.start) + ": a wave is withdrawn only before it opens")
+	}
+	rest := make([]wave, 0, len(waves)-1)
+	waves = append(append(rest, waves[:i]...), waves[i+1:]...)
+	return w, nil
 }
 
 // waveAt returns the index of the wave gnome id is sold in, -1 when none.
