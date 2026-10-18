@@ -23,6 +23,7 @@ import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2 } from "@/lib/types";
 import { Collector } from "@/components/gnomes/Door";
+import { MENU_HEAD } from "@/lib/menu";
 
 // onBuild: the Builder's page (none: it is to come); shop: a fourth panel, the gnome shop's: its gnome (one of the
 // sale's, once read: null until then), its line and where it leads (the gallery)
@@ -30,7 +31,7 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, sho
   const skin = gnomeById(gnome);
   const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
   return (
-    <FrontScreen className="modes" back="Back to the title" onBack={onBack} onAbout={onAbout} eyebrow="Choose your game" title="How do we play?">
+    <FrontScreen className="modes" back={MENU_HEAD.back} onBack={onBack} onAbout={onAbout} eyebrow={MENU_HEAD.eyebrow} title={MENU_HEAD.title}>
       <ul className={`modes__list${shop ? " modes__list--four" : ""}`}>
         <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>

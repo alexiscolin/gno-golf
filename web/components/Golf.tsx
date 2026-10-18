@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { menuReached, onMenuLink } from "@/lib/menu";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
@@ -352,6 +354,7 @@ export default function Golf() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const game = useRef<Game | null>(null);
   const cfg = useConfig();
+  const router = useRouter(); // (the Builder without a reload: the app's own navigation)
 
   const [s, setS] = useState<Snapshot | null>(null);
   const hot = useRef<Hot | null>(null);
@@ -361,7 +364,9 @@ export default function Golf() {
   const [boot, setBoot] = useState(0); // a retry of the start: a new game
   const [gl, setGl] = useState<null | "lost" | "gone">(null); // the WebGL context was taken away
   // title -> game choice -> cups, or rival -> their ghosts -> gnome -> play; the title shows at once, the hole loads behind it
-  const [screen, setScreen] = useState<Screen>("title");
+  // the menu's address (the Builder's and the shop's Back) opens on it from the first frame: it needs no course read
+  const [screen, setScreen] = useState<Screen>(() => (onMenuLink() ? "modes" : "title"));
+  useEffect(menuReached, []);
   const playing = screen === "play";
   // what the effects below follow of the game's state, as plain values
   const holeId = s && s.id;
@@ -681,12 +686,6 @@ export default function Golf() {
     game.current && game.current.setGnome(id);
   };
   const unlockedRef = useRef<(id: string) => boolean>(() => true);
-
-  // a link to the menu (the Builder's and the shop's Back) opens on it from the first frame: the menu needs no
-  // course read, so the title never shows while the game loads behind it
-  useEffect(() => {
-    if (cfg?.screen === "modes") setScreen("modes");
-  }, [cfg]);
 
   useEffect(() => {
     if (!cfg || !canvas.current) return;
@@ -1615,7 +1614,7 @@ export default function Golf() {
       {screen === "modes" && (
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")}
-          onBuild={builderOn() ? () => window.location.assign(buildLink(endpoints(window.location.search).keep)) : undefined}
+          onBuild={builderOn() ? () => router.push(buildLink(endpoints(window.location.search).keep)) : undefined}
           shop={shopOn ? { skin: shopSkin, line: shopBits ? shopBits.shopLine(promo) : SHOP_LINE, onOpen: () => openShop() } : undefined} />
       )}
       {screen === "rival" && s && (

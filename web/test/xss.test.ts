@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { isAddress } from "../lib/chain.ts";
-import { cupsLink, menuLink, playLink } from "../lib/builder/holes.ts";
+import { cupsLink, playLink } from "../lib/builder/holes.ts";
+import { menuLink } from "../lib/menu.ts";
 import type { HoleRow } from "../lib/types.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");

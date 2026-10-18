@@ -10,6 +10,7 @@
 // published hole opened. A new player never lands here first: the first run
 // opens the Garden's dogleg (templates.ts firstRun).
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BackButton, FrontHead } from "@/components/About";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
@@ -23,7 +24,8 @@ import { draftFile, fromFile, openPublished, type Opened } from "@/lib/builder/i
 import { census } from "@/lib/builder/drawn";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
-import { endpoints, menuLink, playLink } from "@/lib/builder/holes";
+import { endpoints, playLink } from "@/lib/builder/holes";
+import { goToMenu } from "@/lib/menu";
 import { proofKey } from "@/lib/builder/proof";
 import { FIELD, weatherName, worldName } from "@/lib/builder/rules";
 import { factsOf, isFresh, statsLine, statsOf, versusLine, type HoleStats } from "@/lib/builder/rewards";
@@ -60,6 +62,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   const [busy, setBusy] = useState(false);
   const [wipe, setWipe] = useState<number | null>(null); // the draft asked to be deleted, before the sheet's yes
   const file = useRef<HTMLInputElement>(null);
+  const router = useRouter(); // (the game's menu without a reload: the app's own navigation)
   // each starter's map, and whether it is the blank lane (its own group, its own card)
   const starts = useMemo(() => startsIn(world).map((s) => ({ ...s, map: draftMap(s.draft), blank: s.name === "blank" })), [world]);
   const keys = useKeys(drafts, host);
@@ -186,7 +189,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   );
   return (
     <div className={`screen worlds front bholes tint--${world}`}>
-      <BackButton label="Back to the game" onClick={() => window.location.assign(menuLink(keep))} />
+      <BackButton label="Back to the game" onClick={() => goToMenu(router, keep)} />
       <div className="worlds__in bholes__in">
         <Workshop />
         {/* a returning builder's holes first, above the fold; none yet, the starters first and the empty list's line after */}

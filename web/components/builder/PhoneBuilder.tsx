@@ -10,13 +10,15 @@
 import "@/app/title.css";
 import "@/app/build/phone.css";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BackButton } from "@/components/About";
 import { useCopied } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
 import { Button } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import { makeChain } from "@/lib/chain";
-import { authorOf, cupsLink, endpoints, holeByline, knownAuthor, listHoles, menuLink, playLink } from "@/lib/builder/holes";
+import { authorOf, cupsLink, endpoints, holeByline, knownAuthor, listHoles, playLink } from "@/lib/builder/holes";
+import { goToMenu } from "@/lib/menu";
 import { knownOnly } from "@/lib/community";
 import { isFresh, statsLine, statsOf } from "@/lib/builder/rewards";
 import { NO_TAKEN, takedownOf } from "@/lib/takedown";
@@ -40,6 +42,7 @@ export default function PhoneBuilder() {
   const [failed, setFailed] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const [copied, copy] = useCopied();
+  const router = useRouter(); // (the game's menu without a reload: the app's own navigation)
   const { chain, keep, author } = useMemo(() => {
     const { rpc, web, keep } = endpoints(window.location.search);
     return { chain: makeChain({ rpc, web }), keep, author: knownAuthor() };
@@ -60,7 +63,7 @@ export default function PhoneBuilder() {
   };
   return (
     <div className="screen worlds front bphone tint--garden">
-      <BackButton label="Back to the game" onClick={() => window.location.assign(menuLink(keep))} />
+      <BackButton label="Back to the game" onClick={() => goToMenu(router, keep)} />
       <div className="worlds__in bphone__in">
         <div className="front__head">
           <span className="eyebrow">The Builder</span>
