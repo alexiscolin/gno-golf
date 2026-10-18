@@ -1647,8 +1647,10 @@ h3 small {
 }
 /* a timed hole's note on the same row, left: under it, not beside it (a phone has it full width, over the toast's 160px) */
 @media (min-width: 601px) { body:has(.timed) .toast { top: 152px; } }
-/* news that is not about the shot (a card filled from the chain): in the middle of the screen */
-body .toast.toast--center { top: 50%; margin-top: -22px; }
+/* news that is not about the shot (a card filled from the chain): docked at the top edge, between the corner buttons
+   (clear of them, wrapped if it must), never over a screen's middle (a picker's gnomes, an album's rows) */
+body .toast.toast--center { top: max(14px, env(safe-area-inset-top)); width: max-content; max-width: min(560px, calc(100vw - 2 * 96px)); }
+@media (max-width: 600px) { body .toast.toast--center { max-width: calc(100vw - 2 * 84px); padding: 8px 12px; font-size: 14px; } } /* (a phone's corner buttons: 30 in, 52 wide) */
 @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 8%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
 
 /* the forecast, bottom left: a gnome's weathervane, a windsock, the sky */
