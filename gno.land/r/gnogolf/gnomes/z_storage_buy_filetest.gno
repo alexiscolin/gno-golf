@@ -70,8 +70,8 @@ func genesis() string {
 // 1
 
 // Storage:
-// gno.land/r/gnogolf/gnomes: 68080
+// gno.land/r/gnogolf/gnomes: 68082
 // gno.land/r/test/storedbuy: 0
 
 // Gas:
-// 1403643088
+// 1403655160

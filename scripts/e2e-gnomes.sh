@@ -436,6 +436,10 @@ GASW=3000000000 ok "catalogue: publish the genesis (720 rows)" "published" test1
 c=$(qg 'Collection()')
 is "catalogue: Collection series" "Collection().series[0]" "genesis 1 720 0" "$(printf %s "$c" | jf '" ".join(str(x) for x in (d["series"][0]["name"], d["series"][0]["first"], d["series"][0]["last"], d["series"][0]["sold"]))')"
 no "catalogue: once" "already published" test1 "$GN" AddSeries genesis "$(cat "$ROWS")"
+# a name is letters, digits, spaces and - ' . (the audit's payloads: a link
+# over the portrait, a bidi override)
+no "catalogue: a name with a link" "a name is 1 to 48 bytes of letters" test1 "$GN" AddSeries drop2 "721|common|x](https://e.vil/p) ![t](https://e.vil/t.png|01"
+no "catalogue: a name with a bidi override" "a name is 1 to 48 bytes of letters" test1 "$GN" AddSeries drop2 "$(printf '721|common|Pip \342\200\256gnp.evil|01')"
 is "catalogue: Gnome(104)" "Gnome(\"104\").tier,name" "legendary The Miller" "$(qg 'Gnome("104")' | jf 'd["tier"] + " " + d["name"]')"
 
 # ------------------------------------------------------- the sale opens
@@ -645,6 +649,13 @@ SEND=1ugnot no "earned: free" "an earned gnome is free" p1 "$GN" MintEarned wiza
 no "earned: a kind" "no such earned gnome" p1 "$GN" MintEarned dragon
 no "earned: not proven (Island Cup unpublished)" "not proven: pirate" p1 "$GN" MintEarned pirate
 no "earned: not proven without a record" "not proven: wizard" p0 "$GN" MintEarned wizard
+# their own switch, apart from the sale's: open at deploy
+no "earned: the switch, owner only" "only the owner" p0 "$GN" SetEarnedOpen false
+ok "earned: the switch off" "paused" test1 "$GN" SetEarnedOpen false
+is "earned: EarnedOpen(), MintOpen()" "EarnedOpen() MintOpen()" "false true" "$(qg 'EarnedOpen()') $(qg 'MintOpen()')"
+is "earned: Collection().earnedOpen" "Collection().earnedOpen" "False" "$(qg 'Collection()' | jf 'd["earnedOpen"]')"
+no "earned: none while it is off" "earned gnomes are paused" p1 "$GN" MintEarned wizard
+ok "earned: the switch on" "open" test1 "$GN" SetEarnedOpen true
 ok "earned: p1 finished the Garden Cup (wizard)" "minted 1000001" p1 "$GN" MintEarned wizard
 is "earned: OwnerOf(1000001)" "OwnerOf(\"1000001\")" "$P1" "$(qg 'OwnerOf("1000001")')"
 no "earned: once" "already minted: wizard" p1 "$GN" MintEarned wizard

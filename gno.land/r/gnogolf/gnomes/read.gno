@@ -14,14 +14,14 @@ import (
 // pageSize is a GnomesOf page.
 const pageSize = 100
 
-// Collection is the mint page's header: the switch, the genesis's closing
-// date (0 for none), the owner, the treasury and the one offered it, the
+// Collection is the mint page's header: the sale's switch ("open") and the
+// earned gnomes' ("earnedOpen"), the genesis's closing date (0 for none), the owner, the treasury and the one offered it, the
 // site, the tiers (the price of the next wave, the
 // caps, how many sold), the series (how many sold; "closed" once the sale
 // closed, so its final supply is "sold") and the waves.
 func Collection() string {
 	var b strings.Builder
-	b.WriteString(`{"version":1,"open":` + strconv.FormatBool(mintOpen) + `,"closesAt":` + itoa(closeAt) +
+	b.WriteString(`{"version":1,"open":` + strconv.FormatBool(mintOpen) + `,"earnedOpen":` + strconv.FormatBool(earnedOpen) + `,"closesAt":` + itoa(closeAt) +
 		`,"owner":` + jsonq.Quote(owner.String()) + `,"treasury":` + jsonq.Quote(treasury.String()) +
 		`,"pendingTreasury":` + jsonq.Quote(pendingTreasury.String()) + `,"site":` + jsonq.Quote(siteURL) +
 		`,"royaltyBps":` + itoa(royaltyBps) + `,"tiers":[`)

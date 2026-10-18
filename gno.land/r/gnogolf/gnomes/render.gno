@@ -42,6 +42,9 @@ func renderHome() string {
 	if !mintOpen {
 		b.WriteString("Sales are paused.\n\n")
 	}
+	if !earnedOpen {
+		b.WriteString("Earned gnomes are paused.\n\n")
+	}
 	if closeAt != 0 {
 		verb := "closes"
 		if genesisClosed() {

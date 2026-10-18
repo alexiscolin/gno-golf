@@ -76,7 +76,23 @@ var (
 	earned     *bptree.BPTree // "<player> <kind>" -> id, once per player and kind
 	kindOf     *bptree.BPTree // id -> kind
 	nextEarned int64          // the next earned id; never reused
+	earnedOpen bool           // the owner's switch over MintEarned alone; starts open
 )
+
+// EarnedOpen reports whether earned gnomes are minted.
+func EarnedOpen() bool { return earnedOpen }
+
+// SetEarnedOpen opens or closes MintEarned: the owner's switch for a fault
+// in the proof, apart from the sale's (SetMintOpen), which never stops it,
+// since it sells nothing. Open at deploy. Owner only.
+func SetEarnedOpen(cur realm, open bool) {
+	assertOwner(0, cur)
+	if open == earnedOpen {
+		return
+	}
+	earnedOpen = open
+	chain.Emit("EarnedOpen", "open", strconv.FormatBool(open))
+}
 
 const (
 	errEntry     = "gnomes: a hole entry not as golf/v2 keeps it: "
@@ -85,6 +101,7 @@ const (
 	errKind      = "gnomes: no such earned gnome: "
 	errEarned    = "gnomes: already minted: "
 	errNotProven = "gnomes: not proven: "
+	errNoEarned  = "gnomes: earned gnomes are paused: none is minted until the owner resumes them"
 	maxMissing   = 20
 	maxCupSlots  = 300 // a store page (store maxPage): a cup the proof reads whole
 )
@@ -114,11 +131,15 @@ var rows reader = storeReader{}
 // MintEarned mints the caller's earned gnome of kind ("wizard" … "miner")
 // once store proves the feat, and returns its id. Free: nothing may be sent
 // with it; the caller pays the deposit. Once per player and kind, until it
-// is burned. A direct user call, as every call that could be paid for is;
-// the switch over sales does not close it, since it sells nothing.
+// is burned. A direct user call, as every call that could be paid for is.
+// Its own switch closes it (SetEarnedOpen); the switch over sales does not,
+// since it sells nothing.
 func MintEarned(cur realm, kind string) string {
 	if !cur.Previous().IsUserCall() {
 		panic(errNotUserCall)
+	}
+	if !earnedOpen {
+		panic(errNoEarned)
 	}
 	if len(unsafe.OriginSend()) > 0 {
 		panic("gnomes: an earned gnome is free: send nothing with it")

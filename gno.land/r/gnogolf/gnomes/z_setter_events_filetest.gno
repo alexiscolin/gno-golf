@@ -12,7 +12,8 @@ import (
 
 // The owner's setters emit the events the spec lists for an indexer to
 // follow, named as it names them and with the new value: here the closing
-// date's, a wave added then withdrawn, and the site's.
+// date's, a wave added then withdrawn, the site's, and the earned gnomes'
+// switch.
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
@@ -20,6 +21,7 @@ func main(cur realm) {
 	gnomes.AddWave(cross(cur), 1, 104, time.Now().Unix()+3600, 0)
 	gnomes.CancelWave(cross(cur), 1)
 	gnomes.SetSiteURL(cross(cur), "https://gnogolf.xyz/")
+	gnomes.SetEarnedOpen(cross(cur), false)
 }
 
 // genesis is the genesis's 720 rows, each tier's in a run.
@@ -115,6 +117,16 @@ func genesis() string {
 //       {
 //         "key": "url",
 //         "value": "https://gnogolf.xyz/"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/gnogolf/gnomes"
+//   },
+//   {
+//     "type": "EarnedOpen",
+//     "attrs": [
+//       {
+//         "key": "open",
+//         "value": "false"
 //       }
 //     ],
 //     "pkg_path": "gno.land/r/gnogolf/gnomes"

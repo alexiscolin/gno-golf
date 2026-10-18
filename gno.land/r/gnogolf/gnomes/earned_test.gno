@@ -414,3 +414,34 @@ func TestEarnedIDsAreAboveEveryCatalogue(t *testing.T) {
 	uassert.True(t, firstEarned > maxSeries*maxSeriesRows)
 	uassert.Equal(t, int64(1_000_001), int64(firstEarned))
 }
+
+// The audit's L3: earned gnomes have their own switch, apart from the
+// sale's, open at deploy: the owner can stop MintEarned for a fault in the
+// proof without pausing the sale, and the sale's switch never stops it.
+func TestEarnedGnomesHaveTheirOwnSwitch(cur realm, t *testing.T) {
+	f := withRows(t, cur)
+	for _, id := range cupHoles(f, "garden", 18) {
+		best(f, id, "assisted", alice.String(), 3)
+	}
+	uassert.True(t, EarnedOpen(), "open at deploy")
+	testing.SetRealm(asUser(alice, nil))
+	urequire.AbortsContains(t, cur, "only the owner", func() { SetEarnedOpen(cross(cur), false) })
+	testing.SetRealm(asUser(deployer, nil))
+	SetEarnedOpen(cross(cur), false)
+	uassert.False(t, EarnedOpen())
+	uassert.True(t, MintOpen(), "the sale's switch is its own")
+	uassert.True(t, strings.Contains(Collection(), `"open":true,"earnedOpen":false,`), Collection())
+	has(t, Render(""), "Earned gnomes are paused.")
+	testing.SetRealm(asUser(alice, nil))
+	urequire.AbortsContains(t, cur, "gnomes: earned gnomes are paused: none is minted until the owner resumes them",
+		func() { MintEarned(cross(cur), "wizard") })
+	testing.SetRealm(asUser(alice, ugnot(priceOf(1))))
+	Buy(cross(cur), "1") // the sale goes on
+
+	testing.SetRealm(asUser(deployer, nil))
+	SetMintOpen(cross(cur), false)
+	SetEarnedOpen(cross(cur), true)
+	testing.SetRealm(asUser(alice, nil))
+	uassert.Equal(t, "1000001", MintEarned(cross(cur), "wizard"), "the sale paused, the earned open")
+	uassert.True(t, strings.Contains(Collection(), `"open":false,"earnedOpen":true,`), Collection())
+}

@@ -45,7 +45,7 @@ var (
 func init(cur realm) { setUp(0, cur, ownerAtDeploy(unsafe.OriginCaller(), runtime.ChainID())) }
 
 // setUp starts the collection empty, the catalogue unpublished, the sale
-// closed, owned by deployer: the token, its extensions, its royalty to the
+// closed and the earned gnomes open, owned by deployer: the token, its extensions, its royalty to the
 // owner. rlm is this realm's live cur, which grc721 records as the token's
 // home. The tests call it again for a fresh collection.
 func setUp(_ int, rlm realm, deployer address) {
@@ -66,7 +66,7 @@ func setUp(_ int, rlm realm, deployer address) {
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
 	closeAt, rules = 0, rulesAtDeploy
 	bought, inWindow, equipped, held = seeded(), seeded(), seeded(), seeded()
-	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
+	earned, kindOf, nextEarned, earnedOpen, rows = seeded(), seeded(), firstEarned, true, storeReader{}
 }
 
 // MintOpen reports whether sales are taken.

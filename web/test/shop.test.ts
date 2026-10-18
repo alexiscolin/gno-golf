@@ -17,7 +17,7 @@ const A = "g1" + "a".repeat(38);
 const T0 = Date.UTC(2026, 9, 9, 18) / 1000; // Fri 9 Oct 2026, 18:00 UTC
 
 const collection = (o: Partial<Collection> = {}): Collection => ({
-  version: 1, open: true, closesAt: Date.UTC(2026, 11, 14, 18) / 1000, owner: A, treasury: A, pendingTreasury: "", site: "", royaltyBps: 500,
+  version: 1, open: true, earnedOpen: true, closesAt: Date.UTC(2026, 11, 14, 18) / 1000, owner: A, treasury: A, pendingTreasury: "", site: "", royaltyBps: 500,
   tiers: [
     { name: "common", price: 36e6, cap: 10, playerCap: 3, sold: 0 },
     { name: "rare", price: 72e6, cap: 5, playerCap: 2, sold: 0 },
@@ -114,6 +114,9 @@ test("shop: an answer of another shape is refused, as the chain's", async () => 
   const shop = makeShop(chain);
   await assert.rejects(shop.collection(), /not one this page can read/);
   await assert.rejects(shop.gnomesOf(A), /not one this page can read/);
+  // the earned gnomes' switch is read too (read.gno Collection's "earnedOpen")
+  const { earnedOpen: _, ...noSwitch } = collection();
+  await assert.rejects(makeShop(fakeChain({ Collection: noSwitch }).chain).collection(), /not one this page can read/);
 });
 
 test("shop: the sold bitmap reads a bit an id, id 1 the lowest bit of the first byte", () => {

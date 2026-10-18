@@ -14,7 +14,7 @@ import (
 
 // What publishing the genesis stores, which its owner pays: 720 rows kept
 // as one string, as the catalogue lays them out, and a wave over all of it:
-// 64,230 bytes, 6.4 GNOT of deposit at 100 ugnot a byte. Then the buyer
+// 64,232 bytes, 6.4 GNOT of deposit at 100 ugnot a byte. Then the buyer
 // z_storage_buy has, its coins and its realm: that file is this one and its
 // Buy, so their difference is the Buy alone.
 func main(cur realm) {
@@ -68,8 +68,8 @@ func genesis() string {
 // {"version":1,"id":"720","series":"genesis","name":"Pip Seedwell 720","tier":"legendary","traits":"0100000000000000000000000000000000000000000000000000000720","owner":"","price":1296000000,"sold":false,"closed":false}
 
 // Storage:
-// gno.land/r/gnogolf/gnomes: 64230
+// gno.land/r/gnogolf/gnomes: 64232
 // gno.land/r/test/storedgenesis: 0
 
 // Gas:
-// 1396098819
+// 1396108872

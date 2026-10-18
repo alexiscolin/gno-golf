@@ -21,9 +21,10 @@ type PerTier = Record<BuyTier, number>;
 export interface TierRow { name: string; price: number; cap: number; playerCap: number; sold: number }
 export interface SeriesRow { name: string; first: number; last: number; sold: number; closed: boolean }
 export interface WaveRow { first: number; last: number; start: number; playersUntil: number; prices: number[] }
-/** Collection(): the switch, the genesis's closing date (0: none set), the tiers, the series, the waves. */
+/** Collection(): the sale's switch (open) and the earned gnomes' (earnedOpen), the genesis's closing date (0: none
+ *  set, and then none of the genesis on sale), the tiers, the series, the waves. */
 export interface Collection {
-  version: number; open: boolean; closesAt: number; owner: string; treasury: string; pendingTreasury: string; site: string; royaltyBps: number;
+  version: number; open: boolean; earnedOpen: boolean; closesAt: number; owner: string; treasury: string; pendingTreasury: string; site: string; royaltyBps: number;
   tiers: TierRow[]; series: SeriesRow[]; waves: WaveRow[];
 }
 /** Gnome(id): one gnome, its owner ("" unsold) and its price. */
@@ -46,7 +47,7 @@ const every = (v: unknown, ok: (x: unknown) => boolean) => Array.isArray(v) && v
 const perTier = (v: unknown): v is PerTier => isObj(v) && nums(v, ...BUY_TIERS);
 const checks = {
   collection: (v: unknown): v is Collection =>
-    isObj(v) && bools(v, "open") && nums(v, "closesAt") && strs(v, "site") &&
+    isObj(v) && bools(v, "open", "earnedOpen") && nums(v, "closesAt") && strs(v, "site") &&
     every(v.tiers, (t) => isObj(t) && strs(t, "name") && nums(t, "price", "cap", "playerCap", "sold")) &&
     every(v.series, (s) => isObj(s) && strs(s, "name") && nums(s, "first", "last", "sold") && bools(s, "closed")) &&
     every(v.waves, (w) => isObj(w) && nums(w, "first", "last", "start", "playersUntil") && every(w.prices, Number.isFinite)),
