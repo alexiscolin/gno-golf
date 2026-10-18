@@ -72,7 +72,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
   const lens = useRef<THREE.PerspectiveCamera>(null);
 
   /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn; none while the canvas is
-   *  lent (a quick test, Hole it: the game sizes and draws it). Whether it drew. */
+   *  lent (Play: the game sizes and draws it). Whether it drew. */
   const draw = (now = performance.now()): boolean => {
     const t = three.current, r = stageRenderer();
     if (!t || !r || !latest.current.size.w || r.domElement.parentElement !== box.current) return false;
@@ -91,7 +91,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
 
   /** The player's view in eye's canvas, at its own size: rendered in the board canvas's corner (the canvas grown for
    *  it if it is the larger: the view shown large), copied, then the board drawn again at its size, in one task (never
-   *  seen); only while the board holds the canvas (a quick test has it else). Whether it painted (and drew the board). */
+   *  seen); only while the board holds the canvas (Play has it else). Whether it painted (and drew the board). */
   const paint = (): boolean => {
     const t = three.current, r = stageRenderer(), el = eye?.canvas, s = latest.current.size;
     if (!t?.course || !r || !el || !stageUp() || r.domElement.parentElement !== box.current) return false;
@@ -118,7 +118,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
     return () => void (eye.paint = () => {});
   }, [eye]); // eslint-disable-line react-hooks/exhaustive-deps -- (paint reads refs only)
 
-  // the scene, on the Builder's canvas, while the board is up; given back after a quick test, it draws again
+  // the scene, on the Builder's canvas, while the board is up; given back after Play, it draws again
   useEffect(() => {
     const r = stageRenderer();
     if (!r) return;

@@ -2,13 +2,14 @@
 
 // The Builder's start on a computer (the GUI spec's B7, "Your holes"): the
 // workshop (the game's Miner in his hard hat over a blueprint, what the
-// Builder is for and its three steps), a new hole in a world (its tab, its
-// starters as cards that show the hole and say in a line what it is), the
-// drafts this browser keeps as cards with their state, the author's holes on
-// the chain with who played them and the Builder's badges (Rewards.tsx), and
-// a file or a published hole opened. A new player never lands here first: the
-// first run opens the Garden's dogleg (templates.ts firstRun).
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+// Builder is for in a line: the editor's steps say the rest), a new hole in a
+// world (its tab, its starters as cards that show the hole and say in a line
+// what it is), the drafts this browser keeps as cards (the whole card opens
+// one; its weathers ticked as holed), the author's holes on the chain with
+// who played them and the Builder's badges (Rewards.tsx), and a file or a
+// published hole opened. A new player never lands here first: the first run
+// opens the Garden's dogleg (templates.ts firstRun).
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackButton, FrontHead } from "@/components/About";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
@@ -24,7 +25,7 @@ import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
 import { endpoints, playLink } from "@/lib/builder/holes";
 import { proofKey } from "@/lib/builder/proof";
-import { FIELD, worldName } from "@/lib/builder/rules";
+import { FIELD, weatherName, worldName } from "@/lib/builder/rules";
 import { factsOf, isFresh, statsLine, statsOf, versusLine, type HoleStats } from "@/lib/builder/rewards";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import type { HoleRow } from "@/lib/types";
@@ -134,19 +135,23 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
           {drafts.map((d, i) => {
             const st = draftState(d, keys[i] ?? null), h = rowOf(d);
             return (
-              <li key={i} className="bholes__draft">
+              <li key={i} className="bholes__draft bholes__draft--open">
                 <span className="bholes__map bholes__map--s"><HoleMap hole={draftMap(d)} className="bholes__svg" /></span>
                 <span className="bholes__name">
-                  <b>{d.title || "A hole with no name yet"}</b>
+                  {/* the whole card opens it (this button's area covers it: its other links over it) */}
+                  <button type="button" className="bholes__pick" onClick={() => onOpen(i)}><b>{d.title || "A hole with no name yet"}</b></button>
                   <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
-                  {/* (published and not tested here since: its line on the chain says it all) */}
-                  {!(h && st.stage === "new") && <span className={`bholes__state bholes__state--${st.stage}`}>{st.word}</span>}
+                  {/* its weathers, ticked as holed (published and none holed here since: its line on the chain says it all) */}
+                  {!(h && st.stage === "new") && (
+                    <span className={`bholes__state bholes__state--${st.stage}`} aria-label={`Weathers holed: ${st.word}`}>
+                      {st.ticks.map((t, k) => <span key={t.kind} className={t.done ? "on" : undefined}>{k ? " · " : ""}{weatherName(t.kind)}{t.done ? " ✓" : ""}</span>)}
+                    </span>
+                  )}
                   {h && live(h)}
                   {/* the author's test round, the record to beat while none of theirs is saved */}
                   {h && got && author && !statsOf(h, got.saved, author).mine && <SaveTestRound chain={chain} proofs={d.proofs} id={h.id} world={d.world} author={author} onSaved={reload} />}
                 </span>
                 <span className="bholes__acts">
-                  <Button size="s" onClick={() => onOpen(i)}>Open</Button>
                   {h && <a className="linkish" href={playLink(h, keep)}>Play</a>}
                   <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
                   <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
@@ -236,7 +241,7 @@ function useKeys(drafts: readonly Draft[], host: BuilderHost) {
   return keys;
 }
 
-/** The workshop's sign: the game's Miner in his hard hat, out of a blueprint's disc (the menu's Builder panel's), hopping under the pointer; what the Builder is for; its three steps. */
+/** The workshop's sign: the game's Miner in his hard hat, out of a blueprint's disc (the menu's Builder panel's), hopping under the pointer; what the Builder is for, in a line. */
 function Workshop() {
   const [hot, setHot] = useState(false);
   const stage = useGnomeStage<HTMLSpanElement>(gnomeById("miner"), { act: "hop", playing: hot });
@@ -245,21 +250,8 @@ function Workshop() {
       <span ref={stage} className="bholes__gnome"><Emblem id="build" /></span>
       <div className="bholes__say">
         <FrontHead eyebrow="The Builder" title="Hard hats on!" h1 />
-        <p>Build your own hole. Test it. Put your name on it.</p>
+        <p>Build your own hole, sink it in every weather, put your name on it.</p>
       </div>
-      <ol className="bholes__steps" aria-label="How it goes">
-        <Step n={1} name="Pick" line="a template or a blank lane"><path d="M5 6h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" className="i-paper" /><path d="M6 16q4-7 8-2t4-4" className="i-dash" /><circle cx="18" cy="10" r="1.6" className="i-ink" /></Step>
-        <Step n={2} name="Build" line="drag pieces onto the board"><path d="M4 20 13 11" className="i-line" /><path d="M11 6.5 15 3l6 6-3.5 4z" className="i-gold" /></Step>
-        <Step n={3} name="Hole it & publish" line="in every weather, then sign it"><path d="M8 21V4" className="i-line" /><path d="M8 4l10 3.5L8 11z" className="i-flag" /><ellipse cx="9" cy="21" rx="6" ry="1.6" className="i-ink" /></Step>
-      </ol>
     </header>
   );
 }
-
-/** One of the three steps: a small inked picture, its name and a few words. */
-const Step = ({ n, name, line, children }: { n: number; name: string; line: string; children: ReactNode }) => (
-  <li className="bholes__step">
-    <svg viewBox="0 0 24 24" aria-hidden="true">{children}</svg>
-    <span><b><i>{n}</i>{name}</b><small>{line}</small></span>
-  </li>
-);

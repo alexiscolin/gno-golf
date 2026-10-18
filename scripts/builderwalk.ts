@@ -2,24 +2,27 @@
 // The Builder's starter path, timed (the GUI spec's B6): a new player in a
 // headless Chrome against a dev server with the Builder on, from /build to a
 // proved hole on the Publish form. It opens /build (the first run: the
-// Garden's dogleg and its hints), presses Got it, drags a Bumper onto the
-// starter, presses Hole it, pastes the address the hole is proved under, holes
-// each weather (each round found as scripts/starters.ts finds one, through
-// the page's own test chain, builder.wasm; each shot fired as an aim would
-// fire it, through the game's ?camlog hook, and counted as one drag; each
-// next weather starting on its own), and presses Publish on the summary
-// card the last one ends on. It reports the wall time and the clicks, drags and fields
-// typed in, and fails over 5 minutes or over B6's budget. Without a local
-// chain the Publish form says the chain is unread: it still counts as
-// reached (B6).
+// Garden's dogleg and its hints, which the first drag puts away), drags a
+// Bumper onto the starter, presses Play, holes a try in calm weather, pastes
+// the address the hole is proved under in the line the HUD then shows (the
+// try is replayed as the calm proof), holes each weather left (each round
+// found as scripts/starters.ts finds one, through the page's own test chain,
+// builder.wasm; each shot fired as an aim would fire it, through the game's
+// ?camlog hook, and counted as one drag; each next weather starting on its
+// own under its title card), and presses Publish on the summary card the
+// last one ends on. It reports the wall time and the clicks, drags and
+// fields typed in, and fails over 5 minutes or over B6's budget (4 clicks
+// since Play and Hole it are one: 5 before; 2 with Adena already sharing
+// an account with the site). Without a local chain the Publish form says
+// the chain is unread: it still counts as reached (B6).
 //
 //   APP=http://localhost:3471 node --experimental-strip-types scripts/builderwalk.ts
 //
 // WIDTH and HEIGHT set the window (1280x800); NOSUBTLE=1 takes crypto.subtle
 // away, as a page on plain http from another machine is. At the first run it checks
-// that the three hints, Got it and the three steps' words are each in the
-// window, on top (nothing drawn over them), and readable (4.5:1 on their
-// ground at least).
+// that the three hints and the three steps' words are each in the window, on
+// top (nothing drawn over them), and readable (4.5:1 on their ground at
+// least), and that the hints are gone once a piece is dragged.
 //
 // With SEED (a seed.env of scripts/e2e-gnomes.sh SEED=1 or try-local.sh)
 // and KEY (one of its keys, p1 by default), the hole is proved under that
@@ -47,8 +50,8 @@ const stand = SEED
   : null;
 const env = stand ? stand.seedEnv(SEED) : null;
 const LIMIT_MS = 5 * 60_000;
-/** B6's budget for the starter path: Got it, Hole it, the address the hole is proved under (pasted: its field shown, then used), Publish. */
-const BUDGET = { clicks: 5, typed: 1 };
+/** B6's budget for the starter path: Play, the address the hole is proved under (pasted: its field shown, then used), Publish. */
+const BUDGET = { clicks: 4, typed: 1 };
 const AUTHOR = env ? env[KEY] : "g1" + "q".repeat(38);
 
 const t0 = Date.now();
@@ -78,29 +81,29 @@ const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMous
 try {
   // open /build: the first run
   await c.send("Page.navigate", { url: `${APP}/build/?camlog` });
-  await until(`!!document.querySelector(".bhint__ok")`, "the first run's hints");
-  said(`opened on ${await c.js<string>(`document.querySelector(".bhead__hole input").value`)}`);
+  await until(`document.querySelectorAll(".bhint").length === 3`, "the first run's hints");
+  said(`opened on ${await c.js<string>(`document.querySelector(".bhead__name input").value`)}`);
   // the first run's guidance, every part of it seen: in the window, on top, readable
   const unseen = await c.js<string[]>(`(() => {
     const lum = (rgb) => { const [r, g, b] = rgb.match(/[\\d.]+/g).slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
     const ground = (el) => { for (let e = el; e; e = e.parentElement) { const bg = getComputedStyle(e).backgroundColor; if (!/rgba\\(.*, 0\\)$/.test(bg) && bg !== "transparent") return bg; } return "rgb(255, 255, 255)"; };
-    const parts = [...document.querySelectorAll(".bhint, .bhint__ok"), ...[...document.querySelectorAll(".stepper .step button")].map((b) => b.querySelector("span") || b)];
+    const parts = [...document.querySelectorAll(".bhint"), ...[...document.querySelectorAll(".stepper .step button")].map((b) => b.querySelector("span") || b)];
     const bad = [];
-    if (parts.length < 7) bad.push("only " + parts.length + " parts (3 hints, Got it, 3 steps)");
+    if (parts.length < 6) bad.push("only " + parts.length + " parts (3 hints, 3 steps)");
     for (const el of parts) {
       const r = el.getBoundingClientRect(), name = (el.textContent || "").trim().slice(0, 30), cs = getComputedStyle(el);
       if (!r.width || !r.height || cs.display === "none" || cs.visibility !== "visible" || +cs.opacity < 0.9) { bad.push(name + ": not shown"); continue; }
       if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) { bad.push(name + ": out of the window"); continue; }
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      if (!top || !(top === el || el.contains(top) || top.contains(el) || el.closest("button") === top.closest("button"))) bad.push(name + ": under " + (top ? String(top.className || top.tagName) : "nothing"));
+      // (the hints let the pointer through: the element on top is what lies under them, so a hint is looked for itself)
+      if (!el.classList.contains("bhint") && (!top || !(top === el || el.contains(top) || top.contains(el) || el.closest("button") === top.closest("button")))) bad.push(name + ": under " + (top ? String(top.className || top.tagName) : "nothing"));
       const [a, b] = [lum(cs.color), lum(ground(el))], ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
       if (ratio < 4.5) bad.push(name + ": contrast " + ratio.toFixed(1));
     }
     return bad;
   })()`);
   if (unseen.length) throw new Error(`the first run's guidance is not all seen at ${innerSize()}: ${unseen.join("; ")}`);
-  said(`the hints, Got it and the steps' words all seen at ${innerSize()}`);
-  await click(`document.querySelector(".bhint__ok")`, "Got it");
+  said(`the hints and the steps' words all seen at ${innerSize()}`);
 
   // a Bumper dragged onto the starter, beside the tee (the pieces' count says where it held)
   const n0 = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
@@ -120,23 +123,44 @@ try {
     said(`the bumper did not hold there: ${await c.ev<string>(`document.querySelector(".board__said")?.textContent || ""`)}`);
   }
   if ((await c.js<number>(`document.querySelectorAll("[data-piece]").length`)) <= n0) throw new Error("no bumper placed");
-  said("drag: a Bumper onto the board");
+  if (await c.js<number>(`document.querySelectorAll(".bhint").length`)) throw new Error("the first run's hints still up after a drag");
+  said("drag: a Bumper onto the board (the hints gone with it)");
 
-  // Hole it, under the author's address
-  await until(`!document.querySelector(".bhead__end .btn[aria-disabled]")`, "Hole it on");
-  await click(button(/^Next: Hole it →$/), "Next: Hole it →");
-  // the step opens on its one line, over the weathers to hole, none ticked yet
-  await until(`!!document.querySelector(".tmode--ask .tmode__intro")`, "the Hole it step's first page");
-  const opens = await c.js<{ line: string; chips: number; done: number }>(`({ line: document.querySelector(".tmode--ask .tmode__intro").textContent, chips: document.querySelectorAll(".tmode--ask .tmode__chip").length, done: document.querySelectorAll(".tmode--ask .tmode__chip--done").length })`);
-  if (!opens.line.startsWith("Before your hole goes on chain, you must sink it yourself") || opens.chips < 3 || opens.done) throw new Error(`the Hole it step's first page: ${JSON.stringify(opens)}`);
-  await click(button(/^Or paste an address/), "Or paste an address");
-  await until(`!!document.querySelector(".tmode__addr input")`, "the address step");
+  // Play: no address known, a try in calm weather, then the address in the HUD's line
+  await until(`!document.querySelector(".bhead__act[aria-disabled]")`, "Play on");
+  await click(`document.querySelector(".bhead__act")`, "Play");
+  const kind0 = await holeOne();
+  said(`${kind0}: a try holed`);
+  await until(`!!document.querySelector(".tmode__sign")`, "the address asked in the HUD, once a try is holed");
+  await click(button(/^or paste an address/i), "or paste an address");
+  await until(`!!document.querySelector(".tmode__addr input")`, "the address field");
   await c.js(`(() => { const el = document.querySelector(".tmode__addr input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(AUTHOR)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   count.typed++;
   await click(button(/^Use this address$/), "Use this address");
+  // the try replayed as the author's calm round: Clear ticked without playing it again
+  await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === "Clear")`, "the try counted as the calm proof", 60_000);
+  said("Clear: the try counted, under the author's address");
 
-  // each weather holed: a round found through the page's test chain, then played shot by shot
-  for (let w = 0; w < 6; w++) {
+  // each weather left holed, the next starting on its own under its title card, the last ending on the summary
+  for (let w = 0; w < 6 && !(await c.ev<boolean>(`!!document.querySelector(".tmode__sum")`)); w++) {
+    const kind = await holeOne();
+    await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === ${JSON.stringify(kind)})`, `${kind} proved`, 60_000);
+    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__now")?.textContent || "").startsWith("Now: ")`, `${kind}: the summary or the next weather's title card`, 10_000);
+    said(`${kind}: holed and proved · ${await c.js<string>(`document.querySelector(".tmode__sum") ? "the summary" : document.querySelector(".tmode__now").textContent`)}`);
+  }
+  await until(`!!${onCard(/^Publish →$/)}`, "every weather proved: Publish on the summary", 60_000);
+  said(`the summary: ${await c.js<string>(`[...document.querySelectorAll(".tmode__sum tbody tr")].map((r) => r.textContent).join(" | ")`)}`);
+  // (the walk's own Publish click below)
+  await publishAndCheck();
+} catch (e) {
+  console.error(`builderwalk: ${e instanceof Error ? e.message : String(e)}`, JSON.stringify(count), JSON.stringify(c.errors).slice(0, 800));
+  console.error("state", JSON.stringify(await c.ev(`({ pub: document.querySelector(".pub")?.textContent.replace(/\\s+/g, " ").slice(-400), chips: [...document.querySelectorAll(".tmode__chip")].map((x) => x.className + " " + x.textContent), score: document.querySelector(".tmode__score")?.textContent, won: document.querySelector(".tmode__won")?.textContent, notes: [...document.querySelectorAll(".tmode__notes p")].map((x) => x.textContent), step: document.querySelector("[aria-current=step]")?.textContent })`)));
+  c.kill();
+  process.exit(1);
+}
+
+/** The weather now played holed: a round found through the page's test chain, then played shot by shot (each a drag); its weather's name. */
+async function holeOne(): Promise<string> {
     await until(`!!window.__g && !!document.querySelector(".tmode__chip--now:not(.tmode__chip--done)") && document.querySelector(".tmode__score strong")?.textContent === "0" && !document.querySelector(".tmode__won")`, "a weather to play", 90_000);
     const kind = await c.js<string>(`document.querySelector(".tmode__chip--now .weather__say").textContent`);
     await sleep(1500);
@@ -170,20 +194,17 @@ try {
       count.drags++;
       count.shots++;
     }
-    // proved: the next weather on its own, said in the HUD, or the summary
-    await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === ${JSON.stringify(kind)})`, `${kind} proved`, 60_000);
-    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__done")?.textContent || "").startsWith(${JSON.stringify(`${kind} holed · next: `)})`, `${kind}: the summary or the next weather said`, 10_000);
-    said(`${kind}: holed and proved · ${await c.js<string>(`document.querySelector(".tmode__sum") ? "the summary" : document.querySelector(".tmode__done").textContent`)}`);
-    if (await c.ev<boolean>(`!!document.querySelector(".tmode__sum")`)) break;
-  }
-  await until(`!!${onCard(/^Publish →$/)}`, "every weather proved: Publish on the summary", 60_000);
-  said(`the summary: ${await c.js<string>(`[...document.querySelectorAll(".tmode__sum tbody tr")].map((r) => r.textContent).join(" | ")`)}`);
+    return kind;
+}
 
-  // Publish: the form, the name suggested
+/** Publish pressed on the summary: the form and its checks, the budget, and (SEED) published for real. */
+async function publishAndCheck() {
+  try {
+  // Publish: the form, the name shown
   await click(onCard(/^Publish →$/), "Publish →");
   await until(`!!document.querySelector(".pub")`, "the Publish form");
   await sleep(3000);
-  const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub input")?.value || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
+  const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub__field b")?.textContent || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
   said(`on the Publish form: "${form.name}" · ${form.note || "ready"}${/could not be read/.test(form.note) ? " (chain unread: counts as reached, B6)" : ""}`);
   // the publish layout on a short wide window: the hole's card in sight
   const card = await c.js<{ b: number; h: number }>(`(() => { const r = document.querySelector(".pub__card")?.getBoundingClientRect(); return { b: r ? r.bottom : 1e9, h: innerHeight }; })()`);
@@ -193,13 +214,13 @@ try {
   console.log(JSON.stringify({ seconds: Math.round(ms / 1000), ...count }));
   if (ms > LIMIT_MS) throw new Error(`over 5 minutes: ${Math.round(ms / 1000)} s`);
   if (count.clicks > BUDGET.clicks || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
-  // past the path (not counted): a short wide window keeps the hole's card in sight; the Hole it step goes back to the test
+  // past the path (not counted): a short wide window keeps the hole's card in sight; the Play step goes back to play (its summary at once)
   await c.send("Emulation.setDeviceMetricsOverride", { width: 1366, height: 650, deviceScaleFactor: 1, mobile: false });
   await sleep(800);
   const short = await c.js<{ b: number; h: number }>(`(() => { const r = document.querySelector(".pub__card").getBoundingClientRect(); return { b: r.bottom, h: innerHeight }; })()`);
   if (short.b > short.h) throw new Error(`1366x650: the hole's card is cut off the Publish form (${short.b} > ${short.h})`);
-  await c.js(`[...document.querySelectorAll(".step button")].find((b) => /Hole it/.test(b.textContent)).click()`);
-  await until(`!!document.querySelector(".tmode")`, "the Hole it step from Publish: test mode", 10_000);
+  await c.js(`[...document.querySelectorAll(".step button")].find((b) => /Play/.test(b.textContent)).click()`);
+  await until(`!!document.querySelector(".tmode .tmode__sum")`, "the Play step from Publish: play, every weather holed: its summary", 30_000);
   if (wallet) {
     // published for real: back to Publish, Publish in Adena, signed by the stand-in, until the page says it landed
     await c.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -213,9 +234,10 @@ try {
   console.log("builderwalk: ok");
   c.kill();
   process.exit(0);
-} catch (e) {
+  } catch (e) {
   console.error(`builderwalk: ${e instanceof Error ? e.message : String(e)}`, JSON.stringify(count), JSON.stringify(c.errors).slice(0, 800));
   console.error("state", JSON.stringify(await c.ev(`({ pub: document.querySelector(".pub")?.textContent.replace(/\\s+/g, " ").slice(-400), chips: [...document.querySelectorAll(".tmode__chip")].map((x) => x.className + " " + x.textContent), score: document.querySelector(".tmode__score")?.textContent, won: document.querySelector(".tmode__won")?.textContent, notes: [...document.querySelectorAll(".tmode__notes p")].map((x) => x.textContent), step: document.querySelector("[aria-current=step]")?.textContent })`)));
   c.kill();
   process.exit(1);
+  }
 }

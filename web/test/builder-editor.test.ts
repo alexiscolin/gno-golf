@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { NO_GL, commonShift, dials, gauges, meterFace, nearLimits, offAtLimit, problems, shortWhy, testGate, verdict, type Gauge } from "../lib/builder/editor.ts";
+import { NO_GL, brokenLine, commonShift, dials, gauges, meterFace, nearLimits, offAtLimit, problems, shortWhy, testGate, type Gauge } from "../lib/builder/editor.ts";
 import type { Shown } from "../lib/builder/difficulty.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
@@ -21,23 +21,12 @@ const entry = (id: string) => garden.find((e) => e.id === id)!;
 const err = (rule: Issue["rule"]): Issue => ({ rule, severity: "error", text: "x" });
 const stateAt1 = (hex: string) => (host.load(DRAFT_ID, hex), host.setperiod(1), JSON.parse(host.state(DRAFT_ID)) as unknown);
 
-void test("verdict: what to fix first, then ready to test, then proved", () => {
-  assert.deepEqual(verdict({ pieces: 0, errors: 0, proved: false }), { ok: false, text: "Place pieces between the tee and the cup" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false }), { ok: false, text: "2 things to fix" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 1, proved: false }), { ok: false, text: "1 thing to fix" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false }), { ok: true, text: "Ready: press T to try it, or hole it." });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: true }), { ok: true, text: "Holed in every weather: press Publish." });
-  // the one place the next step's reason is said, in words (the header's action keeps its own words, so nothing moves)
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Give it a short name first" }), { ok: false, text: "Give it a short name first" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Checking…" }), { ok: true, text: "Ready: press T to try it, or hole it." }, "a check under way changes nothing said");
-  assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false, off: "Fix 2 first" }), { ok: false, text: "2 things to fix" });
-  // proofs over an edit: the rounds that broke said, the weathers still holed after them, ready to test again
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, rounds: { kept: ["", "rain"], broken: ["Your Wind round now stops short"] } }),
-    { ok: true, warn: true, text: "Your Wind round now stops short · Clear and Rain still holed" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, rounds: { kept: [], broken: ["Your Clear round now stops short", "Your Wind round now stops short"] } }),
-    { ok: true, warn: true, text: "Your Clear round now stops short · and 1 more" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: true, rounds: { kept: ["", "wind", "rain"], broken: [] } }), { ok: true, text: "Holed in every weather: press Publish." });
-  assert.deepEqual(verdict({ pieces: 3, errors: 1, proved: false, rounds: { kept: [], broken: ["Your Wind round now stops short"] } }), { ok: false, text: "1 thing to fix" }, "a thing to fix first");
+void test("brokenLine: the rounds an edit broke, said calm, the weathers still holed after them; nothing else (the header says it)", () => {
+  assert.equal(brokenLine({ errors: 0, proved: false }), "", "all well: nothing said under the board");
+  assert.equal(brokenLine({ errors: 0, proved: false, rounds: { kept: ["", "rain"], broken: ["Your Wind round now stops short"] } }), "Your Wind round now stops short · Clear and Rain still holed");
+  assert.equal(brokenLine({ errors: 0, proved: false, rounds: { kept: [], broken: ["Your Clear round now stops short", "Your Wind round now stops short"] } }), "Your Clear round now stops short · and 1 more");
+  assert.equal(brokenLine({ errors: 0, proved: true, rounds: { kept: ["", "wind", "rain"], broken: [] } }), "");
+  assert.equal(brokenLine({ errors: 1, proved: false, rounds: { kept: [], broken: ["Your Wind round now stops short"] } }), "", "a thing to fix first: listed under the board");
   void err;
 });
 
@@ -93,27 +82,20 @@ void test("nearLimits: a limit said only when near it (amber from 80%), in words
   assert.deepEqual(nearLimits([g("Walls", 4, 160, "ok")]), [], "far from every limit: nothing said");
 });
 
-void test("dials: the player's four gauges always, a chain count only from 80%, the rest in the chain limits' tooltip", () => {
+void test("dials: a gauge only once it nears its limit (amber from 80%), in order, the player's own first; nothing while far from them all", () => {
   const g = (name: string, used: number, of: number, level: Gauge["level"], shown = `${used}/${of}`): Gauge => ({ name, used, of, level, shown });
   const calm = [g("Pieces", 6, 60, "ok", "6 / 60"), g("Moving", 0, 8, "ok", "0 / 8"), g("Walls", 4, 160, "ok"), g("Posts", 2, 32, "ok"), g("Zones", 0, 32, "ok"), g("Points", 0, 512, "ok"), g("Size", 512, 32768, "ok", "0.5 KB"), g("Room", 19, 100, "ok", "81%")];
-  const d = dials(calm);
-  assert.deepEqual(d.dials.map((x) => [x.label, x.shown, x.fill, x.level]), [["Pieces", "6 / 60", 10, "ok"], ["Moving", "0 / 8", 0, "ok"], ["Room for shots", "81%", 81, "ok"], ["Size", "0.5 KB", 2, "ok"]],
-    "Pieces, Moving, the room (its bar the room left), Size; nothing of the chain's counts");
-  assert.equal(d.chain, "Walls 4/160 · Posts 2/32 · Zones 0/32 · Points 0/512");
-  assert.deepEqual(d.reached, [], "no limit reached: no sentence");
-  assert.match(d.dials[2].title, /room left for a first shot in its stormiest weather: 81%/i);
-  // a chain count near its limit (80%) joins the line, amber; one at its cap, red, and its sentence said
-  const near = dials(calm.map((x) => (x.name === "Posts" ? g("Posts", 26, 32, "warn") : x.name === "Zones" ? g("Zones", 32, 32, "full") : x)));
-  assert.deepEqual(near.dials.slice(4).map((x) => [x.label, x.shown, x.fill, x.level]), [["Posts", "26/32", 81, "warn"], ["Zones", "32/32", 100, "full"]]);
-  assert.equal(near.chain, "Walls 4/160 · Points 0/512");
+  assert.deepEqual(dials(calm), { dials: [], reached: [] }, "far from every limit: no gauge, no \"0.5 KB\"");
+  // a count near its limit (80%) shown, amber; one at its cap, red, and its sentence said; the player's own first
+  const near = dials(calm.map((x) => (x.name === "Posts" ? g("Posts", 26, 32, "warn") : x.name === "Zones" ? g("Zones", 32, 32, "full") : x.name === "Pieces" ? g("Pieces", 50, 60, "warn", "50 / 60") : x)));
+  assert.deepEqual(near.dials.map((x) => [x.label, x.shown, x.fill, x.level]), [["Pieces", "50 / 60", 83, "warn"], ["Posts", "26/32", 81, "warn"], ["Zones", "32/32", 100, "full"]]);
   assert.deepEqual(near.reached, ["Zones: 32 of 32 · no room for more"]);
-  // the room nearly gone: amber at 80% used (20% left), red when none is left
-  assert.equal(dials([g("Room", 80, 100, "warn", "20%")]).dials.find((x) => x.name === "Room")!.fill, 20);
+  assert.equal(near.dials[0].title, "Pieces: 50 of 60 · room for 10 more");
+  // the room nearly gone: amber at 80% used (20% left, its bar the room left), red when none is left
+  const room = dials([g("Room", 80, 100, "warn", "20%")]).dials[0];
+  assert.deepEqual([room.label, room.fill], ["Room for shots", 20]);
+  assert.match(room.title, /room left for a first shot in its stormiest weather: 20%/i);
   assert.deepEqual(dials([g("Room", 100, 100, "full", "0%")]).reached, ["Room for a shot in its stormiest weather: 0% left"]);
-  // before the first check: the room and the size kept in their places, not yet measured
-  const first = dials([g("Pieces", 1, 60, "ok", "1 / 60"), g("Moving", 0, 8, "ok", "0 / 8")]);
-  assert.deepEqual(first.dials.map((x) => [x.label, x.shown, x.fill]), [["Pieces", "1 / 60", 2], ["Moving", "0 / 8", 0], ["Room for shots", "–", 0], ["Size", "–", 0]]);
-  assert.equal(first.chain, "");
 });
 
 void test("problems: each issue's plain reason and the piece a click selects; Move it for an error on a piece", () => {
@@ -134,11 +116,11 @@ void test("shortWhy: the reason beside the big button, in a few words (the full 
   assert.equal(shortWhy("Fix 1 first"), "1 thing to fix ↓");
   assert.equal(shortWhy("Fix 3 first"), "3 things to fix ↓");
   assert.equal(shortWhy("Checking…"), "Checking…");
-  assert.equal(shortWhy("Give it a short name first"), "Name it first ↓");
+  assert.equal(shortWhy("Name it first"), "Name it first");
   assert.equal(shortWhy(""), "");
 });
 
-void test("testGate: Test opens only on a check of the draft as kept now (an older check's verdict never opens it)", () => {
+void test("testGate: Play opens only on a check of the draft as kept now (an older check's verdict never opens it)", () => {
   const ok = { ...lane("garden", [placePiece(entry("*/post/rock"), "x", [12, 4])]), slug: "lane" };
   const v = validate(ok, { host, palette: garden });
   assert.equal(testGate(ok, { of: ok, v }), "");
@@ -148,8 +130,8 @@ void test("testGate: Test opens only on a check of the draft as kept now (an old
   const walled = { ...lane("garden", [rail("w", [20, 0], [20, 20])]), slug: "lane" };
   assert.equal(testGate(walled, { of: walled, v: validate(walled, { host, palette: garden }) }), "Fix 1 first");
   const unnamed = { ...ok, slug: "" };
-  assert.equal(testGate(unnamed, { of: unnamed, v }), "Give it a short name first");
-  assert.equal(testGate(ok, { of: ok, v }, false), NO_GL, "no WebGL: no game to test it in, said plainly");
+  assert.equal(testGate(unnamed, { of: unnamed, v }), "Name it first", "its address follows its name: a name is all it asks");
+  assert.equal(testGate(ok, { of: ok, v }, false), NO_GL, "no WebGL: no game to play it in, said plainly");
   assert.equal(shortWhy(NO_GL), "Needs 3D (WebGL)");
 });
 
@@ -159,12 +141,13 @@ void test("the Editor keeps one session (its undo history) for as long as it is 
   assert.doesNotMatch(src, /useMemo\(\(\) => makeSession/, "not remade when the parent hands the saved draft back");
 });
 
-void test("quick shots in Edit: said on the board to be no proof, never handed to a proof, and the meter's line shown only on the hole it measured", () => {
+void test("quick shots in Build: said on the board to be no proof, never handed to a proof, and the meter's line shown only on the hole it measured", () => {
   const board = fs.readFileSync(new URL("../components/builder/Board.tsx", import.meta.url), "utf8");
   const editor = fs.readFileSync(new URL("../components/builder/Editor.tsx", import.meta.url), "utf8");
   assert.match(board, />Quick shot: just to try</);
   assert.match(editor, /quickShots\(host, /);
-  assert.doesNotMatch(editor, /replay\(|onProof/, "the editor never makes a proof: Test does");
+  assert.doesNotMatch(editor, /replay\(/, "the editor never makes a proof: Play does (TestMode's replay)");
+  assert.equal(editor.match(/onProof=/g)?.length, 1, "proofs come from Play alone");
   assert.match(editor, /est\?\.of === kept && draft === kept/, "the line: of the hole as kept, and not while a drag moves it");
 });
 
@@ -185,6 +168,7 @@ void test("meterFace: measured, measuring, not measurable (said so, never \"meas
   const d = lane("garden", []), other = { ...d, title: "Other" };
   const e = { level: 1, word: "Easy", title: "Difficulty: easy", line: { text: "" }, par: 2, path: [], heat: [] } as unknown as Shown;
   assert.deepEqual(meterFace(true, { of: d, e }, d), { level: 1, word: "Easy", title: "Difficulty: easy", busy: false });
+  assert.equal(meterFace(true, { of: d, e: { ...e, line: { text: "The gap is narrow." } } }, d).title, "Difficulty: easy The gap is narrow.", "past easy: its strongest reason in the chip's words");
   assert.deepEqual(meterFace(true, { of: other, e }, d), { level: null, word: "–", title: "Difficulty: measuring…", busy: true });
   assert.deepEqual(meterFace(true, null, d), { level: null, word: "–", title: "Difficulty: measuring…", busy: true });
   assert.deepEqual(meterFace(true, { of: d, e: null }, d), { level: null, word: "–", title: "Difficulty: not measured: the meter's shots found no way to hole it, or it could not run here. Try it yourself; it never stops you publishing.", busy: false });

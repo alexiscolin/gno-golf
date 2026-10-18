@@ -1,13 +1,13 @@
 // The Builder's start screen's cards (components/builder/Start.tsx): a
 // starter's or a draft's map, drawn as the game draws a hole's
 // (components/HoleMap.tsx, from the pieces gg1.ts writes), and where a draft
-// stands on its way to the chain, from its proofs.
+// stands on its way to the chain: its weathers holed, from its proofs.
 import type { MapHole } from "../duel";
 import type { Post, Wall, Zone } from "../types";
 import type { Draft } from "./draft";
 import { draftHole } from "./gg1";
 import { unproven } from "./proof";
-import { FIELD, required } from "./rules";
+import { FIELD, required, weatherName } from "./rules";
 import type { PostIn, WallIn, ZoneIn } from "./types";
 
 const wall = (w: WallIn, moving = false): Wall => ({ a: w.a, b: w.b, skin: w.skin ?? "", every: moving ? w.every || 1 : (w.every ?? 0), on: w.on ?? 0, phase: w.phase ?? 0 });
@@ -33,18 +33,18 @@ export function draftMap(d: Draft): MapHole {
   };
 }
 
-/** Where a draft stands: never tested, changed since its test, holed in some weathers, or in every one (ready to publish). */
-export type DraftStage = "new" | "changed" | "testing" | "ready";
+/** Where a draft stands: no weather holed for the hole as it is now, some, or every one (ready to publish). */
+export type DraftStage = "new" | "testing" | "ready";
 
 /**
- * A draft's stage and its words, from its proofs for the hole as it is now
- * (key: proof.ts proofKey; null: not known, or the hole does not fit): the
- * best of its ids, as the Publish step counts them (unproven).
+ * A draft's stage and its weathers as its card ticks them ("Clear ✓ · Wind ·
+ * Rain"), from its proofs for the hole as it is now (key: proof.ts proofKey;
+ * null: not known, or the hole does not fit: none holed): the best of its
+ * ids, as the Publish step counts them (unproven).
  */
-export function draftState(d: Pick<Draft, "world" | "proofs">, key: string | null): { stage: DraftStage; word: string } {
-  if (!d.proofs.length) return { stage: "new", word: "Not tested yet" };
-  const ids = [...new Set(d.proofs.filter((p) => p.key === key).map((p) => p.id))];
-  if (!key || !ids.length) return { stage: "changed", word: "Changed since its test" };
-  const left = Math.min(...ids.map((id) => unproven(d.proofs, d.world, key, id).length)), all = required(d.world).length;
-  return left ? { stage: "testing", word: `Holed in ${all - left} of ${all} weathers` } : { stage: "ready", word: "Ready to publish" };
+export function draftState(d: Pick<Draft, "world" | "proofs">, key: string | null): { stage: DraftStage; ticks: { kind: string; done: boolean }[]; word: string } {
+  const all = required(d.world), ids = key ? [...new Set(d.proofs.filter((p) => p.key === key).map((p) => p.id))] : [];
+  const left = ids.map((id) => unproven(d.proofs, d.world, key!, id)).sort((a, b) => a.length - b.length)[0] ?? all;
+  const ticks = all.map((kind) => ({ kind, done: !left.includes(kind) }));
+  return { stage: !left.length ? "ready" : left.length < all.length ? "testing" : "new", ticks, word: ticks.map((t) => `${weatherName(t.kind)}${t.done ? " ✓" : ""}`).join(" · ") };
 }

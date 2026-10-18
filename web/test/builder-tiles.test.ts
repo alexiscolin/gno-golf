@@ -9,7 +9,7 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { armedByKey, foldOpen, GROUPS, LOOKS_ROW, lookOf, looksOpen, looksRow, looksShown, pictureOf, saveFold, saveLooksOpen, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { armedByKey, armOn, foldOpen, GROUPS, lookOf, looksShown, pictureOf, saveFold, tileOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
 import { entryName, TILES } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
@@ -71,37 +71,17 @@ void test("variants that play alike are one tile with looks: water, hills, tunne
   assert.equal(entryName(named("garden", "Tunnel").looks.at(-1)!), "Pipe", "the plain tunnel, a pipe as drawn");
 });
 
-void test("each piece's looks under its row: every look of a piece of several, each once, in the tile's order; none for a piece of one", () => {
+void test("each piece's looks, in the Inspector: every look of a piece of several, each once, in the tile's order; none for a piece of one", () => {
   for (const w of palettes.keys())
     for (const t of tiles(w)) {
       const shown = looksShown(t);
       if (t.looks.length === 1) assert.deepEqual(shown, [], `${w} ${t.name}: one look, its row is it`);
       else assert.deepEqual(shown.map((e) => e.id), t.looks.map((e) => e.id), `${w} ${t.name}: all its looks, in order`);
+      for (const e of t.looks) assert.equal(tileOf(palettes.get(w)!, e.id)?.key, t.key, `${w} ${e.id}: its tile`);
     }
   assert.equal(looksShown(named("garden", "Obstacle")).length, 6, "the garden's obstacle: its six looks");
   assert.deepEqual(looksShown(named("mountain", "Ice")), [], "the ice: one look, none under it");
-});
-
-void test("a piece's looks on one row: past a row, the first ones and +N, which opens them all in place, kept for the visit", () => {
-  const obstacle = named("garden", "Obstacle"), water = named("garden", "Water");
-  assert.equal(LOOKS_ROW, 4);
-  assert.deepEqual(looksRow(water, false), { shown: water.looks, more: 0 }, "a row's worth: all of them");
-  const shut = looksRow(obstacle, false);
-  assert.deepEqual([shut.shown.map((e) => e.id), shut.more], [obstacle.looks.slice(0, 3).map((e) => e.id), 3], "six looks: three and +3, the row full");
-  assert.deepEqual(looksRow(obstacle, true), { shown: obstacle.looks, more: 0 }, "opened: every one");
-  sessionStorage.clear();
-  assert.equal(looksOpen(obstacle.key), false, "shut at first");
-  saveLooksOpen(obstacle.key, true);
-  assert.equal(looksOpen(obstacle.key), true, "opened, for the visit");
-  sessionStorage.clear();
-  const real = globalThis.sessionStorage;
-  Object.defineProperty(globalThis, "sessionStorage", { get: () => { throw new Error("blocked"); }, configurable: true });
-  try {
-    saveLooksOpen(obstacle.key, true);
-    assert.equal(looksOpen(obstacle.key), false, "a browser that keeps nothing: shut");
-  } finally {
-    Object.defineProperty(globalThis, "sessionStorage", { value: real, configurable: true, writable: true });
-  }
+  assert.equal(tileOf(palettes.get("garden")!, "no/such/entry"), null);
 });
 
 void test("1 to 5 arm the first five pieces, each in its look as chosen (its first until then); past five, nothing", () => {
@@ -168,18 +148,27 @@ void test("one name per piece, its own: a clean name for every entry of every wo
   }
 });
 
-void test("the palette's folds: More pieces open and From other worlds folded at first; as the author leaves them, for the visit; a browser that keeps nothing, at first", () => {
+void test("the palette's folds: More pieces and From other worlds folded at first (the five first in sight, no scroll); as the author leaves them, for the visit; a browser that keeps nothing, at first", () => {
   sessionStorage.clear();
-  assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, false]);
-  saveFold("more", false), saveFold("others", true);
-  assert.deepEqual([foldOpen("more"), foldOpen("others")], [false, true]);
+  assert.deepEqual([foldOpen("more"), foldOpen("others"), foldOpen("group/Walls")], [false, false, true]);
+  saveFold("more", true), saveFold("others", true);
+  assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, true]);
   sessionStorage.clear();
   const real = globalThis.sessionStorage;
   Object.defineProperty(globalThis, "sessionStorage", { get: () => { throw new Error("blocked"); }, configurable: true });
   try {
-    saveFold("more", false);
-    assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, false]);
+    saveFold("more", true);
+    assert.deepEqual([foldOpen("more"), foldOpen("others")], [false, false]);
   } finally {
     Object.defineProperty(globalThis, "sessionStorage", { value: real, configurable: true, writable: true });
   }
+});
+
+void test("a piece pressed is armed, always: a second press after a drop refused carries it again (never puts it back); Enter again puts it back", () => {
+  const p = palettes.get("garden")!, water = named("garden", "Water").looks[0], wall = p[0];
+  assert.equal(armOn(null, water, "press"), water);
+  assert.equal(armOn(water, water, "press"), water, "pressed again, still armed: the drag carries it");
+  assert.equal(armOn(wall, water, "press"), water);
+  assert.equal(armOn(water, water, "key"), null, "Enter again: put back");
+  assert.equal(armOn(null, water, "key"), water);
 });

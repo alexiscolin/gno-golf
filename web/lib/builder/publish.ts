@@ -73,7 +73,7 @@ export async function holeHolds(d: Draft, hex: string, key: string, id: string, 
   for (const kind of required(d.world)) {
     const p = d.proofs.find((x) => x.kind === kind && x.key === key && x.id === id);
     const again = p && (await replay(makeLocalChain(o.host, holeRow(id, d), hex, p.period), { key, id, kind, period: p.period, shots: p.shots }));
-    if (!p || !again || typeof again === "string" || again.strokes !== p.strokes) return "The rounds that proved it no longer play out the same on its final data: test it again.";
+    if (!p || !again || typeof again === "string" || again.strokes !== p.strokes) return "The rounds that proved it no longer play out the same on its final data: play it again.";
     proofs.push(p);
   }
   if (!parAllowed(proofs, d.par)) {
@@ -125,7 +125,7 @@ export function publishSteps(r: Readings, { author, slug, proved, sha, realm }: 
   if (r.publishing === null || r.rules === null || r.writer === null || r.taken === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
   if (r.publishing === undefined || r.rules === undefined || r.writer === undefined || r.taken === undefined || r.versions === undefined || r.hole === undefined) return { at: "reading", why: "" };
   const id = holeId(author, slug, r.versions);
-  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: test it again.` };
+  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: play it again.` };
   if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };
   if (r.hole) return { at: "hole", why: r.hole };
   if (r.name) return { at: "name", why: r.name };

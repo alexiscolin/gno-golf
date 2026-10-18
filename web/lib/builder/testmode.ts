@@ -1,9 +1,11 @@
-// Test mode's set-up (the hole-builder design's "Test mode and par"): the
-// hole's id as it will be published (its weather hangs on it), a period for
-// each weather to beat, the row the engine finds the hole by, and the chain
-// the engine plays it on: the local chain's answers (builder.wasm, one
-// clock) over the network's (the page's links, the rest the engine reads
-// and copes without).
+// Play's set-up (the hole-builder design's "Test mode and par"): the hole's
+// id as it will be published (its weather hangs on it), a period for each
+// weather to beat, the row the engine finds the hole by, and the chain the
+// engine plays it on: the local chain's answers (builder.wasm, one clock)
+// over the network's (the page's links, the rest the engine reads and copes
+// without). With the author's address known, every round played is a try at
+// the next weather not holed; without it, a round in calm weather (a try,
+// under an id of its own: TRY_HOLE), the address asked once one is holed.
 import type { Chain } from "../chain";
 import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
@@ -18,12 +20,6 @@ export function holeId(author: string, slug: string, versions: Versions | null):
   const last = versions?.versions.at(-1)?.v ?? 0;
   return `${author}/${slug}/v${last + 1}`;
 }
-
-/** The Hole it step's first words, over its weathers to hole. */
-export const HOLE_IT = "Before your hole goes on chain, you must sink it yourself in each weather that moves the ball (calm, wind, rain…). That proves anyone can.";
-
-/** The weathers to hole, in order (required), each ticked once holed (left: those not holed yet). */
-export const checklist = (world: string, left: readonly string[]): { kind: string; done: boolean }[] => required(world).map((kind) => ({ kind, done: !left.includes(kind) }));
 
 /** The weathers to beat in order (required), each with the period it is played in (periodFor). */
 export function plan(host: BuilderHost, id: string, world: string, now: number): { kind: string; period: number }[] {
@@ -42,11 +38,11 @@ export function testChain(base: Chain, local: LocalChain, hex: string): Chain {
   return { ...base, ...local, holeData: () => Promise.resolve(hex), chainId: builder, genesis: builder };
 }
 
-/** The id a quick test plays the draft under: no author's (no address is asked), and no proof is ever kept for it. */
-export const QUICK_HOLE = "quick/test/v1";
+/** The id a round is played under before the author's address is known: no author's, and no proof is ever kept for it. */
+export const TRY_HOLE = "try/test/v1";
 
-/** A quick test's one weather: calm, at its period (quickshot.ts calmPeriod), the draft loaded under id first. */
-export const quickPlan = (host: Pick<BuilderHost, "setperiod" | "find">, id: string): { kind: string; period: number }[] => [{ kind: "", period: calmPeriod(host, id) }];
+/** Such a round's one weather: calm, at its period (quickshot.ts calmPeriod), the draft loaded under id first. */
+export const tryPlan = (host: Pick<BuilderHost, "setperiod" | "find">, id: string): { kind: string; period: number }[] => [{ kind: "", period: calmPeriod(host, id) }];
 
 /** A weather's time in play, as its chip says it: "0:14.2". */
 export function clock(ms: number): string {
@@ -54,11 +50,11 @@ export function clock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}.${t % 10}`;
 }
 
-/** The test's par in the score card's corner, as the game's card says it ("par 3"): the rounds' once every weather is proved, else the difficulty meter's guess ("par 3?"), else nothing. */
+/** The par in the score card's corner, as the game's card says it ("par 3"): the rounds' once every weather is proved, else the difficulty meter's guess ("par 3?"), else nothing. */
 export const parSaid = (par: number, guess: number): string => (par ? `par ${par}` : guess ? `par ${guess}?` : "");
 
-/** A finished card's action: play the weather again (R), back to the editor (Escape), and the one going on: prove it (a quick test's), publish. */
-export type Act = "again" | "edit" | "prove" | "publish";
+/** A finished card's action: play the weather again (R), back to the editor (Escape), and the one going on: publish. */
+export type Act = "again" | "edit" | "publish";
 export interface Finished {
   /** "Holed in 3"; "Holed in every weather" */
   title: string;
@@ -66,29 +62,26 @@ export interface Finished {
   line: string;
   /** the summary's rows: each weather proved, its strokes and its time in play */
   rows?: { weather: string; strokes: string; time: string }[];
-  /** the buttons, in order: the way on last, the one primary; off: why it waits */
-  actions: { act: Act; text: string; key?: string; primary?: boolean; off?: string }[];
+  /** the buttons, in order: the way on last, the one primary */
+  actions: { act: Act; text: string; key?: string; primary?: boolean }[];
 }
-const AGAIN = { act: "again", text: "Try again", key: "R" } as const, EDIT = { act: "edit", text: "Back to edit", key: "Esc" } as const;
+const AGAIN = { act: "again", text: "Try again", key: "R" } as const, EDIT = { act: "edit", text: "Back to Build", key: "Esc" } as const;
 
 /**
- * The card of a round holed in a test, as the game's hole-finished card: a
- * quick test's (never a proof: Hole it is the way on), or a round of
- * the Hole it step's that does not count (why, and play it again). A round of the Hole it step's
- * that counts has none: the next weather starts on its own (provedNote),
- * the last one ends on the summary.
+ * The card of a round holed that does not count, as the game's
+ * hole-finished card: why, and play it again. A round that counts has none:
+ * the next weather starts on its own (nowSaid), the last one ends on the
+ * summary; a try (no address yet) has none either, the HUD asks for the address.
  */
-export function finished(o: { quick: boolean; strokes: number; kind: string; why?: string; proveOff?: string }): Finished | null {
-  const title = `Holed in ${o.strokes}`;
-  if (o.quick) return { title, line: "Hole it in every weather to publish it.", actions: [AGAIN, EDIT, { act: "prove", text: "Hole it in every weather", primary: true, ...(o.proveOff ? { off: o.proveOff } : {}) }] };
+export function finished(o: { strokes: number; kind: string; why?: string }): Finished | null {
   if (!o.why) return null;
-  return { title, line: `That ${weatherName(o.kind).toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...AGAIN, primary: true }, EDIT] };
+  return { title: `Holed in ${o.strokes}`, line: `That ${weatherName(o.kind).toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...AGAIN, primary: true }, EDIT] };
 }
 
-/** The HUD's brief word as a weather is proved and the next one starts on its own. */
-export const provedNote = (kind: string, next: string) => `${weatherName(kind)} holed · next: ${weatherName(next)}`;
+/** The title card a moment as the next weather starts on its own. */
+export const nowSaid = (kind: string) => `Now: ${weatherName(kind)}`;
 
-/** The Hole it step's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
+/** Play's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
 export function summary(rows: readonly { kind: string; strokes: number; ms?: number }[], par: number): Finished {
   return {
     title: "Holed in every weather",

@@ -2,9 +2,12 @@
 
 // The Builder on a computer (the GUI spec's B1, B2, B5): builder.wasm
 // loaded, then the drafts this browser keeps (Start: open one, or start a
-// new hole in a world), then the editor; a community hole remixed from the
-// game (?remix=, Community.tsx) opens as a new draft. Reached only through
-// app/build/gate.tsx's dynamic import: nothing here loads on a phone.
+// new hole in a world), then the editor (Build, and Play over it), then
+// Publish; a community hole remixed from the game (?remix=, Community.tsx)
+// opens as a new draft. The author's address is the one this browser keeps,
+// else the account Adena already shares with the site, read without a popup
+// (adena.ts current). Reached only through app/build/gate.tsx's dynamic
+// import: nothing here loads on a phone.
 import "@/app/title.css";
 import "@/app/build/builder.css";
 import "@/app/build/phone.css";
@@ -15,26 +18,24 @@ import { endpoints, knownAuthor, remixId } from "@/lib/builder/holes";
 import { remixFrom } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
 import { makeChain } from "@/lib/chain";
-import { canonicalHex, parAllowed, proofKey, provedAs } from "@/lib/builder/proof";
 import { loadBuilder } from "@/lib/builder/load";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import Editor from "./Editor";
 import Header from "./Header";
 import Publish from "./Publish";
 import Start from "./Start";
-import TestMode from "./TestMode";
+import { current } from "@/lib/adena";
 import { firstRun, HINTS_KEY } from "@/lib/builder/templates";
 
 export default function Builder() {
   const [host, setHost] = useState<BuilderHost | null>(null);
   const [failed, setFailed] = useState("");
   const [drafts, setDrafts] = useState<Kept[]>([]);
-  // the draft open (its key), how many times opened (a fresh editor each), and the step
-  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "test" | "publish"; test?: { hex: string; key: string } } | null>(null);
+  // the draft open (its key), how many times opened (a fresh editor each), the step, and whether Play opens at once (back from Publish)
+  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "publish"; play?: boolean } | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
   const [hints, setHints] = useState(false);
-  const [guess, setGuess] = useState(0); // the meter's par for the draft last edited, until its test rounds set one
   const [said, setSaid] = useState(""); // why a remix asked for did not open
   const [opened, setOpened] = useState(""); // why a file opened as it is is broken ("" none)
   // the open draft as this tab last read or wrote it (a save writes only over that), and whether another tab has changed it since
@@ -63,7 +64,10 @@ export default function Builder() {
     const first = remix ? null : firstRun(list.map((k) => k.draft), hinted);
     setDrafts(list);
     if (first) add(first), setHints(true);
-    setAuthor(knownAuthor());
+    // the address kept, else Adena's account if it already shares one with the site (no popup)
+    const kept = knownAuthor();
+    setAuthor(kept);
+    if (!kept) void current().then((a) => a && setAuthor((was) => was ?? a.address));
     void loadBuilder().then((h) => {
       setHost(h);
       if (!remix) return;
@@ -96,6 +100,11 @@ export default function Builder() {
     return () => window.removeEventListener("storage", on);
   }, [home]);
   const onSave = useCallback((d: Draft) => update(() => d), [update]);
+  // the first run's hints seen: never again in this browser
+  const onHinted = useCallback(() => {
+    try { localStorage.setItem(HINTS_KEY, "1"); } catch {}
+    setHints(false);
+  }, []);
 
   if (failed) return <main className="builder-off" role="alert"><h1>The Builder could not load.</h1><p>{failed}</p><Button onClick={() => window.location.reload()}>Try again</Button></main>;
   if (!host) return <main className="builder-off" aria-busy="true"><p>Loading the Builder…</p></main>;
@@ -104,7 +113,7 @@ export default function Builder() {
   const theirs = () => {
     const list = loadDrafts();
     setDrafts(list);
-    if (open && list.some((k) => k.key === open.at)) (was.current = keptText(open.at), setElsewhere(false), setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined }));
+    if (open && list.some((k) => k.key === open.at)) (was.current = keptText(open.at), setElsewhere(false), setOpen({ ...open, n: open.n + 1, step: "edit", play: false }));
     else (setElsewhere(false), setOpen(null));
   };
   const mine = () => open && d && (setUnkept(!saveDraft(open.at, d)), (was.current = keptText(open.at)), setElsewhere(false));
@@ -118,44 +127,24 @@ export default function Builder() {
     </>
   );
   if (open && d) {
-    const edit = () => setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined });
-    const publish = () => setOpen({ ...open, step: "publish" });
+    const edit = (play = false) => setOpen({ ...open, n: open.n + 1, step: "edit", play });
     if (open.step === "publish" && author) {
       return (
         <div className={`pbench tint--${d.world}`}>
-          <Header title={d.title} slug={d.slug} author={author} world={d.world} worlds={[d.world]} step="publish"
-            steps={{ edit: { locked: "", done: true }, test: { locked: "", done: true }, publish: { locked: "", done: false } }}
-            action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}}
-            onStep={(s) => (s === "edit" ? edit() : s === "test" && setOpen(open.test ? { ...open, step: "test" } : { ...open, step: "edit" }))} onBack={edit} />
-          <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={edit} onDone={() => {}} />
-          {unkeptNote}
-        </div>
-      );
-    }
-    if (open.step === "test" && open.test) {
-      const { hex, key } = open.test, proved = !!author && !!provedAs(d.proofs, d.world, key, author, d.slug);
-      return (
-        <div className={`tbench tint--${d.world}`}>
-          <Header title={d.title} slug={d.slug} author={author} world={d.world} worlds={[d.world]} step="test"
-            steps={{ edit: { locked: "", done: true }, test: { locked: "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-            action={proved ? { text: "Publish →", kind: "gold", pulse: true, onClick: publish } : { text: "Back to edit", kind: "secondary", key: "Esc", onClick: edit }}
-            history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}} onStep={(s) => (s === "edit" ? edit() : s === "publish" && proved && publish())} onBack={edit} />
-          <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} guess={guess} onAuthor={setAuthor} onLeave={edit} onPublish={publish}
-            onProof={(p) => update((x) => ({ ...x, proofs: [...x.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }))}
-            onPar={(par) => update((x) => (parAllowed(x.proofs.filter((q) => q.key === key), x.par) ? x : { ...x, par }))} />
+          <Header title={d.title} world={d.world} step="publish"
+            steps={{ edit: { locked: "", done: true }, play: { locked: "", done: true }, publish: { locked: "", done: false } }}
+            action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))}
+            onStep={(s) => s !== "publish" && edit(s === "play")} onBack={() => edit()} />
+          <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onDone={() => {}} />
           {unkeptNote}
         </div>
       );
     }
     return (
       <>
-        <Editor key={`${open.at}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null), unkept || setDrafts(loadDrafts()))} onPublish={publish} opened={opened} onEstimate={setGuess}
-          hints={hints} onHinted={() => { try { localStorage.setItem(HINTS_KEY, "1"); } catch {} setHints(false); }}
-          onTest={(x) => {
-            const hex = canonicalHex(x, host);
-            if (hex == null) return;
-            void proofKey(x, host).then((key) => key && setOpen({ ...open, step: "test", test: { hex, key } }));
-          }} />
+        <Editor key={`${open.at}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null), unkept || setDrafts(loadDrafts()))}
+          onPublish={() => setOpen({ ...open, step: "publish" })} onAuthor={setAuthor} play={open.play} opened={opened}
+          hints={hints} onHinted={onHinted} />
         {unkeptNote}
       </>
     );

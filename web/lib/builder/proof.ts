@@ -120,6 +120,11 @@ export function suggestPar(proofs: readonly Pick<Proof, "strokes">[]): number {
   return proofs.length ? Math.min(MAX_PAR, Math.max(...proofs.map((p) => p.strokes)) + 1) : 0;
 }
 
+/** The author's own score, the hole's "Beat the builder" line: the strokes of the round that proved it in calm weather (the one most players meet), else the fewest of any; 0 with none. */
+export function builderScore(proofs: readonly Pick<Proof, "kind" | "strokes">[]): number {
+  return proofs.find((p) => p.kind === "")?.strokes ?? (proofs.length ? Math.min(...proofs.map((p) => p.strokes)) : 0);
+}
+
 /** Whether par may be set: a whole number from what the proofs suggest to MAX_PAR (below it, the hole was not shown done in it). */
 export function parAllowed(proofs: readonly Pick<Proof, "strokes">[], par: number): boolean {
   const lo = suggestPar(proofs);
