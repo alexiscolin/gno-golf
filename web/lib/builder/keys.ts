@@ -3,15 +3,15 @@
 // and every key in words, one list for the board's key line (short) and the
 // glossary (long). "mod" is ⌘ on a Mac, Ctrl elsewhere.
 
-/** What a press asks for: a palette piece armed (the first five, n from 0), the hole framed, a quick test, the 3D board tilted or turned a quarter, every key shown (?); null for none of these. */
-export type KeyAction = { t: "arm"; n: number } | { t: "frame" } | { t: "test" } | { t: "tilt" } | { t: "turn"; by: 1 | -1 } | { t: "help" } | null;
+/** What a press asks for: a palette piece armed (the first five, n from 0), the hole framed, Play, the 3D board tilted or turned a quarter, the player's view large, every key shown (?); null for none of these. */
+export type KeyAction = { t: "arm"; n: number } | { t: "frame" } | { t: "play" } | { t: "tilt" } | { t: "turn"; by: 1 | -1 } | { t: "view" } | { t: "help" } | null;
 
 export function keyAction(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey"> & { shiftKey?: boolean }): KeyAction {
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
   if (/^[1-5]$/.test(e.key)) return { t: "arm", n: Number(e.key) - 1 };
   if (e.key === "?") return { t: "help" };
   const k = e.key.toLowerCase();
-  return k === "f" ? { t: "frame" } : k === "t" ? { t: "test" } : k === "v" ? { t: "tilt" } : k === "q" ? { t: "turn", by: e.shiftKey ? -1 : 1 } : null;
+  return k === "f" ? { t: "frame" } : k === "t" ? { t: "play" } : k === "v" ? { t: "tilt" } : k === "q" ? { t: "turn", by: e.shiftKey ? -1 : 1 } : k === "p" ? { t: "view" } : null;
 }
 
 /** The keys in words: the key line's few (line: the board's one line, the most used and ?), the glossary's sentence (every one). */
@@ -24,15 +24,28 @@ export const KEYS: readonly { key: string; short: string; long: string; line?: t
   { key: "F", short: "Frame", long: "frames the whole hole" },
   { key: "V", short: "Tilt", long: "tilts the board a little, to see heights and shadows (again: straight down)" },
   { key: "Q", short: "Rotate", long: "turns the board a quarter (with ⇧, the other way)" },
-  { key: "T", short: "Try it", long: "a quick test: plays it in calm weather, then back here (just to try)", line: true },
-  { key: "⇧ drag", short: "Quick shot", long: "on the board, pulls back a quick shot from the tee, or from where the last one stopped (calm weather; just to try)" },
-  { key: "Esc", short: "Back", long: "drops the piece in hand and the quick shots; in a test, back to Build (R plays again, V swaps the view)" },
+  { key: "P", short: "View", long: "shows the player's view large, the hole from its tee" },
+  { key: "T", short: "Play", long: "plays the hole: each round you sink is a try at the next weather, until every one is holed", line: true },
+  { key: "⇧ drag", short: "Quick shot", long: "on the board (or a drag from the ball by the tee), pulls back a quick shot from the tee, or from where the last one stopped (calm weather; just to try)" },
+  { key: "Esc", short: "Back", long: "drops the piece in hand and the quick shots; in play, back to Build (R plays again, V swaps the view)" },
   { key: "?", short: "All keys", long: "the hints again, the world's pieces and every key", line: true },
 ];
-/** The board's key line: the few keys most used, and ? for every one. */
+/** The board's key line: the few keys most used, and ? for every one. Shown for a browser's first visit to the editor only (seen). */
 export const KEY_LINE = KEYS.filter((k) => k.line);
 
-/** What a press asks for in a test: play again from the tee (R, Backspace), the overview camera and back (V), back to Build (Escape); null for none. */
+/** A one-time help: the board's key line, the Inspector's "drag it". */
+export type Once = "keys" | "drag";
+const onceKey = (what: Once) => `gnogolf.builder.seen.${what}`;
+/** Whether a one-time help was shown on an earlier visit of this browser (a browser that keeps nothing: never, so it shows each time; never throws). */
+export function seen(what: Once): boolean {
+  try { return !!localStorage.getItem(onceKey(what)); } catch { return false; }
+}
+/** A one-time help shown: from the next visit on, not again. */
+export function markSeen(what: Once) {
+  try { localStorage.setItem(onceKey(what), "1"); } catch {}
+}
+
+/** What a press asks for in play: play again from the tee (R, Backspace), the overview camera and back (V), back to Build (Escape); null for none. */
 export type PlayKey = "restart" | "view" | "leave" | null;
 export function playKey(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey">): PlayKey {
   if (e.metaKey || e.ctrlKey || e.altKey) return null;

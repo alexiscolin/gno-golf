@@ -105,7 +105,7 @@ void test("publishSteps: open once every check holds; else the first that does n
   assert.deepEqual(publishSteps({ ...ready, taken: true }, at), { at: "taken", why: "This hole was taken down: it cannot be published again." });
   assert.equal(publishSteps({ ...ready, taken: undefined }, at).at, "reading");
   const newer = publishSteps({ ...ready, versions: { ...ready.versions, versions: [ver(1), ver(2)] } }, at);
-  assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: test it again." }, "a version published elsewhere since: its proofs are another id's");
+  assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: play it again." }, "a version published elsewhere since: its proofs are another id's");
   assert.deepEqual(publishSteps(ready, { ...at, sha: "old" }), { at: "same", why: "This is exactly the version already published." });
   assert.deepEqual(publishSteps({ ...ready, hole: "Par 1 is below the 5 strokes it was proved in: at least 6." }, at), { at: "hole", why: "Par 1 is below the 5 strokes it was proved in: at least 6." });
   assert.equal(publishSteps({ ...ready, hole: undefined }, at).at, "reading", "the hole still being judged");

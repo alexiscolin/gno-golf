@@ -3,7 +3,7 @@
 // (bounce, grip, grade) and its push's way, its clock and timing; each kept
 // within its entry's ranges, the geometry on the grid (handles.ts). Whether
 // the hole still holds is the inspector's to ask (edit.ts canPlace).
-import { clampTo, START_SUBSTEPS } from "./edit";
+import { clampTo, placePiece, START_SUBSTEPS, whereOf } from "./edit";
 import { setHandle } from "./handles";
 import type { Clock, PaletteEntry, Range } from "./palette";
 import type { Draft, Piece, Pulse, V } from "./draft";
@@ -40,6 +40,29 @@ export function withSize(p: Piece, e: PaletteEntry, key: Size["key"], v: number,
 export function withNumber(p: Piece, e: PaletteEntry, key: "bounce" | "scale" | "grade", v: number): Piece {
   const r = e[key];
   return r ? { ...p, params: { ...p.params, [key]: clampTo(v, r) } } : p;
+}
+
+/**
+ * The piece in another look of its tile (the Inspector's choice: a pond
+ * made a lagoon), where it stands, as it is: its geometry kept, each number
+ * the new look takes kept in its range (one it lacks dropped, one it adds at
+ * its own default, as placePiece gives it), its clock kept if the look takes
+ * it. Null for a look of another kind, or a zone of a shape it does not take.
+ * Whether the hole still holds is the inspector's to ask (edit.ts canPlace).
+ */
+export function withLook(p: Piece, to: PaletteEntry, from: PaletteEntry): Piece | null {
+  const g = p.geometry, shape = g.t === "rect" || g.t === "round" || g.t === "poly" ? g.t : null;
+  if (to.kind !== from.kind || (shape && to.shapes && !to.shapes.includes(shape))) return null;
+  const fresh = placePiece(to, p.id, whereOf(g)), params: Piece["params"] = { ...p.params };
+  for (const k of ["bounce", "scale", "grade"] as const) {
+    const r = to[k];
+    if (!r) delete params[k];
+    else params[k] = p.params[k] !== undefined ? clampTo(p.params[k], r) : fresh.params[k];
+    if (params[k] === undefined) delete params[k];
+  }
+  if (params.grade !== undefined && !params.dir) params.dir = fresh.params.dir;
+  if (params.grade === undefined) delete params.dir;
+  return { ...p, entry: to.id, params, clock: to.clocks.includes(p.clock.k) ? p.clock : fresh.clock };
 }
 
 /** A push's eight ways, east first, turning clockwise on the board (y down). */

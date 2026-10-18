@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { emptyDraft } from "../lib/builder/draft.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
-import { BLINK, blinkOf, DIRS, OPEN, sizesOf, TIMING, withBlink, withClock, withDir, withNumber, withSize, withTiming } from "../lib/builder/settings.ts";
+import { BLINK, blinkOf, DIRS, OPEN, sizesOf, TIMING, withBlink, withClock, withDir, withLook, withNumber, withSize, withTiming } from "../lib/builder/settings.ts";
 import "./scene-harness.ts";
 
 const garden = await loadPalette("garden");
@@ -65,4 +65,16 @@ void test("blink presets: slow, medium, fast; open half, most or little of the t
   const fine = withTiming(d, "h", { every: 37, on: 11, phase: 0 });
   assert.deepEqual(blinkOf(t(fine)), { speed: null, open: null }, "set by Fine: no preset claims it");
   assert.ok(Object.values(BLINK).every((n) => n >= TIMING.every.min && n <= TIMING.every.max));
+});
+
+void test("withLook: the piece in another look of its tile, where it stands, its numbers kept in the new look's ranges; none of another kind", () => {
+  const rock = withNumber(placePiece(entry("*/post/rock"), "p", [5, 5]), entry("*/post/rock"), "bounce", 0.5);
+  const stump = withLook(rock, entry("*/post/stump"), entry("*/post/rock"))!;
+  assert.deepEqual([stump.id, stump.entry, stump.geometry, stump.params.bounce], ["p", "*/post/stump", rock.geometry, 0.5], "where it stands, as it is");
+  const bumper = withLook(rock, entry("*/post/bumper"), entry("*/post/rock"))!;
+  assert.equal(bumper.params.bounce, 0.5, "in the bumper's range: kept");
+  assert.equal(withLook(withNumber(bumper, entry("*/post/bumper"), "bounce", 1.4), entry("*/post/rock"), entry("*/post/bumper"))!.params.bounce, 0.75, "past the rock's: at its most");
+  const pond = placePiece(entry("*/hazard/water"), "w", [5, 5]);
+  assert.equal(withLook(pond, entry("*/hazard/"), entry("*/hazard/water"))!.entry, "*/hazard/");
+  assert.equal(withLook(rock, entry("*/hazard/water"), entry("*/post/rock")), null, "a post is no pond");
 });

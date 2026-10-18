@@ -1,25 +1,28 @@
 "use client";
 
-// The selected piece (the GUI spec's B2, the right column under the 3D): its
-// name and place, its sizes and numbers as label · slider · value rows with
-// each range written under them, its timing (a cycle strip for a timed
-// piece), and Turn · Copy · Delete with their keys. A setting that would
-// break the hole does not take: the slider stays at the last value that
-// holds, and the reason is said once (settings.ts; edit.ts canPlace).
+// The selected piece (the GUI spec's B2, the right column over the player's
+// view): its name, Turn · Copy · Delete with their keys, its looks (a piece
+// of several: chosen here, and the next one placed takes the look last
+// chosen), its sizes and numbers as label · slider · value rows, its timing
+// (a cycle strip for a timed piece). How to move it is said once in this
+// browser (keys.ts seen). A setting that would break the hole does not
+// take: the slider stays at the last value that holds, and the reason is
+// said once (settings.ts; edit.ts canPlace).
 import { entryName } from "@/lib/builder/names";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented } from "@/components/ui";
 import { settle } from "@/lib/builder/session";
-import { canPlace, newErrors, errorsOf, whereOf } from "@/lib/builder/edit";
+import { canPlace, newErrors, errorsOf } from "@/lib/builder/edit";
 import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
-import { blinkOf, DIRS, sizesOf, TIMING, withBlink, withClock, withDir, withNumber, withSize, withTiming, type Open, type Speed } from "@/lib/builder/settings";
+import { blinkOf, DIRS, sizesOf, TIMING, withBlink, withClock, withDir, withLook, withNumber, withSize, withTiming, type Open, type Speed } from "@/lib/builder/settings";
 import { MS_PER_STEP } from "@/lib/engine/replay";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
 import { refusalOf } from "@/lib/builder/explain";
 import { detailsOpen, saveDetailsOpen } from "@/lib/prefs";
 import { notTurned } from "@/lib/builder/handles";
-import { xy } from "@/lib/builder/rules";
+import { looksShown, pictureOf, tileOf } from "@/lib/builder/tiles";
+import { markSeen, seen } from "@/lib/builder/keys";
 
 const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
 const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth" } as const;
@@ -35,7 +38,7 @@ function Row({ label, value, range, shown, note, onChange, onDone }: { label: st
       <span>{label}</span>
       <input type="range" min={range.min} max={range.max} step={range.step} value={value} onChange={(e) => (release.changed(), onChange(Number(e.target.value)))} onPointerUp={release.done} onKeyUp={release.done} onBlur={release.done} />
       <output>{shown ?? +value.toFixed(2)}</output>
-      <small>{note ?? `${range.min} to ${range.max}`}</small>
+      {note && <small>{note}</small>}
     </label>
   );
 }
@@ -63,7 +66,7 @@ function Cycle({ t, unit, playing, onPlay }: { t: Pulse; unit: string; playing: 
 const SPEEDS: readonly (readonly [Speed, string])[] = [["slow", "Slow"], ["medium", "Medium"], ["fast", "Fast"]];
 const OPENS: readonly (readonly [Open, string])[] = [["most", "Most"], ["half", "Half"], ["little", "Little"]];
 
-export default function Inspector({ draft, piece, quick, full, playing = true, onPlay = () => {}, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete }: {
+export default function Inspector({ draft, piece, quick, full, playing = true, onPlay = () => {}, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete, onChoose = () => {} }: {
   draft: Draft;
   piece: Piece | null;
   quick: ValidateOptions;
@@ -80,9 +83,12 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
   onTurn: () => void;
   onCopy: () => void;
   onDelete: () => void;
+  /** a look chosen for the piece: the one the next of its tile takes (the editor's) */
+  onChoose?: (tile: string, entry: string) => void;
 }) {
-  // Details open unless the player folded them this visit (prefs.ts)
-  const [open] = useState(detailsOpen);
+  // Details open unless the player folded them this visit (prefs.ts); how to move a piece said on a browser's first visit
+  const [open] = useState(detailsOpen), [drag] = useState(() => !seen("drag"));
+  useEffect(() => markSeen("drag"), []);
   if (!piece) return <p className="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>;
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
@@ -110,7 +116,15 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
     if (why.length) return (onCancel(), onSay(refusalOf(why[0])));
     onCommit();
   };
-  const at = whereOf(p.geometry), c = p.clock;
+  // its looks (a piece of several), the one it has pressed: chosen, the piece takes it where it stands if the hole holds
+  const tile = tileOf(quick.palette, p.entry), looks = tile ? looksShown(tile) : [];
+  const look = (to: PaletteEntry) => {
+    const next = withLook(p, to, ent);
+    if (!next) return onSay(`${entryName(to)} cannot take this piece's shape.`);
+    onChoose(tile!.key, to.id);
+    if (to.id !== ent.id) setDraft({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? next : q)) });
+  };
+  const c = p.clock;
   const t: Pulse | null = c.k === "substep" ? c : c.k === "stroke" ? draft.pulses[c.pulse] ?? null : null;
   const unit = c.k === "substep" ? "substeps" : "strokes";
   return (
@@ -122,14 +136,22 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
         <Button size="s" type="button" keycap={`${MOD}D`} onClick={onCopy}>Copy</Button>
         <Button size="s" type="button" keycap="⌫" onClick={onDelete}>Delete</Button>
       </div>
-      <p className="insp__hint">Drag it to move it, its handles to size and turn it.</p>
+      {drag && <p className="insp__hint">Drag it to move it, its handles to size and turn it.</p>}
+      {looks.length > 0 && (
+        <div className="insp__looks" role="group" aria-label={`Its look: ${looks.length} to choose from`}>
+          {looks.map((l) => (
+            <button key={l.id} type="button" className="look" data-look={l.id} aria-pressed={l.id === ent.id} aria-label={entryName(l)} title={entryName(l)} onClick={() => look(l)}>
+              <img src={pictureOf(draft.world, l)} width={40} height={40} alt="" draggable={false} decoding="async" />
+            </button>
+          ))}
+        </div>
+      )}
       {/* the numbers, open (else the column stands empty), folded away for the visit by whoever would rather not see them */}
       <details className="insp__details" open={open} onToggle={(e) => saveDetailsOpen(e.currentTarget.open)}>
       <summary>Details</summary>
-      <p className="insp__at">At {xy(at)}</p>
       {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v, draft.tee))} onDone={done} />)}
       {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
-      {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
+      {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : undefined} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
       {ent.scale && <Row label={ent.kind === "loop" ? "Speed" : "Grip"} value={p.params.scale ?? ent.scale.def} range={ent.scale} onChange={(v) => tryPiece(withNumber(p, ent, "scale", v))} onDone={done} />}
       {ent.grade && <Row label="Grade" value={p.params.grade ?? ent.grade.def} range={ent.grade} onChange={(v) => tryPiece(withNumber(p, ent, "grade", v))} onDone={done} />}
       {p.params.dir && (

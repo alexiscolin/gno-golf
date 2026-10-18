@@ -9,11 +9,15 @@
 // colours as it goes and, let go where it may not stay, stops at the last
 // place on its way where it may (edit.ts clampMove, clampHandle, clampEnd).
 // Live, the checks run without the render census (fast); a drop or a
-// release is checked with it. With Shift held, a pull on the board plays a
-// quick shot (quickshot.ts: from the tee, or from where the last stopped),
-// its path drawn, the last three faded, all played again as the hole changes;
-// the board says it is no proof. "Show the line" draws the meter's best line
-// and where its shots stopped.
+// release is checked with it; a refusal said by the pointer is gone at the
+// next press (never left over another gesture). A pull from the ball by the
+// tee (or, Shift held, anywhere on the board) plays a quick shot
+// (quickshot.ts: from the tee, or from the ball where the last stopped), its
+// path drawn, the last three faded, all played again as the hole changes;
+// the board says it is no proof. The meter's best line is drawn when the
+// header's difficulty chip asks; after a drop that held, a ghost ball runs
+// it once (a second, never with reduced motion). The keys most used are
+// said at its foot on a browser's first visit.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
@@ -30,7 +34,7 @@ import Scene, { type Eye } from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
-import { Button, Chip } from "@/components/ui";
+import { Chip } from "@/components/ui";
 import { chain, labelAt, lean, reactionAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
 import { KEY_LINE } from "@/lib/builder/keys";
@@ -70,6 +74,12 @@ export interface BoardProps {
   show?: { id: string; n: number } | null;
   /** quick shots (the editor's: quickshot.ts) */
   ball?: Ball;
+  /** the keys line at the board's foot (a browser's first visit) */
+  keys?: boolean;
+  /** a drop that held (placed, moved): the editor runs the ghost ball once the meter has measured it */
+  onLanded?: () => void;
+  /** the ghost ball's run along the meter's line (n: run again) */
+  roll?: { path: readonly (readonly V[])[]; n: number } | null;
   /** how the board is looked at: turned, tilted (view.ts Look; flat by default) */
   look?: Look;
   /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D);
@@ -80,20 +90,15 @@ export interface BoardProps {
 /** The quick shots on the board: those played (the latest last; null, one the realm refused), the one being pulled, and the meter's line. */
 export interface Ball {
   played: readonly (Played | null)[];
-  /** the last quick test's round that holed, as played on the hole as it is now: a dotted trail */
+  /** the last try's round that holed (Play, no address yet), as played on the hole as it is now: a dotted trail */
   trail: readonly (Played | null)[];
   /** the latest's spec (where the next may start from: its rest, unless it holed) */
   last: QuickShot | null;
   aimed: Played | null;
-  /** the meter's line on the hole as kept (null: none to show: measuring, an error, a drag) */
+  /** the meter's line on the hole as kept, when the header's chip shows it (null: not shown, or none: measuring, an error, a drag) */
   line: Pick<Shown, "path" | "heat"> | null;
-  lineOn: boolean;
-  onLine: () => void;
   onAim: (s: QuickShot | null) => void;
   onShot: (s: QuickShot) => void;
-  /** a quick test (T), and why it waits ("" it does not) */
-  onTry: () => void;
-  tryOff: string;
 }
 
 /** The board's own gestures, in pixels: a pan, a quick shot's pull (the edits are the gesture's: gesture.ts). */
@@ -168,6 +173,7 @@ export default function Board(props: BoardProps) {
   /** A drop that held: the piece pops in (0 → 1.15 → 1), stirs what it lands on; placed, a plop climbing a scale as placements chain; moved, a knock. */
   const dropped = (id: string, placed: boolean) => {
     sound(placed ? "plop" : "knock", placed ? chained() : undefined);
+    props.onLanded?.();
     setPopped(id);
     later(() => setPopped((x) => (x === id ? null : x)), 300);
     toStir.current = id; // (stirred once the draft has it where it landed)
@@ -247,17 +253,18 @@ export default function Board(props: BoardProps) {
   function onDown(e: RPointerEvent<SVGSVGElement>) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    setFlash(null); // (a refusal said is the last gesture's: a new one starts clean)
     if (pointers.current.size > 1) {
       // a pinch: a drag under way is dropped, its unchecked preview with it (never kept by the next edit)
       if (gesture.grabbing()) (gesture.cancel(), setLive(null), props.onCarry?.(false));
       return void (drag.current = null);
     }
-    const at = unit(e), hit = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end]");
+    const at = unit(e), hit = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end],[data-shot]");
     if (props.pan) return void (drag.current = { t: "pan", from: [e.clientX, e.clientY], view: shown }); // (Space held: whatever is under it)
-    if (e.shiftKey && props.ball && !armed) {
-      // a quick shot pulled: from where the last one stopped when pressed on its ball, else from the tee
+    if ((e.shiftKey || hit?.dataset.shot) && props.ball && !armed) {
+      // a quick shot pulled: from where the last one stopped when pressed on its ball, else from the tee (its ball beside it)
       const last = props.ball.last, rest = props.ball.played.at(-1);
-      const on = last && rest && !rest.holed && Math.hypot(at[0] - rest.rest[0], at[1] - rest.rest[1]) <= Math.max(1, 14 / shown.k) ? { from: rest.rest, stroke: last.stroke + 1 } : null;
+      const on = last && rest && !rest.holed && (hit?.dataset.shot === "rest" || (!hit?.dataset.shot && Math.hypot(at[0] - rest.rest[0], at[1] - rest.rest[1]) <= Math.max(1, 14 / shown.k))) ? { from: rest.rest, stroke: last.stroke + 1 } : null;
       return void (drag.current = { t: "aim", press: [e.clientX, e.clientY], from: on?.from ?? null, stroke: on?.stroke ?? 0, shot: null });
     }
     const target: Target = hit?.dataset.handle ? { t: "handle", key: hit.dataset.handle as HandleKey } : hit?.dataset.end ? { t: "end", which: hit.dataset.end as "tee" | "pin" }
@@ -328,7 +335,7 @@ export default function Board(props: BoardProps) {
   // in 3D, the overlay draws a piece only where the scene does not show it yet: dragged, or changed since the hole drawn was checked
   const shownBefore = new Map((props.scene?.of?.pieces ?? []).map((p) => [p.id, JSON.stringify(p)]));
   const pending = (p: Piece) => !gl || shownBefore.get(p.id) !== JSON.stringify(p);
-  const ball = props.ball, aiming = drag.current?.t === "aim", line = ball?.lineOn ? ball.line : null;
+  const ball = props.ball, aiming = drag.current?.t === "aim", line = ball?.line ?? null;
   const most = line ? Math.max(1, ...line.heat.map((c) => c[2])) : 1, latest = ball?.played.at(-1);
   const pathOf = (p: readonly V[]) => p.map((v) => `${v[0]},${v[1]}`).join(" ");
   // the tee's and the cup's badges: where they are, upright and at the board's scale whatever the look
@@ -368,9 +375,16 @@ export default function Board(props: BoardProps) {
           <g className="board__shots" pointerEvents="none">
             {ball.trail.map((p, i) => p && <polyline key={`t${i}`} className="trail" points={pathOf(p.path)} />)}
             {ball.played.map((p, i) => p && <polyline key={i} className={i < ball.played.length - 1 ? "old" : undefined} points={pathOf(p.path)} />)}
-            {latest && !latest.holed && <circle className="board__ball" cx={latest.rest[0]} cy={latest.rest[1]} r={0.5} />}
             {ball.aimed && <polyline className="aim" points={pathOf(ball.aimed.path)} />}
           </g>
+        )}
+        {/* where the last quick shot stopped: its ball, pulled for the next */}
+        {ball && latest && !latest.holed && <g data-shot="rest" className="board__shot"><circle className="board__ball" cx={latest.rest[0]} cy={latest.rest[1]} r={0.5} /><circle className="board__hit" cx={latest.rest[0]} cy={latest.rest[1]} r={hit} /></g>}
+        {/* after a drop that held: a ghost ball runs the meter's line once */
+          props.roll && props.roll.path.length > 0 && (
+          <circle key={props.roll.n} className="board__roll" r={0.45} pointerEvents="none">
+            <animateMotion dur="1s" fill="freeze" path={`M${props.roll.path.flat().map((v) => `${v[0]},${v[1]}`).join(" L")}`} />
+          </circle>
         )}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
         {fx.map((f) => (
@@ -380,22 +394,15 @@ export default function Board(props: BoardProps) {
           </g>
         ))}
         </g>
+        {/* the shot's handle: a ball by the tee, pulled back to play a quick shot (as Shift and a pull anywhere) */}
+        {ball && !armed && <g data-shot="tee" className="board__shot board__shot--tee" transform={badge(draft.tee)} aria-hidden="true"><title>Pull back to play a quick shot (just to try)</title><circle className="board__ball" cx={0.95} cy={0.7} r={0.38} /><circle className="board__hit" cx={0.95} cy={0.7} r={Math.max(0.6, 12 / view.k)} /></g>}
         <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${pt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")} transform={badge(draft.tee)}><circle r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text y={0.3} fontSize={0.8} textAnchor="middle">T</text><circle className="board__hit" r={hit} /></g>
         <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${pt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")} transform={badge(draft.pin)}><circle r={0.6} fill="#1f2a26" /><path d="M0 0 v-2.2 l1.4 0.5 -1.4 0.5" fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /><rect className="board__hit" x={-hit} y={-2.2 - hit / 2} width={1.4 + 2 * hit} height={2.2 + 1.5 * hit} rx={hit} /></g>
       </svg>
-      {ball && (
-        <div className="board__tools">
-          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: just to try</Chip>}
-          <Button size="s" type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
-            title={ball.line ? "The difficulty meter's best line, and where its shots stopped (a guess, calm weather)" : "Shown once the meter has measured the hole as it is"}
-            onClick={ball.onLine}>Show the line</Button>
-          <Button size="s" type="button" className="board__toggle" keycap="T" aria-disabled={ball.tryOff ? true : undefined} title={ball.tryOff || "Play it now in calm weather, then back here: never a proof (T)"}
-            onClick={() => !ball.tryOff && ball.onTry()}>Quick test</Button>
-        </div>
-      )}
+      {ball && (aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: just to try</Chip>}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
       {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
-      {!props.said && <p className="board__keys" aria-hidden="true">{KEY_LINE.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
+      {props.keys && !props.said && <p className="board__keys" aria-hidden="true">{KEY_LINE.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live || (aiming && ball?.aimed)) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">

@@ -1,11 +1,13 @@
 "use client";
 
 // The first run's three hints (the GUI spec's B1): one by each place a first
-// hole goes through (the palette, the big button, the steps), short, and gone
-// at once with "Got it"; never a tutorial, and never over the 3D. Shown on the
+// hole goes through (the palette, Play, the steps), short, never in the way:
+// the pointer goes through them, and they are gone at the first drag (the
+// editor's onDone); never a tutorial, and never over the 3D. Shown on the
 // first visit only (templates.ts HINTS_KEY). Asked for again (the header's
 // "?"), a glossary of the world's pieces comes under them, on one screen:
-// each palette tile's picture, its name and what it does (tiles.ts).
+// each palette tile's picture, its name and what it does (tiles.ts), and
+// every key; Close or Escape puts it away.
 import { useEffect, useRef } from "react";
 import { pictureOf, tilesOf } from "@/lib/builder/tiles";
 import { cap, theWorld } from "@/lib/builder/rules";
@@ -17,8 +19,8 @@ import { Button } from "@/components/ui";
 
 const HINTS = [
   ["palette", "Drag a piece onto the board"],
-  ["test", "Press T to try it, Hole it to make it count"],
-  ["steps", "Then Publish, once holed in every weather"],
+  ["test", "Press Play (T): sink it in every weather"],
+  ["steps", "Then Publish it for anyone to play"],
 ] as const;
 
 export default function Hints({ onDone, glossary = null }: {
@@ -26,16 +28,15 @@ export default function Hints({ onDone, glossary = null }: {
   /** the "?": the world's pieces under the hints */
   glossary?: { world: string; palette: readonly PaletteEntry[] } | null;
 }) {
-  const got = useRef<HTMLButtonElement>(null);
-  useEffect(() => got.current?.focus(), []);
-  const tiles = glossary ? (({ first, more }) => [...first, ...more.flatMap((g) => g.tiles)])(tilesOf(glossary.palette)) : [];
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => void (glossary && close.current?.focus()), [glossary]);
   const hints = (inPanel: boolean) => HINTS.map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
-  const ok = <Button ref={got} variant="gold" type="button" className="bhint__ok" onClick={onDone}>Got it</Button>;
-  // the first run: each hint by its place; the "?": one panel in the middle, the hints, then the pieces
-  if (!glossary) return <div className="bhints" role="note" aria-label="Three hints" onKeyDown={(e) => e.key === "Escape" && onDone()}>{hints(false)}<div className="bhints__centre">{ok}</div></div>;
+  // the first run: each hint by its place, the pointer through them
+  if (!glossary) return <div className="bhints" role="note" aria-label="Three hints">{hints(false)}</div>;
+  const tiles = (({ first, more }) => [...first, ...more.flatMap((g) => g.tiles)])(tilesOf(glossary.palette));
   return (
-    <div className="bhints" role="note" aria-label="How it works, and the pieces" onKeyDown={(e) => e.key === "Escape" && onDone()}>
-      <div className="bhints__centre bhints__centre--help">
+    <div className="bhints bhints--help" role="note" aria-label="How it works, and the pieces" onKeyDown={(e) => e.key === "Escape" && onDone()}>
+      <div className="bhints__centre">
         <section className="bgloss" aria-label={`How it works, and ${theWorld(glossary.world)}'s pieces`}>
           <div className="bgloss__hints">{hints(true)}</div>
           <h2>{cap(theWorld(glossary.world))}&apos;s pieces</h2>
@@ -48,7 +49,7 @@ export default function Hints({ onDone, glossary = null }: {
             ))}
           </ul>
           <p className="bgloss__keys">{KEYS.map((k, i) => <span key={k.key}>{i ? " · " : ""}<kbd>{k.key.replace("mod", MOD)}</kbd> {k.long}</span>)}</p>
-          {ok}
+          <Button ref={close} type="button" keycap="Esc" className="bgloss__close" onClick={onDone}>Close</Button>
         </section>
       </div>
     </div>

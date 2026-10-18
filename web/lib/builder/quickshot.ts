@@ -78,7 +78,7 @@ export function pulled(press: readonly [number, number], at: readonly [number, n
   return power > 0 ? shotOf(deg, power) : null;
 }
 
-/** A round's shots (a quick test's) as quick shots: the first from the tee, each next from where the one before stopped; cut where the realm refuses one. */
+/** A round's shots (a try's, in Play) as quick shots: the first from the tee, each next from where the one before stopped; cut where the realm refuses one. */
 export function roundOf(sim: Shooter, d: Draft, shots: readonly string[]): QuickShot[] {
   const out: QuickShot[] = [];
   let from: V | null = null;

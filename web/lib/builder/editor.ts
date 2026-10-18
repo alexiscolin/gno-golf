@@ -1,5 +1,5 @@
 // What the editor's dock and palette say, from the checks (the GUI spec's
-// B2): the verdict, the gauges against the Builder's limits, GG1's and the
+// B2): a round an edit broke, the gauges against the Builder's limits, GG1's and the
 // realm's (size, work), the entries a limit switches off and why.
 import { counts, work, WORK_WARN, type Issue } from "./checks";
 import { plainOf } from "./explain";
@@ -18,42 +18,38 @@ import { BUILDER_LIMITS, pieceCounts } from "./limits";
 const weathers = (kinds: readonly string[]) => listed(kinds.map(weatherName));
 
 /**
- * The dock's one line: what stands between the draft and the next step (off:
- * why Test is off, testGate's; a check under way says nothing new). rounds:
- * the proofs an edit carried over (carry.ts), the weathers still holed and
- * the lines of the rounds that broke (warn: said calm, ready to test again).
+ * The dock's one line, said only when nothing else says it: the rounds an
+ * edit broke (carry.ts: the proofs it could not carry over), the weathers
+ * still holed after them; "" when there is nothing of the kind (the header's
+ * chip and its action say the rest: the difficulty, why Play waits; what to
+ * fix is listed under it). A thing to fix comes first: nothing then.
  */
-export function verdict({ pieces, errors, proved, off = "", rounds }: { pieces: number; errors: number; proved: boolean; off?: string; rounds?: { kept: readonly string[]; broken: readonly string[] } | null }): { ok: boolean; warn?: boolean; text: string } {
-  if (!pieces) return { ok: false, text: "Place pieces between the tee and the cup" };
-  if (errors) return { ok: false, text: `${errors} ${errors === 1 ? "thing" : "things"} to fix` };
-  if (off && off !== "Checking…") return { ok: false, text: off };
-  if (!proved && rounds?.broken.length) {
-    const more = rounds.broken.length - 1;
-    return { ok: true, warn: true, text: `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathers(rounds.kept)} still holed` : ""}` };
-  }
-  return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready: press T to try it, or hole it." };
+export function brokenLine({ errors, proved, rounds }: { errors: number; proved: boolean; rounds?: { kept: readonly string[]; broken: readonly string[] } | null }): string {
+  if (errors || proved || !rounds?.broken.length) return "";
+  const more = rounds.broken.length - 1;
+  return `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathers(rounds.kept)} still holed` : ""}`;
 }
 
-/** Why Hole it and a quick test are off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */
-export const NO_GL = "Testing needs 3D (WebGL), which this browser has turned off";
+/** Why Play is off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */
+export const NO_GL = "Playing needs 3D (WebGL), which this browser has turned off";
 
 /**
- * Why Test is off ("" it is on), from the last check: only a check of the
+ * Why Play is off ("" it is on), from the last check: only a check of the
  * draft as kept now counts (an undo or a step since, and it is checking again).
- * gl: this browser can draw the game (stage.ts), else no test at all.
+ * gl: this browser can draw the game (stage.ts), else no play at all. The
+ * hole's address follows its name (templates.ts retitle): a name is all it asks.
  */
 export function testGate(kept: Draft, checked: { of: Draft; v: Validated } | null, gl = true): string {
   if (!gl) return NO_GL;
   if (!checked || checked.of !== kept) return "Checking…";
   const errors = checked.v.issues.filter((i) => i.severity === "error").length;
-  return errors ? `Fix ${errors} first` : !kept.pieces.length ? "Place a piece first" : !kept.slug ? "Give it a short name first" : "";
+  return errors ? `Fix ${errors} first` : !kept.pieces.length ? "Place a piece first" : !kept.slug ? "Name it first" : "";
 }
 
-/** testGate's reason in a few words, beside the big button (the full one in the checks line, ↓). */
+/** testGate's reason in a few words, beside the big button (what to fix listed under the board, ↓). */
 export function shortWhy(off: string): string {
   const fix = /^Fix (\d+) first$/.exec(off);
   if (fix) return `${fix[1]} ${fix[1] === "1" ? "thing" : "things"} to fix ↓`;
-  if (off === "Give it a short name first") return "Name it first ↓";
   if (off === NO_GL) return "Needs 3D (WebGL)";
   return off;
 }
@@ -84,34 +80,26 @@ export interface Dial extends Pick<Gauge, "name" | "shown" | "level"> {
   fill: number;
   title: string;
 }
-// the four a player reads (the room before the size: the one a hole runs out of), and GG1's own counts
-const PLAYER = ["Pieces", "Moving", "Room", "Size"] as const, CHAIN = ["Walls", "Posts", "Zones", "Points"];
+// the order they come in: the player's own first (the room before the size: the one a hole runs out of), then GG1's counts
+const ORDER = ["Pieces", "Moving", "Room", "Size", "Walls", "Posts", "Zones", "Points"];
 const ROOM = "Room for shots";
 
 /**
- * The dock's gauges (the GUI spec's B3): the player's four always, in their
- * places (the room and the size "–" until the first check); a chain count
- * only once near its limit (amber from 80%, red at it), the others in the
- * chain limits' note (chain); a sentence for each limit reached. The
- * room's bar is the room left, as its words say.
+ * The dock's gauges (the GUI spec's B3): a gauge only once it nears its
+ * limit (amber from 80%, red at it), nothing while the hole is far from them
+ * all (the palette greys what would not fit: offAtLimit); a sentence for
+ * each limit reached. The room's bar is the room left, as its words say.
  */
-export function dials(gs: readonly Gauge[]): { dials: Dial[]; chain: string; reached: string[] } {
+export function dials(gs: readonly Gauge[]): { dials: Dial[]; reached: string[] } {
   const of = (g: Gauge): Dial => {
     const room = g.name === "Room", share = Math.min(1, Math.max(0, g.used / g.of));
     return {
       name: g.name, label: room ? ROOM : g.name, shown: g.shown, level: g.level, fill: Math.round((room ? 1 - share : share) * 100),
-      title: room ? `Room left for a first shot in its stormiest weather: ${g.shown}` : nearLimits([g])[0] ?? `${g.name}: ${g.shown}`,
+      title: room ? `Room left for a first shot in its stormiest weather: ${g.shown}` : nearLimits([g])[0],
     };
   };
-  const byName = new Map(gs.map((g) => [g.name, g])), chain = gs.filter((g) => CHAIN.includes(g.name));
-  return {
-    dials: [
-      ...PLAYER.map((n) => { const g = byName.get(n); return g ? of(g) : { name: n, label: n === "Room" ? ROOM : n, shown: "–", level: "ok" as const, fill: 0, title: "Measured once the hole is checked" }; }),
-      ...chain.filter((g) => g.level !== "ok").map(of),
-    ],
-    chain: chain.filter((g) => g.level === "ok").map((g) => `${g.name} ${g.shown}`).join(" · "),
-    reached: nearLimits(gs.filter((g) => g.level === "full")),
-  };
+  const near = gs.filter((g) => g.level !== "ok").sort((a, b) => ORDER.indexOf(a.name) - ORDER.indexOf(b.name));
+  return { dials: near.map(of), reached: nearLimits(near.filter((g) => g.level === "full")) };
 }
 
 /** The issues as the dock lists them: each one's plain sentence (its rule a tooltip), the piece a click on it selects, and whether Move it can mend it. */
@@ -188,6 +176,7 @@ export function meterFace(clean: boolean, est: { of: Draft; e: Shown | null } | 
   if (!clean) return { level: null, word: "–", title: "Difficulty: measured once the hole has no error", busy: false };
   if (!est || est.of !== kept) return { level: null, word: "–", title: "Difficulty: measuring…", busy: true };
   if (!est.e) return { level: null, word: "–", title: "Difficulty: not measured: the meter's shots found no way to hole it, or it could not run here. Try it yourself; it never stops you publishing.", busy: false };
-  return { level: est.e.level, word: est.e.word, title: est.e.title, busy: false };
+  // (a hole past easy: its strongest reason after it, the dock no longer saying it)
+  return { level: est.e.level, word: est.e.word, title: est.e.level && est.e.line.text ? `${est.e.title} ${est.e.line.text}` : est.e.title, busy: false };
 }
 

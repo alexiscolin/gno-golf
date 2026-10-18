@@ -38,14 +38,15 @@ void test("draftMap: a bar round its four corners; a pulse's piece drawn as a mo
   assert.ok(m.walls[4].every, "the pulse's rail, moving");
 });
 
-void test("draftState: never tested, changed since, holed in some weathers, ready", () => {
+void test("draftState: the weathers ticked as holed for the hole as it is now, the best of its ids", () => {
   const all = required("garden");
-  assert.ok(all.length > 1);
-  assert.deepEqual(draftState({ world: "garden", proofs: [] }, "k"), { stage: "new", word: "Not tested yet" });
-  assert.equal(draftState({ world: "garden", proofs: [proof("")] }, "other").stage, "changed", "proofs of the hole before an edit");
-  assert.equal(draftState({ world: "garden", proofs: [proof("")] }, null).stage, "changed");
-  assert.deepEqual(draftState({ world: "garden", proofs: [proof(all[0])] }, "k"), { stage: "testing", word: `Holed in 1 of ${all.length} weathers` });
+  assert.deepEqual(all, ["", "wind", "rain"]);
+  assert.deepEqual(draftState({ world: "garden", proofs: [] }, "k"), { stage: "new", ticks: all.map((kind) => ({ kind, done: false })), word: "Clear · Wind · Rain" });
+  assert.equal(draftState({ world: "garden", proofs: [proof("")] }, "other").word, "Clear · Wind · Rain", "proofs of the hole before an edit: none holed now");
+  assert.equal(draftState({ world: "garden", proofs: [proof("")] }, null).stage, "new");
+  assert.deepEqual(draftState({ world: "garden", proofs: [proof("")] }, "k"), { stage: "testing", ticks: [{ kind: "", done: true }, { kind: "wind", done: false }, { kind: "rain", done: false }], word: "Clear ✓ · Wind · Rain" });
   // the best of its ids: one id holed everywhere is ready, whatever another holds
   const ready = draftState({ world: "garden", proofs: [proof(all[0], "k", "g1me/hole/v2"), ...all.map((k) => proof(k))] }, "k");
-  assert.deepEqual(ready, { stage: "ready", word: "Ready to publish" });
+  assert.equal(ready.stage, "ready");
+  assert.equal(ready.word, "Clear ✓ · Wind ✓ · Rain ✓");
 });
