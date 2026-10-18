@@ -73,7 +73,7 @@ const click = (b, sel, words = "") => b.js(`(() => { const el = [...document.que
 // ------------------------------------------------------------------ the flows
 const cards = ".gshelf .gcard:not(.gcard--skel)";
 
-// the gallery, every width, as a player with no record (p0): wave 1 in its players' window
+// the gallery, every width, as a player with no record (p0): the sale in its players' window
 for (const width of WIDTHS) {
   const { b, w } = await open("p0", width);
   await b.send("Page.navigate", { url: `${APP}/g/` });
@@ -154,12 +154,12 @@ for (const width of [390, 1280]) {
   await shot(b, "receipt-1280");
   b.kill();
 }
-// the window's cap: three Commons this wave
+// the window's cap: three Commons this window
 {
   const { b } = await sheet("p1", 6, 390);
-  const btn = await button(b, "of 3 Commons this wave");
+  const btn = await button(b, "of 3 Commons this window");
   say(!!btn && btn.off, "p1: the window's cap said", btn ? btn.text : "none");
-  await shot(b, "sheet-wave-cap-390");
+  await shot(b, "sheet-window-cap-390");
   b.kill();
 }
 // a Legendary at its price, as any gnome (b1 has a record), the wallet not connected yet: its button connects and
@@ -198,7 +198,7 @@ for (const width of [390, 1280]) {
   await b.send("Page.navigate", { url: `${APP}/g/?who=${env.p1}` });
   say(await until(b, w, `document.querySelectorAll(${JSON.stringify(cards)}).length >= 4`, 90e3), `my gnomes at ${width}`);
   await sleep(1000);
-  const line = await b.ev(`[...document.querySelectorAll(".shop .wave__note")].map((e) => e.textContent).join(" ")`);
+  const line = await b.ev(`[...document.querySelectorAll(".shop .sale__note")].map((e) => e.textContent).join(" ")`);
   say(/Everyone sees|You play/.test(line || ""), "who sees what, one line", line);
   await until(b, w, `document.querySelector(".galbum__line")`, 20e3);
   const team = await b.ev(`(() => { const shelf = document.querySelector(".gshelf"), album = document.querySelector(".galbum"); return { first: !!shelf && !!album && !!(shelf.compareDocumentPosition(album) & 4), folded: !!album && !album.open, line: document.querySelector(".galbum__line")?.textContent || "", mine: document.querySelector(".gbar__views button.on")?.textContent || "" }; })()`);
@@ -253,16 +253,16 @@ for (const width of [390, 1280]) {
   b.kill();
 }
 
-// an earned gnome's page, a later wave's gnome
+// an earned gnome's page, a gnome a player with no record waits for
 {
   const { b } = await sheet("", "wizard", 390);
   say(!!(await button(b, "Play the Garden Cup")) && (await b.ev(`!!document.querySelector(".gsheet .gtile--earned")`)), "an earned gnome: his tile, Play the Garden Cup");
   await shot(b, "sheet-earned-390");
   b.kill();
   const o = await sheet("p0", 150, 1280);
-  const btn = await button(o.b, "Opens");
-  say(!!btn && btn.off, "a later wave: Opens <date>, off", btn ? btn.text : "none");
-  await shot(o.b, "sheet-later-1280");
+  const btn = await button(o.b, "Players first until");
+  say(!!btn && btn.off, "no record, the window on: Players first until <date>, off", btn ? btn.text : "none");
+  await shot(o.b, "sheet-players-1280");
   o.b.kill();
 }
 

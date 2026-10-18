@@ -101,7 +101,7 @@
 }
 /* a front's paper panel: a card's standing (on its card's face, and its
    drop), the title's facts, the aim's card, the community holes, a new
-   gnome's (flat: they only show), the gnome shop's wave (gnomes.css .wcard) */
+   gnome's (flat: they only show), the gnome shop's sale (gnomes.css .wcard) */
 .world__info, .screen--title .title__facts li, .front .aimset--compact, .worlds--v2 .community, .newgnome, .wcard { background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
 .world__info, .wcard { box-shadow: var(--shadow-btn); }
 /* the call to action: gold, inked, on its shadow (Button's "gold": the title's

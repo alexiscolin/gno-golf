@@ -1,31 +1,33 @@
 // The gnomes' shop as the screens read it (the GUI spec, A): the realm's
-// answers (r/gnogolf/gnomes, ADR-007) checked into these shapes, one query
+// answers (r/gnogolf/gnomes, ADR-007, ADR-013) checked into these shapes, one query
 // each, and what a screen decides from them, pure, so the tests hold every
 // state: the sale's phase, why a gnome can't be bought in plain words, the
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
 import { depositFor, feeFor, upToHundredth } from "../adena";
 import { GNOMES_REALM, isAddress, isObj, nums, shortAddr, strs, type Chain, type Obj } from "../chain";
-import { theWorld, worldName } from "../card";
+import { cap as capitalised, theWorld } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
-import type { Home, Tier } from "./vocab";
+import type { Tier } from "./vocab";
 
 export { SHOP } from "./door";
 
-/** The tiers Buy sells: every one, at its wave's fixed price (there is no auction). */
+/** The tiers Buy sells: every one, at its sale's fixed price (there is no auction). */
 export const BUY_TIERS = ["common", "rare", "epic", "legendary"] as const;
 export type BuyTier = (typeof BUY_TIERS)[number];
 type PerTier = Record<BuyTier, number>;
 
 // ------------------------------------------------------------ the shapes (read.gno, equip.gno)
 export interface TierRow { name: string; price: number; cap: number; playerCap: number; sold: number }
-export interface SeriesRow { name: string; first: number; last: number; sold: number; closed: boolean }
-export interface WaveRow { first: number; last: number; start: number; playersUntil: number; prices: number[] }
+/** A series' sale: its start, its players' window's end (its start: none), its prices per tier (ugnot), as opened. */
+export interface SaleRow { start: number; playersUntil: number; prices: number[] }
+/** A series, and its sale (null: none opened yet). */
+export interface SeriesRow { name: string; first: number; last: number; sold: number; closed: boolean; sale: SaleRow | null }
 /** Collection(): the sale's switch (open) and the earned gnomes' (earnedOpen), the genesis's closing date (0: none
- *  set, and then none of the genesis on sale), the tiers, the series, the waves. */
+ *  set, and then none of the genesis on sale), the tiers (the next sale's prices), the series and their sales. */
 export interface Collection {
   version: number; open: boolean; earnedOpen: boolean; closesAt: number; owner: string; treasury: string; pendingTreasury: string; site: string; royaltyBps: number;
-  tiers: TierRow[]; series: SeriesRow[]; waves: WaveRow[];
+  tiers: TierRow[]; series: SeriesRow[];
 }
 /** Gnome(id): one gnome, its owner ("" unsold) and its price. */
 export interface GnomeRow { id: string; series: string; name: string; tier: string; traits: string; owner: string; price: number; sold: boolean; closed: boolean }
@@ -35,7 +37,7 @@ export interface Held { owner: string; total: number; next: number; rows: { id: 
  *  while still held (equipped), else their best. */
 export interface Worn { player: string; id: string; name: string; tier: string; traits: string; equipped: boolean }
 /** Why Buy would refuse, its first reason, as CanBuy codes it ("" when it would sell). */
-export type Reason = "" | "ids" | "unknown" | "unlisted" | "later" | "taken" | "closed" | "paused" | "players-only" | "wave-cap" | "cap";
+export type Reason = "" | "ids" | "unknown" | "unlisted" | "later" | "taken" | "closed" | "paused" | "players-only" | "window-cap" | "cap";
 /** CanBuy(buyer, ids): what Buy would do, its own sentence (said), the sum to send; the caps left, the window's while it runs. */
 export interface CanBuy { version: number; ok: boolean; reason: Reason; said: string; total: number; left: PerTier; window: { until: number; left: PerTier } }
 /** Params(): the longest player window and a Buy's batch, as the realm holds them. */
@@ -49,8 +51,8 @@ const checks = {
   collection: (v: unknown): v is Collection =>
     isObj(v) && bools(v, "open", "earnedOpen") && nums(v, "closesAt") && strs(v, "site") &&
     every(v.tiers, (t) => isObj(t) && strs(t, "name") && nums(t, "price", "cap", "playerCap", "sold")) &&
-    every(v.series, (s) => isObj(s) && strs(s, "name") && nums(s, "first", "last", "sold") && bools(s, "closed")) &&
-    every(v.waves, (w) => isObj(w) && nums(w, "first", "last", "start", "playersUntil") && every(w.prices, Number.isFinite)),
+    every(v.series, (s) => isObj(s) && strs(s, "name") && nums(s, "first", "last", "sold") && bools(s, "closed") &&
+      (s.sale === null || (isObj(s.sale) && nums(s.sale, "start", "playersUntil") && every(s.sale.prices, Number.isFinite)))),
   // a gnome, or the realm's "none" ({"version":1,"id":""})
   gnome: (v: unknown): v is GnomeRow | { id: "" } =>
     isObj(v) && typeof v.id === "string" && (v.id === "" || (strs(v, "series", "name", "tier", "traits", "owner") && nums(v, "price") && bools(v, "sold", "closed"))),
@@ -162,80 +164,75 @@ const plural = (word: string, n: number) => (n === 1 ? word : word + "s");
 const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name === t);
 /** Whether a gnome is the closed genesis's: the closing closes the genesis alone (close.gno isClosed), a later series sells on. */
 const closedOut = (c: Collection, id: number) => !!c.series[0]?.closed && id >= c.series[0].first && id <= c.series[0].last;
-/** The published wave a gnome is in, by its id (none: not published yet). */
-const waveOf = (c: Collection, id: number) => c.waves.find((w) => id >= w.first && id <= w.last);
+/** The sale a gnome is in, his series' (none: not opened yet). */
+const saleOf = (c: Collection, id: number) => c.series.find((s) => id >= s.first && id <= s.last)?.sale ?? undefined;
 
 // ------------------------------------------------------------ the sale's life (A9)
 type Some = Pick<Listed, "id" | "tier" | "home">;
-/** home: its one world's ("": several, the launch's every world at once: worlds says how many) */
-export interface WaveInfo { n: number; row: WaveRow; home: Home | ""; worlds: number; size: number; sold: number }
-/** A wave's name: "Wave 2 · Island" (the, "Wave 2 · the Island"), a wave of several worlds by how many ("All 7 worlds":
- *  the launch, every gnome at once). */
-export const waveName = (w: Pick<WaveInfo, "n" | "home" | "worlds">, the = false) =>
-  w.home ? `Wave ${w.n} · ${(the ? theWorld : worldName)(w.home)}` : w.worlds > 1 ? `All ${w.worlds} worlds` : `Wave ${w.n}`;
-/** The gallery's "now" row: closed (made and never made: the genesis closed, no later series' wave), or the wave
- *  of the moment (the last started, else the next: a teaser) and what it is at, with the next wave once it is sold out. */
+/** A series' sale as the screens say it: its series (the realm's name) and its name for people ("Genesis"), its
+ *  row, its ids, its size and what found a player. */
+export interface SaleInfo { series: string; name: string; row: SaleRow; first: number; last: number; size: number; sold: number }
+/** The gallery's "now" row: closed (made and never made: the genesis closed, no later series' sale), or the sale
+ *  of the moment (the last started, else the next: a teaser) and what it is at. */
 export type Now =
   | { at: "closed"; closesAt: number; made: number; never: number }
   | { at: "none" }
-  | { at: "teaser" | "players" | "open" | "paused"; wave: WaveInfo }
-  | { at: "soldout"; wave: WaveInfo; next?: WaveInfo };
-export function nowRow(c: Collection, sold: (id: number) => boolean, entries: readonly Some[], now: number): Now {
+  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; sale: SaleInfo };
+/** names: the catalogue's series, their names for people (none: the realm's, capitalised). */
+export function nowRow(c: Collection, sold: (id: number) => boolean, entries: readonly Some[], now: number, names: readonly { id: string; name: string }[] = []): Now {
   const genesis = c.series[0];
-  // each wave and its number; once the genesis closed, a later series' alone
-  const waves = c.waves.map((w, i) => [w, i + 1] as const).filter(([w]) => !closedOut(c, w.first));
-  if (genesis && genesis.closed && !waves.length) return { at: "closed", closesAt: c.closesAt, made: genesis.sold, never: genesis.last - genesis.first + 1 - genesis.sold };
-  const info = (n: number): WaveInfo => {
-    const row = c.waves[n - 1], ids = entries.filter((e) => e.id >= row.first && e.id <= row.last), homes = new Set(ids.map((e) => e.home));
-    return { n, row, home: homes.size === 1 ? ids[0].home : "", worlds: homes.size, size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
+  // the series with a sale; once the genesis closed, a later series' alone
+  const on = c.series.filter((s): s is SeriesRow & { sale: SaleRow } => !!s.sale && !closedOut(c, s.first));
+  if (genesis && genesis.closed && !on.length) return { at: "closed", closesAt: c.closesAt, made: genesis.sold, never: genesis.last - genesis.first + 1 - genesis.sold };
+  const info = (s: SeriesRow & { sale: SaleRow }): SaleInfo => {
+    const ids = entries.filter((e) => e.id >= s.first && e.id <= s.last);
+    return { series: s.name, name: names.find((n) => n.id === s.name)?.name || capitalised(s.name), row: s.sale, first: s.first, last: s.last, size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
   };
-  const started = waves.filter(([w]) => w.start <= now).pop();
+  const started = on.filter((s) => s.sale.start <= now).pop();
   if (!started) {
-    const first = [...waves].sort(([a], [b]) => a.start - b.start)[0];
-    return first ? { at: "teaser", wave: info(first[1]) } : { at: "none" };
+    const first = [...on].sort((a, b) => a.sale.start - b.sale.start)[0];
+    return first ? { at: "teaser", sale: info(first) } : { at: "none" };
   }
-  const wave = info(started[1]);
-  if (!c.open) return { at: "paused", wave };
-  if (wave.size && wave.sold >= wave.size) {
-    const later = waves.filter(([w]) => w.start > now).sort(([a], [b]) => a.start - b.start)[0];
-    return { at: "soldout", wave, ...(later ? { next: info(later[1]) } : {}) };
-  }
-  return { at: now < started[0].playersUntil ? "players" : "open", wave };
+  const sale = info(started);
+  if (!c.open) return { at: "paused", sale };
+  if (sale.size && sale.sold >= sale.size) return { at: "soldout", sale };
+  return { at: now < started.sale.playersUntil ? "players" : "open", sale };
 }
 
-// ------------------------------------------------------------ the shop's wave line (a little fairway, tee to flag)
-/** A tier of the wave: what found a player of what it holds, its price (ugnot, 0: none said), all in words. */
+// ------------------------------------------------------------ the shop's sale card (a little fairway, tee to flag)
+/** A tier of the sale: what found a player of what it holds, its price (ugnot, 0: none said), all in words. */
 export interface TierShare { tier: BuyTier; found: number; total: number; price: number; label: string }
-/** The shop's wave card: the wave's title ("Wave 1 · Garden") and its count ("4 of 104 found a player"), the same said
+/** The shop's sale card: the series' name ("Genesis") and its count ("4 of 720 found a player"), the same said
  *  whole (label), the ball's place
- *  from tee (0) to flag (1) as the share that found a player, each tier's share, the wave's Legendary at
- *  the flag, and the state's chip (a date, never a countdown: none while the wave is simply open; short, a phone's);
- *  closed: what was made and never made; null: no wave to show. */
-export type WaveLine =
+ *  from tee (0) to flag (1) as the share that found a player, each tier's share, its Legendaries at
+ *  the flag, and the state's chip (a date, never a countdown: none while the sale is simply open; short, a phone's);
+ *  closed: what was made and never made; null: no sale to show. */
+export type SaleCard =
   | { at: "closed"; title: string; count: string; label: string }
-  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; n: number; title: string; count: string; label: string; share: number; tiers: TierShare[];
+  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; title: string; count: string; label: string; share: number; tiers: TierShare[];
       legend: { id: number; name: string; words: string } | null; chip: { text: string; short: string; full: string } | null };
-export function waveLine(row: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "name">[], sold: (id: number) => boolean, now: number): WaveLine | null {
+export function saleLine(row: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "name">[], sold: (id: number) => boolean, now: number): SaleCard | null {
   if (row.at === "none") return null;
   if (row.at === "closed") return { at: "closed", title: "The sale is closed", count: `${row.made} made · ${row.never} never made`, label: `The sale is closed: ${row.made} gnomes made, ${row.never} never made` };
-  const { wave } = row, inWave = entries.filter((e) => e.id >= wave.row.first && e.id <= wave.row.last);
+  const { sale } = row, inSale = entries.filter((e) => e.id >= sale.first && e.id <= sale.last);
   const tiers = BUY_TIERS.map((tier) => {
-    const of = inWave.filter((e) => e.tier === tier), found = of.filter((e) => sold(e.id)).length, price = wave.row.prices[tierIndex(c, tier)] ?? 0;
+    const of = inSale.filter((e) => e.tier === tier), found = of.filter((e) => sold(e.id)).length, price = sale.row.prices[tierIndex(c, tier)] ?? 0;
     return { tier, found, total: of.length, price, label: `${label(tier)}${price > 0 ? `, ${gnot(price)} GNOT` : ""}: ${found} of ${of.length} found a player` };
   }).filter((t) => t.total > 0);
-  const legends = inWave.filter((e) => e.tier === "legendary"), waiting = legends.filter((e) => !sold(e.id)), until = utcDate(wave.row.playersUntil, now, true), opens = utcDate(wave.row.start, now, true);
+  const legends = inSale.filter((e) => e.tier === "legendary"), waiting = legends.filter((e) => !sold(e.id)), until = utcDate(sale.row.playersUntil, now, true), opens = utcDate(sale.row.start, now, true);
   // (short: a phone's, the day said only when it is not today's)
   const bare = (s: string) => s.replace(/^today, /, "");
-  const chip = row.at === "teaser" ? { text: `Opens ${opens}`, short: `Opens ${bare(opens)}`, full: `${waveName(wave)} opens ${opens}.` }
+  const chip = row.at === "teaser" ? { text: `Opens ${opens}`, short: `Opens ${bare(opens)}`, full: `${sale.name} opens ${opens}.` }
     : row.at === "players" ? { text: `Players first · until ${until}`, short: `Players first · ${bare(until)}`, full: `Players first until ${until}: save one round on-chain to buy now.` }
     : row.at === "paused" ? { text: "Paused for a moment", short: "Paused", full: "Paused for a moment: the sale picks up where it stopped." } : null;
+  const all = sale.size && sale.sold >= sale.size;
   return {
-    at: row.at, n: wave.n, chip, tiers,
-    title: waveName(wave),
-    count: `${wave.size && wave.sold >= wave.size ? `All ${wave.size}` : `${wave.sold} of ${wave.size}`} found a player`,
-    label: `${waveName(wave, true)}: ${wave.size && wave.sold >= wave.size ? `all ${wave.size}` : `${wave.sold} of ${wave.size}`} ${plural("gnome", wave.size)} found a player`,
-    share: wave.size ? Math.min(1, wave.sold / wave.size) : 0,
-    // (the launch's several: the first still waiting stands for them, the words their count)
+    at: row.at, chip, tiers,
+    title: sale.name,
+    count: `${all ? `All ${sale.size}` : `${sale.sold} of ${sale.size}`} found a player`,
+    label: `${sale.name}: ${all ? `all ${sale.size}` : `${sale.sold} of ${sale.size}`} ${plural("gnome", sale.size)} found a player`,
+    share: sale.size ? Math.min(1, sale.sold / sale.size) : 0,
+    // (several: the first still waiting stands for them, the words their count)
     legend: legends.length > 1 ? legendsWords(legends.length, waiting.length, (waiting[0] ?? legends[0]).id)
       : legends[0] ? { id: legends[0].id, name: legends[0].name, words: `${legends[0].name} ${sold(legends[0].id) ? "found a player" : "waits at the flag"}` } : null,
   };
@@ -249,41 +246,38 @@ function legendsWords(all: number, waiting: number, id: number) {
 
 // ------------------------------------------------------------ the collection on the game's screens
 /** What the menu's Gnomes card, the picker's Collection section and the finish card say of the sale: the
- *  wave to see (on sale, players first, paused, or the next one opening), its size and what found a player,
+ *  sale to see (on sale, players first, paused, or opening), its series' name, its size and what found a player,
  *  its lowest price, its Legendary and three faces (an Epic, a Rare, a Common); null when there is none
- *  to show (closed for good, no wave yet published). Dates, never a countdown. */
+ *  to show (closed for good, sold out, none opened yet). Dates, never a countdown. */
 export interface Promo {
   at: "open" | "players" | "paused" | "teaser";
-  n: number;
-  home: Home | "";
-  worlds: number;
+  name: string;
   size: number;
   sold: number;
-  /** ugnot: the lowest price of the tiers the wave holds (0: none above 0, no price said) */
+  /** ugnot: the lowest price of the tiers the sale holds (0: none above 0, no price said) */
   from: number;
   start: number;
   playersUntil: number;
   legendary: { id: number; name: string; price: number } | null;
-  /** an Epic, a Rare, a Common of the wave, those it holds, each with its own tier */
+  /** an Epic, a Rare, a Common of the sale, those it holds, each with its own tier */
   faces: { id: number; tier: Tier }[];
 }
 export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "home" | "name">[]): Promo | null {
-  const shown = now.at === "soldout" ? (now.next ? { at: "teaser" as const, wave: now.next } : null) : now.at === "closed" || now.at === "none" ? null : { at: now.at, wave: now.wave };
-  if (!shown) return null;
-  const { row } = shown.wave, inWave = entries.filter((e) => e.id >= row.first && e.id <= row.last);
-  const priceOf = (t: string) => row.prices[tierIndex(c, t)] ?? 0, legend = inWave.find((e) => e.tier === "legendary");
-  const prices = [...new Set(inWave.map((e) => e.tier))].map(priceOf).filter((p) => p > 0);
+  if (now.at === "soldout" || now.at === "closed" || now.at === "none") return null;
+  const { sale } = now, { row } = sale, inSale = entries.filter((e) => e.id >= sale.first && e.id <= sale.last);
+  const priceOf = (t: string) => row.prices[tierIndex(c, t)] ?? 0, legend = inSale.find((e) => e.tier === "legendary");
+  const prices = [...new Set(inSale.map((e) => e.tier))].map(priceOf).filter((p) => p > 0);
   return {
-    at: shown.at, n: shown.wave.n, home: shown.wave.home, worlds: shown.wave.worlds, size: shown.wave.size, sold: shown.wave.sold,
+    at: now.at, name: sale.name, size: sale.size, sold: sale.sold,
     from: prices.length ? Math.min(...prices) : 0, start: row.start, playersUntil: row.playersUntil,
     legendary: legend ? { id: legend.id, name: legend.name, price: priceOf("legendary") } : null,
-    faces: (["epic", "rare", "common"] as const).flatMap((t) => inWave.filter((e) => e.tier === t).slice(0, 1).map((e) => ({ id: e.id, tier: t }))),
+    faces: (["epic", "rare", "common"] as const).flatMap((t) => inSale.filter((e) => e.tier === t).slice(0, 1).map((e) => ({ id: e.id, tier: t }))),
   };
 }
-/** A promo in words: its title ("Wave 1 · the Garden"), what it holds ("104 gnomes, from 36 GNOT") and where it is. */
+/** A promo in words: its title ("Genesis"), what it holds ("720 gnomes, from 36 GNOT") and where it is. */
 export function promoWords(p: Promo, now: number) {
   return {
-    title: waveName(p, true),
+    title: p.name,
     line: `${p.size} ${plural("gnome", p.size)}${p.from > 0 ? `, from ${gnot(p.from)} GNOT` : ""}`,
     state: p.at === "teaser" ? `Opens ${utcDate(p.start, now, true)}` : p.at === "paused" ? "Paused for a moment"
       : p.at === "players" ? `Players first until ${utcDate(p.playersUntil, now, true)}` : `${p.sold} of ${p.size} found a player`,
@@ -293,23 +287,23 @@ export function promoWords(p: Promo, now: number) {
 // ------------------------------------------------------------ why not (A2), every CanBuy code in words
 /** What the buy panel says instead of buying: its button's words (off) and one note; play: the note links to a hole. */
 export interface WhyNot { button: string; note: string; play?: true }
-export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "id" | "tier" | "wave" | "home">, now: number): WhyNot | null {
+export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "id" | "tier" | "home">, now: number): WhyNot | null {
   if (r.ok) return null;
-  const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${worldName(g.home)}.`;
-  const wave = waveOf(c, g.id);
+  const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From ${theWorld(g.home)}.`;
+  const sale = saleOf(c, g.id);
   switch (r.reason) {
     case "paused": return { button: "Paused for a moment", note: "The sale picks up where it stopped." };
     case "players-only": return { button: `Players first until ${utcDate(r.window.until, now, true)}`, note: "Save one round on-chain to buy now.", play: true };
-    case "wave-cap": {
+    case "window-cap": {
       const cap = c.tiers[i]?.playerCap ?? 0;
-      return { button: `${cap - r.window.left[t]} of ${cap} ${plural(label(t), cap)} this wave`, note: `Your share until ${utcDate(r.window.until, now, true)}. Then open to everyone.` };
+      return { button: `${cap - r.window.left[t]} of ${cap} ${plural(label(t), cap)} this window`, note: `Your share until ${utcDate(r.window.until, now, true)}. Then open to everyone.` };
     }
     case "cap": {
       const cap = c.tiers[i]?.cap ?? 0;
       return { button: `${cap - r.left[t]} of ${cap} ${plural(label(t), cap)}`, note: "The most one wallet buys." };
     }
-    case "later": return { button: wave ? `Opens ${utcDate(wave.start, now, true)}` : "Not on sale yet", note: from };
-    case "unlisted": return { button: "Not on sale yet", note: c.closesAt ? `${from} A wave not open by ${utcDate(c.closesAt, now)} never opens.` : from };
+    case "later": return { button: sale ? `Opens ${utcDate(sale.start, now, true)}` : "Not on sale yet", note: from };
+    case "unlisted": return { button: "Not on sale yet", note: c.closesAt ? `${from} Its sale opens before ${utcDate(c.closesAt, now)}, or never.` : from };
     case "taken": return { button: "Already found a player", note: "" };
     case "closed": return { button: "Never made", note: "The sale closed before this gnome found a player." };
     case "unknown": case "ids": return { button: "No gnome by that number", note: "" };
@@ -341,9 +335,10 @@ export type Bill = ReturnType<typeof bill>;
 export const PAGE = 48;
 export type View = "sale" | "mine" | "all" | "made";
 interface Seen { c: Collection; sold: (id: number) => boolean; mine: ReadonlySet<number>; now: number }
-/** Whether a gnome is on sale now: in a started wave, not sold, not the closed genesis's. */
+/** Whether a gnome is on sale now: his series' sale started, not sold, not the closed genesis's. */
 export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, now: number) {
-  return !sold(e.id) && !closedOut(c, e.id) && c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now);
+  const s = saleOf(c, e.id);
+  return !sold(e.id) && !closedOut(c, e.id) && !!s && s.start <= now;
 }
 /** Whether a gnome was never made: the closed genesis's, never sold. */
 export const neverMade = (e: Some, s: Seen) => closedOut(s.c, e.id) && !s.sold(e.id);
@@ -365,26 +360,17 @@ export const theirTitle = (name: string, who: string) => `${name || shortAddr(wh
 export const showsClosing = (c: Collection) => c.closesAt > 0 && !c.series[0]?.closed;
 /** The closing line's place in the shop's head: its line, none, or its room kept while the sale is not read yet (null). */
 export const closingSlot = (c: Collection | null): "line" | "none" | "room" => (!c ? "room" : showsClosing(c) ? "line" : "none");
-/** Whether a card in the gallery shows Buy: on sale now (its wave open, unsold, the sale not closed) and not the player's. */
+/** Whether a card in the gallery shows Buy: on sale now (its sale started, unsold, the sale not closed) and not the player's. */
 export const canBuyCard = (e: Listed, s: Seen) => !s.mine.has(e.id) && onSale(e, s.c, s.sold, s.now);
-/** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", or its wave. */
+/** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", when it opens, or not on sale yet. */
 export function cardFact(e: Listed, s: Seen) {
   if (s.mine.has(e.id)) return "Yours";
   if (s.sold(e.id)) return "Found a player";
   if (neverMade(e, s)) return "Never made";
-  const w = waveOf(s.c, e.id);
-  if (w && w.start <= s.now) return `${gnot(w.prices[tierIndex(s.c, e.tier)] ?? 0)} GNOT`;
-  if (w) return `Opens ${utcDate(w.start, s.now, true)}`;
-  return `Wave ${e.wave} · ${worldName(e.home)}`;
+  const sale = saleOf(s.c, e.id);
+  if (sale && sale.start <= s.now) return `${gnot(sale.prices[tierIndex(s.c, e.tier)] ?? 0)} GNOT`;
+  return sale ? `Opens ${utcDate(sale.start, s.now, true)}` : "Not on sale yet";
 }
-
-/** The Legendaries the gallery shows coming, to look at: each wave's while no started wave holds it (not published
- *  yet, or its start to come), in id order; none of the genesis once it has closed (a wave not open by then never opens). */
-export function comingLegends<E extends Some>(entries: readonly E[], c: Collection, now: number): E[] {
-  return entries.filter((e) => e.tier === "legendary" && !closedOut(c, e.id) && !c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now));
-}
-/** A coming Legendary's one fact: his wave, no price, no date. */
-export const comingFact = (e: Pick<Listed, "wave">) => `Coming · wave ${e.wave}`;
 
 // ------------------------------------------------------------ a team (A6)
 const RANK: Record<string, number> = { legendary: 0, epic: 1, rare: 2, common: 3, earned: 4 };

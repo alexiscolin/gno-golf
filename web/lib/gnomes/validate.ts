@@ -128,17 +128,17 @@ export function validate(c: Catalogue, gnomes: readonly Traits[]): Report {
   const counts: Report["counts"] = { tier: {}, home: {}, archetype: {} };
   const looks: { id: number; t: Traits }[] = [];
   // the series' plan, id by id
-  const planned = new Map<number, { tier: string; home: string; wave: number; series: string }>();
+  const planned = new Map<number, { tier: string; home: string; series: string }>();
   for (const s of c.series) for (const w of planSeries(s)) for (const tier of SALE_TIERS) {
     const { first, count } = w.tiers[tier];
-    for (let id = first; id < first + count; id++) planned.set(id, { tier, home: w.home, wave: w.n, series: s.id });
+    for (let id = first; id < first + count; id++) planned.set(id, { tier, home: w.home, series: s.id });
   }
   if (planned.size !== c.gnomes.length) errors.push(`${c.gnomes.length} gnomes for ${planned.size} planned`);
   const names = new Set<string>(), lines = new Set<string>(), holings = new Set<string>(), props = new Set<string>();
   for (const e of c.gnomes) {
     const p = planned.get(e.id);
     if (!p) { err(e.id, "not in any series' plan"); continue; }
-    if (p.tier !== e.tier || p.home !== e.home || p.wave !== e.wave || p.series !== e.series) err(e.id, `planned ${p.series} wave ${p.wave} ${p.home} ${p.tier}, is ${e.series} wave ${e.wave} ${e.home} ${e.tier}`);
+    if (p.tier !== e.tier || p.home !== e.home || p.series !== e.series) err(e.id, `planned ${p.series} ${p.home} ${p.tier}, is ${e.series} ${e.home} ${e.tier}`);
     for (const [k, v] of [["tier", e.tier], ["home", e.home], ["archetype", e.archetype]] as const) counts[k][v] = (counts[k][v] ?? 0) + 1;
     if (!/^[A-Za-z' -]{3,24}$/.test(e.name)) err(e.id, `name "${e.name}"`);
     if (/\b(king|queen|crown)/i.test(e.name)) err(e.id, `name "${e.name}": crowns are the Gnome King's, earned`);

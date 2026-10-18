@@ -8,16 +8,15 @@
       "name": "Genesis",
       "first": 1,
       "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
-      "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
+      "worlds": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
       "seed": "gnogolf/genesis/1",
       "released": false,
       "sale": {
-        "note": "The realm's starting settings, in GNOT, golf numbers (ADR-008): its owner sets prices between waves, never during one, and never lower on what is on sale. launch all: the whole series opens at once, one wave of all its ids (AddWave first last), its player window first.",
+        "note": "The realm's starting settings, in GNOT, golf numbers (ADR-008): the series is sold in one sale (OpenSale, ADR-013), all its ids at once, its player window first, at the prices of the day it opens, never changed after.",
         "prices": { "common": 36, "rare": 72, "epic": 336, "legendary": 1296 },
         "playerWindowHours": 48,
         "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1, "legendary": 1 },
-        "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 },
-        "launch": "all"
+        "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 }
       }
     }
   ]

@@ -16,7 +16,7 @@
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
 # genesis series, its closing date a year off (the realm sells none of the
 # genesis without one: "close" brings it forward), the whole genesis on sale
-# in one wave, as at launch (its players' window an hour); community publishing open; the treasury moved to a test key; p1 and
+# in its one sale (its players' window an hour); community publishing open; the treasury moved to a test key; p1 and
 # b1 with a record and a few gnomes; all the course, the four classic cups
 # and the Crystal Mines. Then the site built as the real one is (next build:
 # no dev server's compiles or reloads over a proxied link), with the shop,
@@ -188,7 +188,7 @@ MNEMONIC_p1=$("$GNOKEY" generate 2>/dev/null | tail -1) MNEMONIC_p0=$("$GNOKEY" 
 [ "$(printf %s "$MNEMONIC_p1" | wc -w)" -ge 12 ] && [ "$(printf %s "$MNEMONIC_p0" | wc -w)" -ge 12 ] || die "gnokey generate made no seed phrase"
 log "try-local: a local chain ($CHAINID), the realms under $NS and the course's 90 holes (a few minutes; its log: $WORK/seed.log)"
 MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
-	SEED=1 SEED_LAUNCH=1 SEED_CLOSE=365 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
+	SEED=1 SEED_CLOSE=365 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
 	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT \
 	bash "$root/scripts/e2e-gnomes.sh" >"$WORK/seed.out" 2>"$WORK/seed.log" ||
 	{ DEV_PID=$(sed -n 's/^DEV_PID=//p' "$WORK/seed.env" 2>/dev/null); tail -5 "$WORK/seed.log" >&2; die "the seed failed (its steps: $WORK/e2e.md)"; }
@@ -270,7 +270,7 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
 
   Try (the title's "Click to start" opens "How do we play?": Solo, Duel, Builder, Gnomes):
     1. Play: Solo, a cup (all five are there), a hole; finish it, see the card
-       (and the wave's line at its foot).
+       (and the sale's line at its foot).
     2. The gnomes: the "Gnomes" card (also the picker's Collection band at its
        top, the cups screen's "Gnomes →"). Buy a Common, a Rare, an Epic and the
        Legendary #$LEGENDARY (p1: its window's caps); the two boxes, Adena, the receipt.

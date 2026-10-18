@@ -3,7 +3,7 @@
 // line): the collection, what was sold and the catalogue, read once a chain
 // (a failed read is asked again the next time); its state worked out from the
 // clock at each use (shop.ts promoOf), so a players' window that ends or a
-// wave that opens shows without a new read.
+// sale that opens shows without a new read.
 import type { Chain } from "../chain";
 import { makeShop, nowRow, promoOf, type Collection, type Promo } from "./shop";
 import { served, type Served } from "./served";
@@ -28,4 +28,4 @@ export function readSale(chain: Pick<Chain, "qjson" | "qstr">, catalogue: () => 
 }
 
 /** What the screens promote at time now (unix seconds, the chain's clock), null for nothing. */
-export const saleAt = (s: Sale, now: number): Promo | null => promoOf(nowRow(s.c, s.sold, s.gnomes, now), s.c, s.gnomes);
+export const saleAt = (s: Sale, now: number): Promo | null => promoOf(nowRow(s.c, s.sold, s.gnomes, now, s.served.series), s.c, s.gnomes);

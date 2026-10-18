@@ -177,7 +177,7 @@ export function generateSeries(s: SeriesConfig, recipe: Recipe, epics: readonly 
             return { t: { ...t, series: s.code }, name: name(a), line: line(openers, a.lines) };
           });
         });
-        // the archetypes of a wave mixed, as a gallery shows them
+        // the archetypes of a world mixed, as a gallery shows them
         looks = shuffled(looks, rand);
       } else {
         const mine = designs[tier].filter((d) => d.home === w.home);
@@ -186,7 +186,7 @@ export function generateSeries(s: SeriesConfig, recipe: Recipe, epics: readonly 
       }
       looks.forEach(({ t, name: n, line: l }, i) => {
         const id = first + i, traits = encode(t);
-        out.push({ id, series: s.id, wave: w.n, tier, home: w.home, archetype: t.archetype as Archetype, name: n, line: l, traits, skin: skinOf(t, { id: `t${id}`, name: n, line: l }) });
+        out.push({ id, series: s.id, tier, home: w.home, archetype: t.archetype as Archetype, name: n, line: l, traits, skin: skinOf(t, { id: `t${id}`, name: n, line: l }) });
       });
     }
   }

@@ -1648,7 +1648,7 @@ export default function Golf() {
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} mark={<Collector chain={game.current?.chain} player={dare} />} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         owned={(() => {
-          // the collection under the picker's tile (in a region the shop is offered in): the player's own gnomes first, else the wave
+          // the collection under the picker's tile (in a region the shop is offered in): the player's own gnomes first, else the sale
           const row = SHOP && account && held.length > 0 && game.current ? (
             <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region === true} onWorn={readWorn}
               name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
@@ -2036,7 +2036,7 @@ export default function Golf() {
                 <NameForm chain={game.current.chain} account={null} chainId={chainId || chainName || null} price={gasPrice} lead="Your name on the board" onNamed={() => {}} folded />
               </details>
             )}
-            {/* the gnomes' wave, one quiet line at the card's foot (never among its actions) */}
+            {/* the gnomes' sale, one quiet line at the card's foot (never among its actions) */}
             {shopOn && <PromoLine promo={promo} now={promoNow} onOpen={() => openShop()} />}
           </Dialog>
         </div>

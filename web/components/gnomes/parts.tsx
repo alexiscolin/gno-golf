@@ -13,7 +13,7 @@ import { siteURL } from "@/lib/site";
 import { shareOrCopy } from "@/components/Share";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
-import { comingFact, gnot, utcDate, localDate, type TierShare, type WaveLine } from "@/lib/gnomes/shop";
+import { gnot, utcDate, localDate, type SaleCard, type TierShare } from "@/lib/gnomes/shop";
 import type { Tier } from "@/lib/gnomes/vocab";
 
 // a tier's shape, read in grey too: a disc, a diamond, a gem, a crown; a leaf for an earned one
@@ -102,15 +102,6 @@ export function GnomeCard({ g, fact, mine, never, buy = false, onChain = null, o
     </button>
   );
 }
-/** A Legendary of a wave not open yet, to look at: his tile, name and number, his tier and his wave. No price, no Buy,
- *  no date, nothing to press. */
-export const ComingCard = ({ g, onChain = null }: { g: Listed; onChain?: Portraits | null }) => (
-  <article className="gcard gcard--coming" aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${comingFact(g)}`}>
-    <Tile id={g.id} tier={g.tier} onChain={onChain} />
-    <span className="gcard__name"><span>{g.name}</span><small>#{g.id}</small></span>
-    <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{comingFact(g)}</span></span>
-  </article>
-);
 /** A card's place while the grid is read: the same size, blank. */
 export const BlankCard = () => (
   <span className="gcard gcard--skel" aria-hidden="true"><span className="gtile" /><span className="gcard__name">&nbsp;</span><span className="gcard__foot" /><span className="gcard__buy gcard__buy--skel">&nbsp;</span></span>
@@ -125,12 +116,12 @@ export function Closes({ at, now }: { at: number; now: number }) {
   );
 }
 
-/** The sale's card, the game's front card (title.css): the wave's Legendary in gold on the left, the wave's title in
- *  bold over its count and the Legendary's words, its state's chip at the right of the title (a date, never a
+/** The sale's card, the game's front card (title.css): its Legendary in gold on the left, the series' name in
+ *  bold over its count and the Legendaries' words, its state's chip at the right of the title (a date, never a
  *  countdown; a phone's shorter), the fairway under them its whole width, the ball rolled from the tee to the share
  *  that found a player (still with reduced motion); the sale's end in words; the closing date (closes), its last line,
- *  in the card. Its height the slot's (ShopFrame WaveSlot). */
-export function SaleLine({ line, closes }: { line: WaveLine; closes?: ReactNode }) {
+ *  in the card. Its height the slot's (ShopFrame SaleSlot). */
+export function SaleLine({ line, closes }: { line: SaleCard; closes?: ReactNode }) {
   if (line.at === "closed")
     return <section className="wcard wcard--closed" aria-label="The sale"><b className="wcard__title">{line.title}</b><span className="wcard__count">{line.count}</span></section>;
   const { legend, chip } = line;
@@ -159,9 +150,9 @@ export function SaleLine({ line, closes }: { line: WaveLine; closes?: ReactNode 
   );
 }
 
-/** The tiers as the shelf's filter: a chip each, its price in the wave (once, here; no price, none said) and how many
- *  of it are left of what the wave holds (the wave's own count, never a countdown), pressed
- *  when it filters; pressed again, every tier. Each chip says its tier's share of the wave to a screen reader. */
+/** The tiers as the shelf's filter: a chip each, its price in the sale (once, here; no price, none said) and how many
+ *  of it are left of what the sale holds (its own count, never a countdown), pressed
+ *  when it filters; pressed again, every tier. Each chip says its tier's share of the sale to a screen reader. */
 export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierShare[]; value?: string; onChange: (t: string | undefined) => void }) {
   const known = new Map(tiers.map((t) => [t.tier, t]));
   return (

@@ -22,7 +22,7 @@ type Group = "worlds" | "tiers" | "sets";
 const LEAF = <path d="M3 13C3 7 7 3 13 3c0 6-4 10-10 10z" />;
 const SILHOUETTE = <path d="M20 3 11 19h18L20 3Zm0 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z" />;
 
-export default function Album({ cat, owned, given = null, chain, player, mine, home, onOpen }: {
+export default function Album({ cat, owned, given = null, chain, player, mine, onOpen }: {
   cat: Served;
   /** what they hold (GnomesOf's rows, every page) */
   owned: readonly { id: string; tier: string; traits?: string }[];
@@ -32,8 +32,6 @@ export default function Album({ cat, owned, given = null, chain, player, mine, h
   player: string;
   /** the player's own (their next rank said), or another's */
   mine: boolean;
-  /** the world its one line says (the wave's), else the one most filled */
-  home?: string;
   /** a slot tapped: its gnome's number, or an earned kind */
   onOpen: (open: string) => void;
 }) {
@@ -90,7 +88,7 @@ export default function Album({ cat, owned, given = null, chain, player, mine, h
   // folded, their gnomes first: the player's own to its one line, another player's to its head
   return (
     <details className="galbum galbum--fold" aria-label={mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}>
-      <summary>{mine ? <span className="galbum__line"><b>{ALBUM_WORDS.title}</b> {albumSummary(a, { total: owned.length, rows: owned }, home)}</span> : head}</summary>
+      <summary>{mine ? <span className="galbum__line"><b>{ALBUM_WORDS.title}</b> {albumSummary(a, { total: owned.length, rows: owned })}</span> : head}</summary>
       {mine && head}
       {body}
     </details>

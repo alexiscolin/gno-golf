@@ -23,5 +23,5 @@ test("served: scripts/gnomeassets.mjs writes every gnome, without its skin, and 
   const c = JSON.parse(fs.readFileSync(new URL("../public/gnomes/catalogue.json", import.meta.url), "utf8")) as { gnomes: Record<string, unknown>[]; earned: unknown[] };
   assert.equal(c.gnomes.length, 720);
   assert.equal(c.earned.length, 9);
-  assert.deepEqual(Object.keys(c.gnomes[0]).sort(), ["archetype", "home", "id", "line", "name", "series", "tier", "traits", "wave"]);
+  assert.deepEqual(Object.keys(c.gnomes[0]).sort(), ["archetype", "home", "id", "line", "name", "series", "tier", "traits"]);
 });

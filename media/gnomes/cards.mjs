@@ -4,10 +4,10 @@
 // of his page /g/<id>/, and the gallery's, web/public/og/g.jpg. Each is a page
 // of HTML laid out in the repo's headless Chrome and screenshotted, as
 // media/og/og.mjs makes the holes': his tile (his thumbnail, media/gnomes/thumbs,
-// on his tier's stage), his tier, name, line and wave, the game's word and his
+// on his tier's stage), his tier, name, line and world, the game's word and his
 // address. No dev server, no chain: the thumbnails and the game's font go in
 // as data URIs.
-//   node media/gnomes/cards.mjs --wave 1   (a wave's gnomes and the gallery's card)
+//   node media/gnomes/cards.mjs --world garden   (a world's gnomes and the gallery's card)
 //   node media/gnomes/cards.mjs [ids…]    (none: every gnome and the gallery)
 // Make them again when a thumbnail, a name or a line changes.
 import fs from "node:fs";
@@ -21,15 +21,15 @@ const OUT = new URL("public/og/g/", WEB);
 const W = 1200, H = 630, Q = 80, MAX_BYTES = 60e3;
 
 /** @typedef {"common" | "rare" | "epic" | "legendary"} Tier */
-/** @typedef {{ id: number, tier: Tier, name: string, line: string, home: string, wave: number }} Gnome */
+/** @typedef {{ id: number, tier: Tier, name: string, line: string, home: string }} Gnome */
 /** @type {{ gnomes: Gnome[] }} */
 const catalogue = JSON.parse(fs.readFileSync(new URL("data/gnomes.json", ROOT), "utf8"));
-// --wave n: the gnomes of wave n (a wave's cards are made and committed as it
-// opens: a gnome's page without its card links the gallery's, app/g)
-const args = process.argv.slice(2), at = args.indexOf("--wave");
-const wave = at >= 0 ? Number(args.splice(at, 2)[1]) : 0;
+// --world <home>: that world's gnomes (the cards can be made and committed a
+// world at a time: a gnome's page without its card links the gallery's, app/g)
+const args = process.argv.slice(2), at = args.indexOf("--world");
+const world = at >= 0 ? args.splice(at, 2)[1] : "";
 const named = args.map(Number).filter(Boolean);
-const todo = catalogue.gnomes.filter((g) => (named.length ? named.includes(g.id) : !wave || g.wave === wave));
+const todo = catalogue.gnomes.filter((g) => (named.length ? named.includes(g.id) : !world || g.home === world));
 const gallery = !named.length;
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -113,7 +113,7 @@ const gnomeCard = (/** @type {Gnome} */ g) => `<!doctype html><meta charset="utf
   .foot { margin-top: 8px; }
 </style>
 <div class="card">${tile(g)}<div class="text">${chip(g.tier)}<h1 class="inked">${esc(g.name)}</h1><p class="line">${esc(g.line)}</p>
-<p class="meta">#${g.id} · Wave ${g.wave} · ${esc(cap(g.home))}</p>${FOOT(`g/${g.id}/`)}</div></div>`;
+<p class="meta">#${g.id} · ${esc(cap(g.home))}</p>${FOOT(`g/${g.id}/`)}</div></div>`;
 
 // the name as large as fits: two lines at most, no word cut, the column not overflowing
 // (the line then loses a line before the name goes under 48 px); clamped with an ellipsis past that
@@ -127,9 +127,9 @@ const FIT = `(() => {
 
 /** The gallery's card: the question, a strip of tiles across the tiers, the count. */
 function galleryCard() {
-  // one of each tier from as many waves as can be, a Legendary in the middle
-  const pick = (/** @type {Tier} */ t, /** @type {number} */ wave) => catalogue.gnomes.find((g) => g.tier === t && g.wave === wave) || catalogue.gnomes.find((g) => g.tier === t);
-  const strip = /** @type {[Tier, number][]} */ ([["common", 2], ["rare", 3], ["epic", 1], ["legendary", 1], ["epic", 5], ["rare", 6], ["common", 7]]).map(([t, w]) => pick(t, w)).filter((g) => !!g);
+  // one of each tier from as many worlds as can be, a Legendary in the middle
+  const pick = (/** @type {Tier} */ t, /** @type {string} */ home) => catalogue.gnomes.find((g) => g.tier === t && g.home === home) || catalogue.gnomes.find((g) => g.tier === t);
+  const strip = /** @type {[Tier, string][]} */ ([["common", "island"], ["rare", "town"], ["epic", "garden"], ["legendary", "garden"], ["epic", "mines"], ["rare", "volcano"], ["common", "storm"]]).map(([t, w]) => pick(t, w)).filter((g) => !!g);
   return `<!doctype html><meta charset="utf-8"><style>${STYLE}${FOOT_STYLE}
   .card { position: absolute; inset: 0; display: grid; justify-items: center; align-content: center; gap: 30px; padding: 56px 60px; text-align: center; }
   h1 { font-size: 84px; line-height: 1.05; font-weight: 700; --ink-w: 11px; --ink-drop: 7px; transform: rotate(-2deg); }

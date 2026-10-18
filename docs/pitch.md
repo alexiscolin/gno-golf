@@ -53,7 +53,7 @@ real example of a full app on Gno.
 Draw your own hole, test it, publish it. It lands on-chain under your name,
 readable by anyone, playable by everyone, with its own board and its own
 ghosts, and no studio can take it down. The contract side is already live and
-closed behind a switch; the in-game editor comes with the second wave, once
+closed behind a switch; the in-game editor comes with the second release, once
 the first players are in and the gas is watched on a real network.
 
 [Play](https://gnogolf.xyz) · [Code](https://github.com/alexiscolin/gno-golf) · [gno.land](https://gno.land) · [Adena](https://www.adena.app/)

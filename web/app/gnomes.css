@@ -53,7 +53,7 @@
 @media (max-width: 700px) { .shop--sale .front__head > .eyebrow, .shop--sale .shop__pitch { display: none; } }
 /* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
 .gcard__buy { justify-self: stretch; margin: var(--sp-2) 0 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
-.wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
+.sale__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
 
 /* the shop's head: the game's front head (its pill, its title at the rival's size, its line), level with the corner
    buttons; then the sale's line and the toolbar, the gnomes above the fold */
@@ -74,7 +74,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
    a player's page), never under the About button */
 @media (max-width: 420px) { .shop .front__head { justify-self: stretch; } .shop .worlds__title { justify-self: stretch; font-size: 28px; text-align: center; text-wrap: balance; } }
 /* the sale's card: the game's front card (title.css: paper, the inked edge, its radius and drop), centred at the
-   gallery's width, 720 at most, compact: the wave's Legendary on the left, its title with the state's chip at its
+   gallery's width, 720 at most, compact: its Legendary on the left, its title with the state's chip at its
    right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
    (fixed tracks: the slot while it is read is the same room) */
 .wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: var(--sp-4) var(--sp-5); color: var(--ink); font-style: normal; text-align: left; } /* (16 above and under its words, 24 at its sides) */
@@ -209,8 +209,6 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
 .gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
 .gcard--skel { pointer-events: none; }
-.gcard--coming { cursor: default; box-shadow: none; border-style: dashed; }
-.gcard--coming:hover { transform: none; }
 .gcard--skel .gtile { background: rgba(var(--ink-rgb), .06); }
 .gshelf__more { justify-self: center; }
 .gempty { justify-self: center; text-align: center; color: var(--ink-soft); }

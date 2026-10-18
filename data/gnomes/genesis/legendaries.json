@@ -1,5 +1,5 @@
 {
-  "note": "The seven Legendaries, one of one, one per home, in the waves' order: each a piece no other gnome wears and that moves (web/lib/scene/gnome-legend.ts), a material or hat of his own, and a trail and a holing that only he has. kind is his number (1-7) in the traits.",
+  "note": "The seven Legendaries, one of one, one per home, in the worlds' order: each a piece no other gnome wears and that moves (web/lib/scene/gnome-legend.ts), a material or hat of his own, and a trail and a holing that only he has. kind is his number (1-7) in the traits.",
   "legendaries": [
     { "kind": 4, "home": "garden", "archetype": "gardener", "name": "The Miller", "concept": "The garden's miller: a floury miller's cap and a blue smock, a small mill standing on the cap, whitewashed, red-roofed, its four sails turning.",
       "hat": "mill", "hatColour": "oat", "body": "denim", "beard": "long", "hair": "snow", "accent": "cap", "wear": ["cheeks"],

@@ -5,8 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, landing, utcDate, nowRow, promoOf, promoWords, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
-  type Collection, type CanBuy,
+  makeShop, soldSet, gnot, landing, utcDate, nowRow, promoOf, promoWords, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, saleLine,
+  type Collection, type CanBuy, type SeriesRow,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
 import { depositFor, feeFor } from "../lib/adena.ts";
@@ -16,6 +16,10 @@ const entries = catalogue.gnomes;
 const A = "g1" + "a".repeat(38);
 const T0 = Date.UTC(2026, 9, 9, 18) / 1000; // Fri 9 Oct 2026, 18:00 UTC
 
+const SALE = { start: T0, playersUntil: T0 + 48 * 3600, prices: [36e6, 72e6, 336e6, 1296e6] };
+/** The genesis as Collection() writes it: on sale from T0, its players' window two days. */
+const genesis = (o: Partial<SeriesRow> = {}): SeriesRow => ({ name: "genesis", first: 1, last: 720, sold: 0, closed: false, sale: SALE, ...o });
+const CLOSED = [genesis({ sold: 486, closed: true })];
 const collection = (o: Partial<Collection> = {}): Collection => ({
   version: 1, open: true, earnedOpen: true, closesAt: Date.UTC(2026, 11, 14, 18) / 1000, owner: A, treasury: A, pendingTreasury: "", site: "", royaltyBps: 500,
   tiers: [
@@ -24,8 +28,7 @@ const collection = (o: Partial<Collection> = {}): Collection => ({
     { name: "epic", price: 336e6, cap: 2, playerCap: 1, sold: 0 },
     { name: "legendary", price: 1296e6, cap: 1, playerCap: 1, sold: 0 },
   ],
-  series: [{ name: "genesis", first: 1, last: 720, sold: 0, closed: false }],
-  waves: [{ first: 1, last: 104, start: T0, playersUntil: T0 + 48 * 3600, prices: [36e6, 72e6, 336e6, 1296e6] }],
+  series: [genesis()],
   ...o,
 });
 const can = (o: Partial<CanBuy> = {}): CanBuy => ({ version: 1, ok: false, reason: "", said: "", total: 0, left: { common: 10, rare: 5, epic: 2, legendary: 1 }, window: { until: 0, left: { common: 0, rare: 0, epic: 0, legendary: 0 } }, ...o });
@@ -148,69 +151,61 @@ test("shop: the now row follows the sale's life: teaser, players first, open, so
   assert.equal(nowRow(c, isSold([]), entries, T0 - 60).at, "teaser");
   const players = nowRow(c, isSold([1, 2]), entries, T0 + 60);
   assert.equal(players.at, "players");
-  assert.ok(players.at !== "closed" && players.at !== "none" && players.wave.size === 104 && players.wave.sold === 2 && players.wave.home === "garden" && players.wave.n === 1);
+  assert.ok(players.at !== "closed" && players.at !== "none" && players.sale.size === 720 && players.sale.sold === 2 && players.sale.series === "genesis" && players.sale.name === "Genesis");
   assert.equal(nowRow(c, isSold([]), entries, T0 + 49 * 3600).at, "open");
-  const all = Array.from({ length: 104 }, (_, i) => i + 1);
+  const all = Array.from({ length: 720 }, (_, i) => i + 1);
   assert.equal(nowRow(c, isSold(all), entries, T0 + 49 * 3600).at, "soldout");
   assert.equal(nowRow(collection({ open: false }), isSold([]), entries, T0 + 60).at, "paused");
-  const closed = nowRow(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] }), isSold([]), entries, T0);
+  const closed = nowRow(collection({ series: CLOSED }), isSold([]), entries, T0);
   assert.deepEqual(closed, { at: "closed", closesAt: Date.UTC(2026, 11, 14, 18) / 1000, made: 486, never: 234 });
-  assert.equal(nowRow(collection({ waves: [] }), isSold([]), entries, T0).at, "none");
+  assert.equal(nowRow(collection({ series: [genesis({ sale: null })] }), isSold([]), entries, T0).at, "none");
+  // its name for people: the catalogue's, when given
+  const named = nowRow(c, isSold([]), entries, T0 + 60, [{ id: "genesis", name: "The First" }]);
+  assert.ok(named.at === "players" && named.sale.name === "The First");
 });
 
-test("shop: the genesis closing closes the genesis alone: a later series' wave sells on (close.gno isClosed)", () => {
-  const later = [721, 722, 723].map((id, i) => ({ ...entries[0], id, series: "winter-2027", wave: 8, tier: i === 2 ? ("legendary" as const) : ("common" as const), home: "mountain" as const }));
+test("shop: the genesis closing closes the genesis alone: a later series' sale sells on (close.gno isClosed)", () => {
+  const later = [721, 722, 723].map((id, i) => ({ ...entries[0], id, series: "winter-2027", tier: i === 2 ? ("legendary" as const) : ("common" as const), home: "mountain" as const }));
   const all = [...entries, ...later];
-  const prices = [36e6, 72e6, 336e6, 1296e6];
-  const c = collection({
-    series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }, { name: "winter-2027", first: 721, last: 723, sold: 0, closed: false }],
-    waves: [...collection().waves, { first: 721, last: 722, start: T0, playersUntil: T0, prices }, { first: 723, last: 723, start: T0 + 86400 * 30, playersUntil: T0 + 86400 * 30, prices }],
-  });
+  const winter = (start: number): SeriesRow => ({ name: "winter-2027", first: 721, last: 723, sold: 0, closed: false, sale: { start, playersUntil: start, prices: SALE.prices } });
+  const c = collection({ series: [...CLOSED, winter(T0)] });
   const now = T0 + 60, none = isSold([]);
-  assert.equal(onSale(all.find((e) => e.id === 721)!, c, none, now), true, "the later series' open wave: on sale");
+  assert.equal(onSale(all.find((e) => e.id === 721)!, c, none, now), true, "the later series' sale: on sale");
   assert.equal(onSale(entries[4], c, none, now), false, "a genesis gnome never sold: never made");
   const row = nowRow(c, none, all, now);
-  assert.ok(row.at === "open" && row.wave.n === 2 && row.wave.size === 2, `the head shows the later series' wave, not "closed": ${row.at}`);
-  assert.deepEqual(comingLegends(all, c, now).map((e) => e.id), [723], "the later series' Legendary still to come; none of the genesis");
-  // no later wave at all: the sale is closed
-  assert.equal(nowRow({ ...c, waves: collection().waves }, none, all, now).at, "closed");
-});
-
-test("shop: a later wave is the teaser once the one before is sold out", () => {
-  const c = collection({ waves: [...collection().waves, { first: 105, last: 208, start: T0 + 86400 * 3, playersUntil: T0 + 86400 * 4, prices: [36e6, 72e6, 336e6, 1296e6] }] });
-  const all = Array.from({ length: 104 }, (_, i) => i + 1);
-  const r = nowRow(c, isSold(all), entries, T0 + 86400);
-  assert.equal(r.at, "soldout");
-  assert.ok(r.at === "soldout" && r.next?.n === 2 && r.next.home === "island");
+  assert.ok(row.at === "open" && row.sale.series === "winter-2027" && row.sale.name === "Winter-2027" && row.sale.size === 3, `the head shows the later series' sale, not "closed": ${row.at}`);
+  assert.equal(nowRow(collection({ series: [...CLOSED, winter(T0 + 86400 * 30)] }), none, all, now).at, "teaser", "its sale to come");
+  // no later sale at all: the sale is closed
+  assert.equal(nowRow(collection({ series: [...CLOSED, { ...winter(T0), sale: null }] }), none, all, now).at, "closed");
 });
 
 // ------------------------------------------------------------ the collection on the game's screens
-test("shop: the promo is the wave to see, its lowest price, its Legendary and three faces; none once closed", () => {
+test("shop: the promo is the sale to see, its lowest price, its Legendary and three faces; none once sold out or closed", () => {
   const c = collection(), open = promoOf(nowRow(c, isSold([1, 2, 3, 4]), entries, T0 + 49 * 3600), c, entries)!;
   assert.equal(open.at, "open");
-  assert.deepEqual([open.n, open.home, open.size, open.sold, open.from], [1, "garden", 104, 4, 36e6]);
+  assert.deepEqual([open.name, open.size, open.sold, open.from], ["Genesis", 720, 4, 36e6]);
   assert.ok(open.legendary && open.legendary.id === 104 && open.legendary.price === 1296e6);
-  // each face with its own tier, the catalogue's: an Epic, a Rare, a Common of the wave
+  // each face with its own tier, the catalogue's: an Epic, a Rare, a Common of the sale
   assert.deepEqual(open.faces.map((f) => f.tier), ["epic", "rare", "common"]);
   for (const f of open.faces) assert.equal(entries.find((e) => e.id === f.id)?.tier, f.tier);
-  assert.deepEqual(promoWords(open, T0 + 49 * 3600), { title: "Wave 1 · the Garden", line: "104 gnomes, from 36 GNOT", state: "4 of 104 found a player" });
+  assert.deepEqual(promoWords(open, T0 + 49 * 3600), { title: "Genesis", line: "720 gnomes, from 36 GNOT", state: "4 of 720 found a player" });
   assert.match(promoWords(promoOf(nowRow(c, isSold([]), entries, T0 + 60), c, entries)!, T0 + 60).state, /^Players first until /);
   assert.match(promoWords(promoOf(nowRow(c, isSold([]), entries, T0 - 60), c, entries)!, T0 - 60).state, /^Opens /);
   assert.equal(promoOf(nowRow(collection({ open: false }), isSold([]), entries, T0 + 60), c, entries)!.at, "paused");
-  const all = Array.from({ length: 104 }, (_, i) => i + 1);
-  assert.equal(promoOf(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries), null, "sold out, no wave after it: nothing to promote");
-  assert.equal(promoOf(nowRow(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] }), isSold([]), entries, T0), c, entries), null);
-  // a wave without some tiers: its faces are what it holds, each named with its tier (never by its place)
-  const commons = entries.filter((e) => e.tier === "common"), onlyCommons = collection({ waves: [{ first: 1, last: 104, start: T0, playersUntil: T0, prices: [36e6, 72e6, 336e6, 1296e6] }] });
+  const all = Array.from({ length: 720 }, (_, i) => i + 1);
+  assert.equal(promoOf(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries), null, "sold out: nothing to promote");
+  assert.equal(promoOf(nowRow(collection({ series: CLOSED }), isSold([]), entries, T0), c, entries), null);
+  // a sale without some tiers: its faces are what it holds, each named with its tier (never by its place)
+  const commons = entries.filter((e) => e.tier === "common"), onlyCommons = collection({ series: [genesis({ sale: { ...SALE, playersUntil: T0 } })] });
   const thin = promoOf(nowRow(onlyCommons, isSold([]), commons, T0 + 60), onlyCommons, commons)!;
   assert.deepEqual(thin.faces.map((f) => f.tier), ["common"]);
   assert.equal(thin.legendary, null);
-  assert.equal(thin.from, 36e6, "from: the tiers the wave holds, not the others' prices");
+  assert.equal(thin.from, 36e6, "from: the tiers the sale holds, not the others' prices");
   // no price above 0 in what it holds: no "from" at all (never "from Infinity GNOT", never "from 0")
-  const free = collection({ waves: [{ first: 1, last: 104, start: T0, playersUntil: T0, prices: [0, 0, 0, 0] }] });
+  const free = collection({ series: [genesis({ sale: { start: T0, playersUntil: T0, prices: [0, 0, 0, 0] } })] });
   const none = promoOf(nowRow(free, isSold([]), entries, T0 + 60), free, entries)!;
   assert.equal(none.from, 0);
-  assert.equal(promoWords(none, T0 + 60).line, "104 gnomes");
+  assert.equal(promoWords(none, T0 + 60).line, "720 gnomes");
   // the words never press: no countdown, no "only", no "last"
   for (const p of [open]) for (const w of Object.values(promoWords(p, T0))) assert.doesNotMatch(w, /only|last|hurry|left|invest|value/i);
 });
@@ -219,7 +214,7 @@ test("shop: the promo is the wave to see, its lowest price, its Legendary and th
 test("shop: no closing line when no closing date is set (a launch may leave it unset), nor once closed", () => {
   assert.equal(showsClosing(collection({ closesAt: 0 })), false);
   assert.equal(showsClosing(collection()), true);
-  assert.equal(showsClosing(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] })), false, "closed: the wave panel says it");
+  assert.equal(showsClosing(collection({ series: CLOSED })), false, "closed: the sale's card says it");
 });
 test("shop: the closing line's room: the line with a date, none without, kept while the sale is not read yet", () => {
   assert.equal(closingSlot(collection()), "line");
@@ -240,26 +235,26 @@ test("shop: Buy on a card on sale only", () => {
   assert.equal(canBuyCard(entries[0], seen), true);
   assert.equal(canBuyCard(entries[1], seen), false, "found a player");
   assert.equal(canBuyCard(entries[2], seen), false, "yours");
-  assert.equal(canBuyCard(entries[0], { ...seen, now: T0 - 60 }), false, "its wave not open yet");
-  assert.equal(canBuyCard(entries.find((e) => e.id > 104)!, seen), false, "no wave of its own yet");
+  assert.equal(canBuyCard(entries[0], { ...seen, now: T0 - 60 }), false, "its sale not started yet");
+  assert.equal(canBuyCard(entries[0], { ...seen, c: collection({ series: [genesis({ sale: null })] }) }), false, "no sale opened yet");
 });
 
 // ------------------------------------------------------------ why not, in plain words
 test("shop: every refusal CanBuy gives has its words: the button's and a note", () => {
   const c = collection(), until = T0 + 48 * 3600;
-  const tansy = { id: 94, tier: "epic" as const, wave: 1, home: "garden" as const };
+  const tansy = { id: 94, tier: "epic" as const, home: "garden" as const };
   const w = (r: CanBuy) => whyNot(r, c, tansy, T0 + 60);
   assert.equal(w(can({ ok: true })), null);
   assert.deepEqual(w(can({ reason: "paused" })), { button: "Paused for a moment", note: "The sale picks up where it stopped." });
   assert.deepEqual(w(can({ reason: "players-only", window: { until, left: { common: 3, rare: 2, epic: 1 } } })), { button: "Players first until Sun 18:00 UTC", note: "Save one round on-chain to buy now.", play: true });
-  assert.deepEqual(w(can({ reason: "wave-cap", window: { until, left: { common: 3, rare: 2, epic: 0 } } })), { button: "1 of 1 Epic this wave", note: "Your share until Sun 18:00 UTC. Then open to everyone." });
+  assert.deepEqual(w(can({ reason: "window-cap", window: { until, left: { common: 3, rare: 2, epic: 0 } } })), { button: "1 of 1 Epic this window", note: "Your share until Sun 18:00 UTC. Then open to everyone." });
   assert.deepEqual(w(can({ reason: "cap", left: { common: 10, rare: 5, epic: 0 } })), { button: "2 of 2 Epics", note: "The most one wallet buys." });
-  assert.deepEqual(w(can({ reason: "later" })), { button: "Opens today, 18:00 UTC", note: "From Wave 1 · Garden." });
-  // two waves to come, published in any order: the date is the gnome's own wave's
-  const two = collection({ waves: [{ first: 105, last: 208, start: T0 + 7 * 86400, playersUntil: T0 + 9 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }, { first: 1, last: 104, start: T0 + 86400, playersUntil: T0 + 3 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }] });
-  assert.equal(whyNot(can({ reason: "later" }), two, { id: 150, tier: "common", wave: 2, home: "island" }, T0)?.button, "Opens Fri 16 Oct, 18:00 UTC");
+  assert.deepEqual(w(can({ reason: "later" })), { button: "Opens today, 18:00 UTC", note: "From the Garden." });
+  // two series' sales to come: the date is the gnome's own series'
+  const two = collection({ series: [genesis({ sale: { ...SALE, start: T0 + 86400 } }), { name: "winter-2027", first: 721, last: 723, sold: 0, closed: false, sale: { ...SALE, start: T0 + 7 * 86400 } }] });
+  assert.equal(whyNot(can({ reason: "later" }), two, { id: 722, tier: "common", home: "mountain" }, T0)?.button, "Opens Fri 16 Oct, 18:00 UTC");
   assert.equal(whyNot(can({ reason: "later" }), two, tansy, T0)?.button, "Opens Sat 18:00 UTC");
-  assert.deepEqual(w(can({ reason: "unlisted" })), { button: "Not on sale yet", note: "From Wave 1 · Garden. A wave not open by Mon 14 Dec, 18:00 UTC never opens." });
+  assert.deepEqual(w(can({ reason: "unlisted" })), { button: "Not on sale yet", note: "From the Garden. Its sale opens before Mon 14 Dec, 18:00 UTC, or never." });
   assert.deepEqual(w(can({ reason: "taken" })), { button: "Already found a player", note: "" });
   assert.deepEqual(w(can({ reason: "closed" })), { button: "Never made", note: "The sale closed before this gnome found a player." });
   assert.deepEqual(w(can({ reason: "unknown" })), { button: "No gnome by that number", note: "" });
@@ -299,9 +294,9 @@ test("shop: the gallery's shelf: on sale, mine, all; tier counts; filters; a pag
   const sold = isSold([1, 2, 3]);
   const now = T0 + 49 * 3600;
   const sale = shelf(entries, { view: "sale" }, { c, sold, mine: new Set(), now });
-  assert.equal(sale.list.length, 101); // wave 1, less the sold
+  assert.equal(sale.list.length, 717); // the genesis, less the sold
   assert.ok(sale.list.every((e) => onSale(e, c, sold, now)));
-  assert.deepEqual(sale.tiers, { common: 69, rare: 21, epic: 10, legendary: 1 });
+  assert.deepEqual(sale.tiers, { common: 501, rare: 144, epic: 65, legendary: 7 });
   assert.equal(shelf(entries, { view: "all" }, { c, sold, mine: new Set(), now }).list.length, 720);
   assert.deepEqual(shelf(entries, { view: "mine" }, { c, sold, mine: new Set([94, 3]), now }).list.map((e) => e.id), [3, 94]);
   assert.deepEqual(shelf(entries, { view: "all", text: "#94" }, { c, sold, mine: new Set(), now }).list.map((e) => e.id), [94]);
@@ -309,19 +304,20 @@ test("shop: the gallery's shelf: on sale, mine, all; tier counts; filters; a pag
   assert.equal(shelf(entries, { view: "all", tier: "legendary" }, { c, sold, mine: new Set(), now }).list.length, 7);
   assert.equal(PAGE, 48);
   // closed: "made" is what was sold
-  const closedC = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 3, closed: true }] });
+  const closedC = collection({ series: [genesis({ sold: 3, closed: true })] });
   assert.deepEqual(shelf(entries, { view: "made" }, { c: closedC, sold, mine: new Set(), now }).list.map((e) => e.id), [1, 2, 3]);
 });
 
-test("shop: a card's one fact: the price, the player, Yours, Never made, its wave", () => {
+test("shop: a card's one fact: the price, the player, Yours, Never made, when it opens, not on sale yet", () => {
   const c = collection(), now = T0 + 49 * 3600;
   const e = (id: number) => entries.find((x) => x.id === id)!;
   assert.equal(cardFact(e(5), { c, sold: isSold([]), mine: new Set(), now }), "36 GNOT");
   assert.equal(cardFact(e(5), { c, sold: isSold([5]), mine: new Set([5]), now }), "Yours");
   assert.equal(cardFact(e(5), { c, sold: isSold([5]), mine: new Set(), now }), "Found a player");
   assert.equal(cardFact(e(104), { c, sold: isSold([]), mine: new Set(), now }), "1,296 GNOT", "a Legendary at its price, as any gnome");
-  assert.equal(cardFact(e(200), { c, sold: isSold([]), mine: new Set(), now }), "Wave 2 · Island");
-  const closedC = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 1, closed: true }] });
+  assert.equal(cardFact(e(200), { c, sold: isSold([]), mine: new Set(), now: T0 - 60 }), "Opens today, 18:00 UTC");
+  assert.equal(cardFact(e(200), { c: collection({ series: [genesis({ sale: null })] }), sold: isSold([]), mine: new Set(), now }), "Not on sale yet");
+  const closedC = collection({ series: [genesis({ sold: 1, closed: true })] });
   assert.equal(cardFact(e(6), { c: closedC, sold: isSold([5]), mine: new Set(), now }), "Never made");
 });
 
@@ -342,94 +338,64 @@ test("shop: the words of each share moment: about the game, never value", () => 
     assert.doesNotMatch(s, /\b(NFT|mint|token|floor|invest|value|limited)\b/i);
 });
 
-// ------------------------------------------------------------ the Legendaries to come
-test("shop: the gallery shows each wave's Legendary while its wave is not open, none once the genesis has closed", () => {
-  const legends = entries.filter((e) => e.tier === "legendary");
-  const ids = (c: Collection, now = T0 + 60) => comingLegends(entries, c, now).map((e) => [e.id, e.wave]);
-  const all = legends.map((e) => [e.id, e.wave]);
-  assert.equal(legends.length, 7, "one a wave");
-  // none open: no wave on the chain yet, or each still to start
-  assert.deepEqual(ids(collection({ waves: [] })), all);
-  assert.deepEqual(ids(collection(), T0 - 60), all, "wave 1 published, its start to come");
-  // some: wave 1 open, wave 2 published for later; a paused sale still has its wave open
-  const two = [collection().waves[0], { first: 105, last: 208, start: T0 + 2 * 86400, playersUntil: T0 + 3 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }];
-  assert.deepEqual(ids(collection({ waves: two })), all.slice(1));
-  assert.deepEqual(ids(collection({ waves: two }), T0 + 2 * 86400), all.slice(2), "wave 2 opened in turn");
-  assert.deepEqual(ids(collection({ waves: two, open: false })), all.slice(1));
-  // all open
-  assert.deepEqual(ids(collection({ waves: [{ first: 1, last: 720, start: T0, playersUntil: T0, prices: [36e6, 72e6, 336e6, 1296e6] }] })), []);
-  // the genesis closed: what never opened never will
-  assert.deepEqual(ids(collection({ waves: two, series: [{ name: "genesis", first: 1, last: 720, sold: 40, closed: true }] })), []);
-  // its card says its wave alone: no price, no date, no scarcity
-  assert.equal(comingFact(legends[2]), "Coming · wave 3");
-});
-
-// ------------------------------------------------------------ the shop's wave line: a little fairway, tee to flag
-test("shop: the wave line: the ball at the share that found a player, each tier's own, the Legendary at the flag", () => {
-  const c = collection(), at = T0 + 49 * 3600;
-  const line = waveLine(nowRow(c, isSold([1, 2, 3, 73]), entries, at), c, entries, isSold([1, 2, 3, 73]), at)!;
+// ------------------------------------------------------------ the shop's sale card: a little fairway, tee to flag
+test("shop: the sale card: the series' name, the ball at the share that found a player, each tier's own, its Legendaries at the flag", () => {
+  const c = collection(), at = T0 + 49 * 3600, sold = isSold([1, 2, 73, 104, 208]);
+  const line = saleLine(nowRow(c, sold, entries, at), c, entries, sold, at)!;
   assert.ok(line.at === "open");
-  // the wave card's two lines: its title, then its count (the Legendary's words beside it)
-  assert.equal(line.title, "Wave 1 · Garden");
-  assert.equal(line.count, "4 of 104 found a player");
-  assert.equal(line.label, "Wave 1 · the Garden: 4 of 104 gnomes found a player");
-  assert.equal(line.share, 4 / 104);
-  assert.deepEqual(line.tiers.map((t) => [t.tier, t.found, t.total, t.price]), [["common", 3, 72, 36e6], ["rare", 1, 21, 72e6], ["epic", 0, 10, 336e6], ["legendary", 0, 1, 1296e6]]);
-  assert.equal(line.tiers[0].label, "Common, 36 GNOT: 3 of 72 found a player");
-  assert.deepEqual(line.legend, { id: 104, name: "The Miller", words: "The Miller waits at the flag" });
-  assert.equal(line.chip, null, "open to everyone: nothing to say but the count");
-  // the Legendary taken: said so, never "waits"
-  const won = waveLine(nowRow(c, isSold([104]), entries, at), c, entries, isSold([104]), at)!;
-  assert.ok(won.at === "open" && won.legend?.words === "The Miller found a player");
-});
-
-test("shop: the launch, every gnome at once (one wave of every world): named by its worlds, its Legendaries counted at the flag", () => {
-  const c = collection({ waves: [{ ...collection().waves[0], last: 720 }] }), at = T0 + 49 * 3600;
-  const line = waveLine(nowRow(c, isSold([1, 104, 208]), entries, at), c, entries, isSold([1, 104, 208]), at)!;
-  assert.ok(line.at === "open");
-  assert.equal(line.title, "All 7 worlds");
-  assert.equal(line.count, "3 of 720 found a player");
-  assert.equal(line.label, "All 7 worlds: 3 of 720 gnomes found a player");
-  assert.deepEqual(line.tiers.map((t) => t.total), [504, 144, 65, 7]);
+  // the card's two lines: its title, then its count (the Legendaries' words beside it)
+  assert.equal(line.title, "Genesis");
+  assert.equal(line.count, "5 of 720 found a player");
+  assert.equal(line.label, "Genesis: 5 of 720 gnomes found a player");
+  assert.equal(line.share, 5 / 720);
+  assert.deepEqual(line.tiers.map((t) => [t.tier, t.found, t.total, t.price]), [["common", 2, 504, 36e6], ["rare", 1, 144, 72e6], ["epic", 0, 65, 336e6], ["legendary", 2, 7, 1296e6]]);
+  assert.equal(line.tiers[0].label, "Common, 36 GNOT: 2 of 504 found a player");
   // the first Legendary still waiting stands for them (104 and 208 found a player: 311, the Town's)
   assert.deepEqual(line.legend, { id: 311, name: "5 of 7 Legendaries", words: "5 of 7 Legendaries wait at the flag" });
-  const fresh = waveLine(nowRow(c, isSold([]), entries, at), c, entries, isSold([]), at)!;
+  assert.equal(line.chip, null, "open to everyone: nothing to say but the count");
+  const fresh = saleLine(nowRow(c, isSold([]), entries, at), c, entries, isSold([]), at)!;
   assert.ok(fresh.at === "open" && fresh.legend?.words === "7 Legendaries wait at the flag" && fresh.legend.id === 104);
   const legends = entries.filter((e) => e.tier === "legendary").map((e) => e.id), oneLeft = isSold(legends.slice(0, 6));
-  const last = waveLine(nowRow(c, oneLeft, entries, at), c, entries, oneLeft, at)!;
+  const last = saleLine(nowRow(c, oneLeft, entries, at), c, entries, oneLeft, at)!;
   assert.ok(last.at === "open" && last.legend?.words === "1 of 7 Legendaries waits at the flag");
-  const gone = isSold(legends), won = waveLine(nowRow(c, gone, entries, at), c, entries, gone, at)!;
+  const gone = isSold(legends), won = saleLine(nowRow(c, gone, entries, at), c, entries, gone, at)!;
   assert.ok(won.at === "open" && won.legend?.words === "All 7 Legendaries found a player");
+  // one Legendary in what it holds: his own name, waiting or taken
+  const garden = entries.filter((e) => e.id <= 104);
+  const waits = saleLine(nowRow(c, isSold([]), garden, at), c, garden, isSold([]), at)!;
+  assert.ok(waits.at === "open" && waits.legend?.name === "The Miller" && waits.legend.words === "The Miller waits at the flag");
+  const taken = saleLine(nowRow(c, isSold([104]), garden, at), c, garden, isSold([104]), at)!;
+  assert.ok(taken.at === "open" && taken.legend?.words === "The Miller found a player");
   // the menu's and the finish card's words, the same name
   const p = promoOf(nowRow(c, isSold([]), entries, at), c, entries)!;
-  assert.equal(promoWords(p, at).title, "All 7 worlds");
+  assert.equal(promoWords(p, at).title, "Genesis");
   assert.equal(promoWords(p, at).line, "720 gnomes, from 36 GNOT");
 });
 
-test("shop: the wave line's edges: none sold, all sold, not started, players first, paused, closed, no wave", () => {
-  const c = collection(), all = Array.from({ length: 104 }, (_, i) => i + 1), none = isSold([]);
-  const zero = waveLine(nowRow(c, none, entries, T0 + 49 * 3600), c, entries, none, T0 + 49 * 3600)!;
-  assert.ok(zero.at === "open" && zero.share === 0 && zero.count === "0 of 104 found a player" && zero.tiers.every((t) => t.found === 0));
-  const full = waveLine(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries, isSold(all), T0 + 49 * 3600)!;
-  assert.ok(full.at === "soldout" && full.share === 1 && full.count === "All 104 found a player");
-  assert.equal(full.label, "Wave 1 · the Garden: all 104 gnomes found a player");
+test("shop: the sale card's edges: none sold, all sold, not started, players first, paused, closed, no sale", () => {
+  const c = collection(), all = Array.from({ length: 720 }, (_, i) => i + 1), none = isSold([]);
+  const zero = saleLine(nowRow(c, none, entries, T0 + 49 * 3600), c, entries, none, T0 + 49 * 3600)!;
+  assert.ok(zero.at === "open" && zero.share === 0 && zero.count === "0 of 720 found a player" && zero.tiers.every((t) => t.found === 0));
+  const full = saleLine(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries, isSold(all), T0 + 49 * 3600)!;
+  assert.ok(full.at === "soldout" && full.share === 1 && full.count === "All 720 found a player");
+  assert.equal(full.label, "Genesis: all 720 gnomes found a player");
   assert.ok(full.tiers.every((t) => t.found === t.total));
-  const teaser = waveLine(nowRow(c, none, entries, T0 - 60), c, entries, none, T0 - 60)!;
+  const teaser = saleLine(nowRow(c, none, entries, T0 - 60), c, entries, none, T0 - 60)!;
   assert.ok(teaser.at === "teaser" && teaser.share === 0);
-  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", short: "Opens 18:00 UTC", full: "Wave 1 · Garden opens today, 18:00 UTC." });
-  const players = waveLine(nowRow(c, none, entries, T0 + 60), c, entries, none, T0 + 60)!;
+  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", short: "Opens 18:00 UTC", full: "Genesis opens today, 18:00 UTC." });
+  const players = saleLine(nowRow(c, none, entries, T0 + 60), c, entries, none, T0 + 60)!;
   assert.deepEqual(players.chip, { text: "Players first · until Sun 18:00 UTC", short: "Players first · Sun 18:00 UTC", full: "Players first until Sun 18:00 UTC: save one round on-chain to buy now." });
-  const p = collection({ open: false }), paused = waveLine(nowRow(p, none, entries, T0 + 60), p, entries, none, T0 + 60)!;
+  const p = collection({ open: false }), paused = saleLine(nowRow(p, none, entries, T0 + 60), p, entries, none, T0 + 60)!;
   assert.deepEqual(paused.chip, { text: "Paused for a moment", short: "Paused", full: "Paused for a moment: the sale picks up where it stopped." });
-  const k = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] });
-  assert.deepEqual(waveLine(nowRow(k, none, entries, T0), k, entries, none, T0), { at: "closed", title: "The sale is closed", count: "486 made · 234 never made", label: "The sale is closed: 486 gnomes made, 234 never made" });
-  const w = collection({ waves: [] });
-  assert.equal(waveLine(nowRow(w, none, entries, T0), w, entries, none, T0), null);
-  // a tier the wave holds at no price: its count kept, no price said; a wave of one tier holds that tier alone
-  const free = collection({ waves: [{ ...c.waves[0], prices: [36e6, 0, 336e6, 1296e6] }] }), at = T0 + 49 * 3600;
-  const thin = waveLine(nowRow(free, none, entries, at), free, entries, none, at)!;
-  assert.ok(thin.at === "open" && thin.tiers[1].price === 0 && thin.tiers[1].label === "Rare: 0 of 21 found a player");
-  const commons = entries.filter((e) => e.tier === "common"), one = waveLine(nowRow(c, none, commons, at), c, commons, none, at)!;
+  const k = collection({ series: CLOSED });
+  assert.deepEqual(saleLine(nowRow(k, none, entries, T0), k, entries, none, T0), { at: "closed", title: "The sale is closed", count: "486 made · 234 never made", label: "The sale is closed: 486 gnomes made, 234 never made" });
+  const w = collection({ series: [genesis({ sale: null })] });
+  assert.equal(saleLine(nowRow(w, none, entries, T0), w, entries, none, T0), null);
+  // a tier the sale holds at no price: its count kept, no price said; a sale of one tier holds that tier alone
+  const free = collection({ series: [genesis({ sale: { ...SALE, prices: [36e6, 0, 336e6, 1296e6] } })] }), at = T0 + 49 * 3600;
+  const thin = saleLine(nowRow(free, none, entries, at), free, entries, none, at)!;
+  assert.ok(thin.at === "open" && thin.tiers[1].price === 0 && thin.tiers[1].label === "Rare: 0 of 144 found a player");
+  const commons = entries.filter((e) => e.tier === "common"), one = saleLine(nowRow(c, none, commons, at), c, commons, none, at)!;
   assert.ok(one.at === "open" && one.tiers.length === 1 && one.legend === null);
   // the words never press: no countdown, no "only", no "last"
   for (const l of [zero, full, teaser, players, paused]) for (const s of [l.label, l.title, l.count, l.at !== "closed" && l.chip ? l.chip.text + l.chip.full : ""]) assert.doesNotMatch(s, /only|last|hurry|left|invest|value/i);

@@ -10,7 +10,7 @@ a ghost you can take turns against, stroke for stroke: a rival picked for
 the day, a player at your level, a friend, or yourself. The chain kept it, so nobody
 can fake one, and there is no game server: the chain is the referee. Next:
 **build a hole, own it forever**, the contract side is ready and closed
-behind a switch, the in-game editor comes with the second wave.
+behind a switch, the in-game editor comes with the second release.
 [The pitch, in one page](docs/pitch.md).
 
 ## How it works
@@ -244,7 +244,7 @@ gno.land/p/gnogolf/jsonq     a string quoted as JSON (golf/v2's jstr, shared)
 gno.land/r/gnogolf/store     the records: every hole, round, best, board and standing
 gno.land/r/gnogolf/golf/v2   the rules: rounds, previews, boards, gnoweb page (the only writer of store)
 gno.land/r/gnogolf/golf      v1, the rules before: on onyx, its records copied into v2
-gno.land/r/gnogolf/gnomes    the gnomes: the catalogue, its sale in waves, the earned ones (ADR-007)
+gno.land/r/gnogolf/gnomes    the gnomes: the catalogue, a sale a series, the earned ones (ADR-007, ADR-013)
 gno.land/r/gnogolf/<hole>    each course hole's source
 web/                         Next.js + three.js client (static export)
 web/lib/builder              the hole Builder's logic: the palette, the draft, the checks, test mode, publishing

@@ -25,7 +25,7 @@ import type { HoleRow, HoleState, Mode, Stroke, Vec2 } from "@/lib/types";
 import { Collector } from "@/components/gnomes/Door";
 
 // onBuild: the Builder's page (none: it is to come); shop: a fourth panel, the gnome shop's: its gnome (one of the
-// wave's, once read: null until then), its line and where it leads (the gallery)
+// sale's, once read: null until then), its line and where it leads (the gallery)
 export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, shop, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; shop?: { skin: Skin | null; line: string; onOpen: () => void }; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
   const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
@@ -36,7 +36,7 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, sho
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
         {/* the Builder: the game's Miner in his hard hat before a hole's sketch, once out; to come, the sketch alone */}
         <li><Panel kind="build" name="Builder" line={onBuild ? "Draw a hole, publish it under your name" : "Draw your own hole, dare the others"} skin={onBuild ? gnomeById("miner") : null} back={<Sketch />} soon={!onBuild} onClick={onBuild} /></li>
-        {/* the gnome shop ("Shop": one line, as the games' names): one of the wave's gnomes before a stall's awning */}
+        {/* the gnome shop ("Shop": one line, as the games' names): one of the sale's gnomes before a stall's awning */}
         {shop && <li><Panel kind="shop" name="Shop" line={shop.line} skin={shop.skin} back={<Awning />} onClick={shop.onOpen} /></li>}
       </ul>
     </FrontScreen>

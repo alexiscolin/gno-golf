@@ -1,13 +1,13 @@
 // The shop's pages, read once at build time from the catalogue (data/gnomes.json,
 // from web/, next build's working directory): one per gnome (/g/<id>/) and per
 // earned kind (/g/<kind>/, the page a token's external_url names), each with
-// its words and its link card (public/og/g/<id>.jpg once its wave's are made,
+// its words and its link card (public/og/g/<id>.jpg once his are made,
 // else the gallery's). Off (NEXT_PUBLIC_GNOMES unset), only the gallery's page
 // exists, and it is the game's home.
 import fs from "node:fs";
 import { SHOP } from "@/lib/gnomes/shop";
 import { TIER_LOOK, type Catalogue } from "@/lib/gnomes/catalogue";
-import { UNLOCKS, worldName, type UnlockId } from "@/lib/card";
+import { UNLOCKS, theWorld, type UnlockId } from "@/lib/card";
 
 const catalogue = JSON.parse(fs.readFileSync("../data/gnomes.json", "utf8")) as Catalogue;
 
@@ -18,7 +18,7 @@ export const PAGES: readonly Page[] = !SHOP ? [] : [
     slug: String(g.id),
     heading: `${g.name}, gnome #${g.id} of Gnogolf`,
     title: `${g.name} · Gnome #${g.id} · Gnogolf`,
-    description: `${g.line} A ${TIER_LOOK[g.tier].label} gnome of Wave ${g.wave} · ${worldName(g.home)}: one of a kind, cosmetic only, the ball you play Gnogolf with.`,
+    description: `${g.line} A ${TIER_LOOK[g.tier].label} gnome of ${theWorld(g.home)}: one of a kind, cosmetic only, the ball you play Gnogolf with.`,
     image: fs.existsSync(`public/og/g/${g.id}.jpg`) ? `/og/g/${g.id}.jpg` : "/og/g.jpg",
   })),
   ...catalogue.earned.map((e) => ({

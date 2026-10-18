@@ -36,7 +36,7 @@ Where to click: "Click to start", then "How do we play?": Solo (the cups),
 Duel, "Builder" (on a computer) and "Gnomes", the collection (also
 atop the gnome picker and on the cups screen). `p1` has a
 record (the players' window lets it buy) and a few gnomes; `p0` has
-neither. All 720 gnomes are on sale at once, as at launch (one wave), its
+neither. All 720 gnomes are on sale at once, in the genesis's one sale, its
 players' window one hour, and the
 genesis sale closes in a year (the realm sells none of the genesis without
 a closing date; `close [days]` brings it forward, to 30 days by default,

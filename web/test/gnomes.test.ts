@@ -126,14 +126,14 @@ test("skin: an earned kind is GNOMES' own gnome; anything else is built from its
   assert.equal(lookOf(GNOMES.find((g) => g.id === "pirate")!).pattern, "stripes");
 });
 
-test("catalogue: a series' plan is its waves, each one run of ids, every count from the config", () => {
+test("catalogue: a series' plan is a run of ids a world, every count from the config", () => {
   assert.deepEqual(evenly(65, 7), [10, 10, 9, 9, 9, 9, 9]);
   for (const s of config.series) {
     const plan = planSeries(s);
-    assert.equal(plan.length, s.waves.length);
+    assert.equal(plan.length, s.worlds.length);
     let next = s.first;
     for (const w of plan) {
-      assert.equal(w.first, next, "no gap between waves");
+      assert.equal(w.first, next, "no gap between worlds");
       for (const t of SALE_TIERS) (assert.equal(w.tiers[t].first, next), (next += w.tiers[t].count));
       assert.equal(w.last, next - 1);
     }
@@ -164,7 +164,7 @@ test("catalogue: a gallery's filters and a token's trait list", () => {
   assert.ok(filterGnomes(all, { trail: true }).every((g) => g.tier !== "common"));
   assert.equal(filterGnomes(all, { trail: false }).length, all.filter((g) => g.tier === "common").length);
   assert.deepEqual(filterGnomes(all, { text: "the miller" }).map((g) => g.name), ["The Miller"]);
-  assert.equal(filterGnomes(all, { wave: 1, series: "genesis", archetype: "fisher" }).length, all.filter((g) => g.wave === 1 && g.archetype === "fisher").length);
+  assert.equal(filterGnomes(all, { home: "garden", series: "genesis", archetype: "fisher" }).length, all.filter((g) => g.home === "garden" && g.archetype === "fisher").length);
   assert.equal(filterGnomes(all, { series: "nope" }).length, 0);
   const rows = traitRows(FULL);
   assert.deepEqual(rows.find((r) => r.trait === "Hat"), { trait: "Hat", value: "Copper slouch" });
@@ -268,14 +268,14 @@ test("validate: a catalogue off its plan, or with twins, is reported", () => {
   assert.ok(r.errors.some((e) => /looks like #/.test(e)));
   const bad = validate({ ...catalogue, gnomes: [{ ...first, traits: "zz" }, { ...catalogue.gnomes[1], tier: "epic", name: "x" }] }, []);
   assert.ok(bad.errors.some((e) => /do not decode/.test(e)));
-  assert.ok(bad.errors.some((e) => /planned genesis wave 1/.test(e)));
+  assert.ok(bad.errors.some((e) => /planned genesis garden common, is genesis garden epic/.test(e)));
   assert.ok(bad.errors.some((e) => /name "x"/.test(e)));
 });
 
 test("generate: the same data and seed make the same gnomes; too little data says so", () => {
   const s = config.series[0], { recipe, epics, legs } = dataOf(s.id);
   assert.throws(() => generateSeries(s, recipe, epics.slice(1), legs, []), /garden has 9 epic designs for 10 planned/);
-  assert.throws(() => generateSeries({ ...s, waves: ["attic" as SeriesConfig["waves"][number], ...s.waves.slice(1)] }, recipe, epics, legs, []), /no archetype for attic/);
+  assert.throws(() => generateSeries({ ...s, worlds: ["attic" as SeriesConfig["worlds"][number], ...s.worlds.slice(1)] }, recipe, epics, legs, []), /no archetype for attic/);
   const tiny = { ...recipe, archetypes: recipe.archetypes.map((a) => ({ ...a, palettes: a.palettes.slice(0, 1), hair: ["snow"] })) };
   assert.throws(() => generateSeries(s, tiny, epics, legs, []), /looks apart/);
   // every hand design is a prop of the table, every Legendary's piece a legend one

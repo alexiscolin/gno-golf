@@ -183,7 +183,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const onChain = look === "chain" ? portraitsOf(chain) : null;
   // his picture, the look switch under it (in his first view alone), then who he is on the same axis: his tier and
   // number on one line (or his place in the series), his name (the sheet's title)
-  const head = (small = false, title: ReactNode = g.name, swap = false, meta: ReactNode = <>#{g.id} · Wave {g.wave} · {worldName(g.home)}</>) => (
+  const head = (small = false, title: ReactNode = g.name, swap = false, meta: ReactNode = <>#{g.id} · {worldName(g.home)}</>) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
       <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
       {swap && <LookSwitch look={look} onLook={onLook} />}

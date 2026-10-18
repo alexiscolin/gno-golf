@@ -2,8 +2,8 @@
 // script beside a stand-in node (its /status) and gnokey (what the realm
 // says): "rebuild" keeps the build served and the new one alone, its numbers
 // only growing; "close" writes the date in seed.env; no command goes on when
-// the chain does not answer; the waves' commands are gone (the launch opens
-// every gnome at once).
+// the chain does not answer; no command opens a sale (the seed opens the
+// genesis's, every gnome at once).
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -89,10 +89,10 @@ void test("try-local close: the date set on the chain and in seed.env; no comman
   const gone = await p.run("close", "10");
   assert.notEqual(gone.code, 0);
   assert.match(gone.out, /chain/i);
-  for (const cmd of ["wave2", "all"]) {
+  for (const cmd of ["all", "open"]) {
     const r = await p.run(cmd);
     assert.notEqual(r.code, 0, cmd);
     assert.match(r.out, /usage/, cmd);
   }
-  assert.doesNotMatch(p.calls(), /AddWave/, "no wave sent from here");
+  assert.doesNotMatch(p.calls(), /OpenSale/, "no sale opened from here");
 });

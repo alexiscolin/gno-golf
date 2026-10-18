@@ -9,7 +9,7 @@ What is where:
 
 | what | file |
 |---|---|
-| the series, their supply, waves and sale settings: **the one place counts live** | `data/gnomes/series.json` |
+| the series, their supply, worlds and sale settings: **the one place counts live** | `data/gnomes/series.json` |
 | the Genesis recipe: archetypes, palettes, names, lines | `data/gnomes/genesis/archetypes.json` |
 | the 65 Epics and the 7 Legendaries, designed by hand | `data/gnomes/genesis/epics.json`, `legendaries.json` |
 | **the catalogue** (made, never edited): every token's id, tier, name, line, traits and skin; the code tables; the earned nine | `data/gnomes.json` |
@@ -26,10 +26,11 @@ What is where:
 | how far apart the gnomes are | `npm run gnomes:stats` (`scripts/gnomestats.ts`) |
 | thumbnails and turntables | `npm run gnomes:thumbs` (`media/gnomes/render.mjs`) → `media/gnomes/thumbs/<id>.webp`, `media/gnomes/turntables/<id>.webp` |
 
-Decisions: ADR-008 (the catalogue as data, in series and waves), ADR-009 (the
+Decisions: ADR-008 (the catalogue as data, in series and worlds), ADR-009 (the
 trait encoding), ADR-010 (the look: style, materials, props as data, budgets,
 permanence), ADR-011 (the collection as status: the album and the collector
-rank). ADR-007 is the realm's (`r/gnogolf/gnomes`).
+rank). ADR-007 is the realm's (`r/gnogolf/gnomes`), ADR-013 its one sale a
+series.
 
 ## 1. The style
 
@@ -279,7 +280,7 @@ at 5, 18 at 6, and none.
 - **Storm Gnome** (#720). The storm's own gnome: a little thundercloud over his hat, raining, flashing now and then. *Carries the weather with him. The cup gets the lightning.* Every storm on the Island Cup was his, once. Now it is just the one cloud, small and loyal, that rains on him and nobody else. Gusts streak behind him as he rolls, and when he holes, the cloud lets go its bolt.
 
 The Legendaries' kinds follow the realm spec's order (Crystal 1 … Summit 7);
-their ids follow the waves.
+their ids follow the worlds.
 
 ### Materials
 
@@ -380,7 +381,7 @@ seed make the same gnomes, id for id.
 
 1. The hand designs are laid down first; the generated ones keep away from
    them.
-2. For each wave (a home) and tier, the count is split evenly over the
+2. For each world (a home) and tier, the count is split evenly over the
    home's two archetypes.
 3. For each archetype, every combination of its palettes' colourings (the
    palette's own, then its key colour with each wardrobe colour), hats,
@@ -392,7 +393,7 @@ seed make the same gnomes, id for id.
    and **within its tier's triangle budget**, counted on the real
    `makeBall` (`scene/gnome-cost.ts`, given to the generator by
    `scripts/gnomes.ts`: the generator itself draws nothing).
-4. A wave's gnomes are shuffled so a gallery shows its archetypes mixed;
+4. A world's gnomes are shuffled so a gallery shows its archetypes mixed;
    then named and given lines, never the same twice.
 
 ## 6. The trait encoding (format 1)
@@ -461,34 +462,33 @@ changes; screens that list traits read the tables.
 tiers and earned kinds with its codes, the Legendaries' kinds in design order
 (Crystal 1 … Summit 7).
 
-## 7. Series, waves and drops
+## 7. Series, worlds and drops
 
 `data/gnomes/series.json` is the one place counts live. A series:
 
 ```json
 { "id": "genesis", "code": 1, "name": "Genesis", "first": 1,
   "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
-  "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
+  "worlds": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
   "seed": "gnogolf/genesis/1", "released": false,
   "sale": { "prices": { "common": 36, "rare": 72, "epic": 336, "legendary": 1296 },
             "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1, "legendary": 1 },
-            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 }, "launch": "all" } }
+            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 } } }
 ```
 
-- **Waves are id ranges.** `planSeries` lays each wave out as one run of
-  ids, its Commons, Rares, Epics and Legendary in turn, each tier shared
-  evenly over the waves (the first waves take what is left over), so the
-  realm opens a wave by one range, not a tier:
+- **A world is a run of ids.** `planSeries` lays each world out as one run
+  of ids, its Commons, Rares, Epics and Legendary in turn, each tier shared
+  evenly over the worlds (the first worlds take what is left over):
 
-  | wave | home | ids | of which |
-  |---|---|---|---|
-  | 1 | garden | 1–104 | 72 common from 1, 21 rare from 73, 10 epic from 94, 1 legendary from 104 |
-  | 2 | island | 105–208 | 72 common from 105, 21 rare from 177, 10 epic from 198, 1 legendary from 208 |
-  | 3 | town | 209–311 | 72 common from 209, 21 rare from 281, 9 epic from 302, 1 legendary from 311 |
-  | 4 | mountain | 312–414 | 72 common from 312, 21 rare from 384, 9 epic from 405, 1 legendary from 414 |
-  | 5 | mines | 415–516 | 72 common from 415, 20 rare from 487, 9 epic from 507, 1 legendary from 516 |
-  | 6 | volcano | 517–618 | 72 common from 517, 20 rare from 589, 9 epic from 609, 1 legendary from 618 |
-  | 7 | storm | 619–720 | 72 common from 619, 20 rare from 691, 9 epic from 711, 1 legendary from 720 |
+  | world | ids | of which |
+  |---|---|---|
+  | garden | 1–104 | 72 common from 1, 21 rare from 73, 10 epic from 94, 1 legendary from 104 |
+  | island | 105–208 | 72 common from 105, 21 rare from 177, 10 epic from 198, 1 legendary from 208 |
+  | town | 209–311 | 72 common from 209, 21 rare from 281, 9 epic from 302, 1 legendary from 311 |
+  | mountain | 312–414 | 72 common from 312, 21 rare from 384, 9 epic from 405, 1 legendary from 414 |
+  | mines | 415–516 | 72 common from 415, 20 rare from 487, 9 epic from 507, 1 legendary from 516 |
+  | volcano | 517–618 | 72 common from 517, 20 rare from 589, 9 epic from 609, 1 legendary from 618 |
+  | storm | 619–720 | 72 common from 619, 20 rare from 691, 9 epic from 711, 1 legendary from 720 |
 
 - **Earned tokens are numbered apart**, from `earned.first` (1,000,001) up,
   as the realm spec says: far above any series a realm will ever hold, so a
@@ -499,16 +499,15 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   (`docs/superpowers/research/2026-10-06-nft-best-practices.md`) and the
   user's decisions: prices in GNOT, every tier at a fixed price (golf's
   numbers, ADR-007; no auction), the player window
-  (wallets with a record in `store` first), its caps, the lifetime caps,
-  and how it opens: `"launch": "all"`, the user's call (2026-10-18), every
-  gnome at once, in one wave of all the series' ids (`AddWave 1 720`), its
-  player window first. The waves above stay the catalogue's layout (each
-  world's run of ids, its art); the realm still takes waves of any range,
-  for a later series. The realm's owner changes them between
-  waves, never during one, and never lower on what is on sale. Nothing in the client
+  (wallets with a record in `store` first), its caps, the lifetime caps.
+  A series is sold in one sale (ADR-013, the user's call, 2026-10-18):
+  `OpenSale genesis <start> <hours>`, every gnome at once, its player
+  window first. The worlds above are the catalogue's layout (each world's
+  run of ids, its art), not the sale's. The realm's owner sets the prices
+  before a sale opens; an opened sale keeps its own. Nothing in the client
   reads them as truth: the realm's `Collection()` is.
 - **A new drop is data, not code.** Add a series to `series.json` (its
-  `code`, `first` id after the last series', its supply and waves), a
+  `code`, `first` id after the last series', its supply and worlds), a
   folder `data/gnomes/<id>/` with its `archetypes.json`, `epics.json` and
   `legendaries.json`, run `npm run gnomes`, `npm run gnomes:rows`,
   `npm run gnomes:looks -- --write`, then `npm run gnomes:thumbs`.
@@ -545,10 +544,10 @@ What a gallery, a token page, the mint, the locker or a builder reads
 |---|---|
 | all tokens, their series and plan, the tables | `data/gnomes.json` (`Catalogue`) |
 | one token | `catalogue.gnomes.find((g) => g.id === id)` (the screens look it up inline) |
-| filter a gallery (series, wave, tier, home, archetype, hat, has a trail, text) | `filterGnomes(list, query)` |
+| filter a gallery (series, tier, home, archetype, hat, has a trail, text) | `filterGnomes(list, query)` |
 | a token's trait list, plainly worded | `traitRows(decode(entry.traits))` |
 | a tier's name and colours | `TIER_LOOK[tier]` |
-| waves and their id ranges | `planSeries(series)` (and `catalogue.series[n].plan`) |
+| each world's run of ids | `planSeries(series)` (and `catalogue.series[n].plan`) |
 | the gnome to draw from a chain's traits | `skinOfTraits(hex, { id, name, line })` (falls back to the Classic) |
 | the collection's wardrobe, before the first collection gnome is drawn | `await loadWardrobe()` (`scene/gnome.ts`: its own chunk; without it a collection gnome is drawn plain) |
 | draw him | `makeBall(skin)` (`makePreview` for a turntable; `makeShowcase` for a still) |

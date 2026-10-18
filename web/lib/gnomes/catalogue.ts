@@ -1,5 +1,5 @@
 // The gnome collection as data (data/gnomes.json, made by scripts/gnomes.ts
-// from data/gnomes/): its series, their waves, and every token's name, line,
+// from data/gnomes/): its series, their worlds, and every token's name, line,
 // traits and look. What a screen needs to show, sort and filter gnomes is
 // here, with no 3D: the gallery, the token page, the mint and the locker
 // read it (docs/gnomes/design.md, "For the screens").
@@ -8,11 +8,11 @@ import { decode, type Traits } from "./codec";
 import { cap, worldName } from "../card";
 import type { Skin } from "../scene/gnome";
 
-/** The tiers a series sells, in id order within a wave. */
+/** The tiers a series sells, in id order within a world. */
 export const SALE_TIERS = ["common", "rare", "epic", "legendary"] as const;
 export type SaleTier = (typeof SALE_TIERS)[number];
 
-/** A series as data/gnomes/series.json writes it: its supply and its waves. */
+/** A series as data/gnomes/series.json writes it: its supply and its worlds. */
 export interface SeriesConfig {
   id: string;
   /** its code in a token's traits (Traits.series) */
@@ -21,8 +21,8 @@ export interface SeriesConfig {
   /** its first token id */
   first: number;
   supply: Record<SaleTier, number>;
-  /** one home per wave, in the order they open */
-  waves: Home[];
+  /** its worlds, each one run of its ids, in id order */
+  worlds: Home[];
   /** the generator's seed: the same seed, the same gnomes */
   seed: string;
   /** on sale (its rows sent to the realm): its looks are final, held by data/gnomes/looks.golden.json */
@@ -31,9 +31,8 @@ export interface SeriesConfig {
   sale: Record<string, unknown>;
 }
 
-/** A wave as planned: its home, and how many of each tier from which id. */
-export interface Wave {
-  n: number;
+/** A world's run of a series as planned: its home, and how many of each tier from which id. */
+export interface Run {
   home: Home;
   first: number;
   last: number;
@@ -43,19 +42,19 @@ export interface Wave {
 /** n shared over k as evenly as can be, the first ones taking what is left over. */
 export const evenly = (n: number, k: number) => Array.from({ length: k }, (_, i) => Math.floor(n / k) + (i < n % k ? 1 : 0));
 
-/** A series' waves: each a run of ids, its Commons, Rares, Epics and Legendaries in turn,
- *  so a wave is opened as one range. Every count comes from the config. */
-export function planSeries(s: SeriesConfig): Wave[] {
-  const per = Object.fromEntries(SALE_TIERS.map((t) => [t, evenly(s.supply[t], s.waves.length)])) as Record<SaleTier, number[]>;
+/** A series' plan: a run of ids a world, its Commons, Rares, Epics and Legendaries in turn, the tiers shared
+ *  evenly over the worlds. Every count comes from the config. */
+export function planSeries(s: SeriesConfig): Run[] {
+  const per = Object.fromEntries(SALE_TIERS.map((t) => [t, evenly(s.supply[t], s.worlds.length)])) as Record<SaleTier, number[]>;
   let id = s.first;
-  return s.waves.map((home, i) => {
+  return s.worlds.map((home, i) => {
     const first = id;
     const tiers = Object.fromEntries(SALE_TIERS.map((t) => {
       const r = { first: id, count: per[t][i] };
       id += r.count;
       return [t, r];
-    })) as Wave["tiers"];
-    return { n: i + 1, home, first, last: id - 1, tiers };
+    })) as Run["tiers"];
+    return { home, first, last: id - 1, tiers };
   });
 }
 
@@ -63,7 +62,6 @@ export function planSeries(s: SeriesConfig): Wave[] {
 export interface Entry {
   id: number;
   series: string;
-  wave: number;
   tier: Tier;
   home: Home;
   archetype: Archetype;
@@ -81,7 +79,7 @@ export interface Catalogue {
   /** the traits' format (codec.ts FORMAT) */
   format: number;
   note: string;
-  series: (SeriesConfig & { plan: Wave[] })[];
+  series: (SeriesConfig & { plan: Run[] })[];
   /** the tables a token's traits are codes into (vocab.ts, props.ts), colours as "#rrggbb", as the realm draws its portrait */
   vocab: Record<string, readonly (string | readonly [string, string])[]>;
   /** the nine earned gnomes, by kind: minted free to whoever proves the feat, never sold */
@@ -128,13 +126,13 @@ export function traitRows(t: Traits): { trait: string; value: string }[] {
 export type Listed = Omit<Entry, "skin">;
 
 /** What a gallery filters on; an empty field filters nothing. */
-export interface Query { series?: string; wave?: number; tier?: Tier; home?: Home; archetype?: Archetype; hat?: string; trail?: boolean; text?: string }
+export interface Query { series?: string; tier?: Tier; home?: Home; archetype?: Archetype; hat?: string; trail?: boolean; text?: string }
 
 /** The entries a query keeps, in id order. */
 export function filterGnomes<E extends Listed>(list: readonly E[], q: Query): E[] {
   const text = q.text?.trim().toLowerCase();
   return list.filter((e) => {
-    if ((q.series && e.series !== q.series) || (q.wave && e.wave !== q.wave) || (q.tier && e.tier !== q.tier)) return false;
+    if ((q.series && e.series !== q.series) || (q.tier && e.tier !== q.tier)) return false;
     if ((q.home && e.home !== q.home) || (q.archetype && e.archetype !== q.archetype)) return false;
     if (q.hat || q.trail !== undefined) {
       const t = decode(e.traits);

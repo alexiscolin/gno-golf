@@ -106,13 +106,13 @@ Sharing is how the game spreads, and today it undersells it:
   gno.land", over a soft, blurred island.
 
 - **The gnomes' cards** (the shop, ADR-007). `media/gnomes/cards.mjs`
-  (`npm run gnomes:cards -- --wave 1`) lays out one 1200×630 card per
+  (`npm run gnomes:cards -- --world garden`) lays out one 1200×630 card per
   gnome the same way, in the same headless Chrome: his thumbnail on his
-  tier's stage, his tier, name, line, wave and address, under
+  tier's stage, his tier, name, line, world and address, under
   `web/public/og/g/<id>.jpg`, and the gallery's `og/g.jpg`. About 57 KB
   each (the halftone and the thumbnail keep them there whatever the
-  quality), so a wave's cards are made and committed as it opens, not all
-  720 at once (6 MB for wave 1): a gnome's page whose card is not made yet
+  quality), so they can be made and committed a world at a time, not all
+  720 at once (6 MB for the Garden's): a gnome's page whose card is not made yet
   links the gallery's. The thumbnails and the catalogue the screens read are
   copied from the repo before each build (`scripts/gnomeassets.mjs`), not
   committed twice.

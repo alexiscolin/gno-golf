@@ -3,8 +3,8 @@
 # It starts a gnodev with throwaway keys, stages and deploys what gnomes
 # needs (store, golf/v2, gnomes and their packages, under the test name NS,
 # as scripts/stage.sh does), publishes the genesis rows
-# (data/gnomes/rows/genesis.txt) and plays the sale through: waves and the
-# player window, buys and caps, a Legendary at its fixed price (one a
+# (data/gnomes/rows/genesis.txt) and plays the sale through: the genesis's
+# one sale and its player window, buys and caps, a Legendary at its fixed price (one a
 # wallet, its first buyer's), the switch paused and resumed, Equip, the
 # locker, the treasury moved and a stray coin swept to it, the site link, the
 # close, an earned gnome, the token reads and the page, and the portraits:
@@ -38,9 +38,9 @@
 #
 # SEED=1 plays no scenario: it deploys, then seeds what the shop's screens
 # show (the genesis published; the close in 30 days, set first: the realm
-# sells none of the genesis without one; wave 1 of data/gnomes.json open
-# since a minute, its player window an hour; wave 2 in two days; p1 and b1 with a record, p1 holding two Commons and a Rare, one
-# worn, b1 a Common; wave 1's Legendary on sale at its price; p0 and b2 with
+# sells none of the genesis without one; its sale, every gnome of it, open
+# since a minute, its player window an hour; p1 and b1 with a record, p1 holding two Commons and a Rare, one
+# worn, b1 a Common; the Legendaries on sale at their price; p0 and b2 with
 # their balance alone), in a few minutes. The chain
 # is left running (KEEP=1) and $WORK/seed.env written: its addresses, the
 # realms, the keybase and password, each key's address, what was seeded.
@@ -51,11 +51,10 @@
 # Env: NS (nym-gnometest000), RPC_ADDR, WEB_ADDR (where gnodev listens, on
 # this machine), CHAINID (dev), WORK (a
 # new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
-# end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WAVE2=0 adds
-# no wave 2, SEED_LAUNCH=1 opens the whole genesis in wave 1 (the launch: no wave 2), SEED_WORLDS publishes every course hole of those worlds too
+# end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WORLDS publishes every course hole of those worlds too
 # ("garden island": garden/3 alone by default), SEED_CLOSE sets the closing
-# date that many days off (30; more than 2 with wave 2, which starts before
-# it; never none: the genesis is not sold without one), SEED_PUBLISHING=1 opens
+# date that many days off (30; never none: the genesis is not sold without
+# one), SEED_PUBLISHING=1 opens
 # community publishing, SEED_TREASURY=1 moves the treasury to the treas key.
 set -u
 
@@ -349,16 +348,14 @@ is "deploy" "store.Writer()" "$GOLF" "$(q "$STORE" 'Writer()')"
 if [ "${SEED:-}" = 1 ]; then
 	must() { [ "$nfail" = 0 ] || die "seed: step $n failed${TXOUT:+: $(why)} (see $OUT)"; }
 	G=$root/data/gnomes.json
-	pl() { jf "d['series'][0]['plan'][$1]$2" <"$G"; } # pl <wave index> <field path>
-	W1F=$(pl 0 "['first']") W1L=$(pl 0 "['last']") W2F=$(pl 1 "['first']") W2L=$(pl 1 "['last']")
+	pl() { jf "d['series'][0]['plan'][$1]$2" <"$G"; } # pl <world index> <field path>
 	C1=$(pl 0 "['tiers']['common']['first']") R1=$(pl 0 "['tiers']['rare']['first']") L1=$(pl 0 "['tiers']['legendary']['first']")
-	WIN2=$(jf "d['series'][0]['sale']['playerWindowHours']" <"$G")
 	price() { qg "Gnome(\"$1\")" | jf 'd["price"]'; }
 	recorded() { q "$STORE" "Has(\"totals\",\"assisted $1\")"; }
 	days=${SEED_CLOSE:-30}
 	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ] || die "seed: SEED_CLOSE is a number of days, 1 or more"
 	GASW=3000000000 ok "seed: publish the genesis" "published" test1 "$GN" AddSeries genesis "$(cat "$ROWS")"; must
-	# the close first: the realm opens no sale of the genesis, nor a wave of it, before one is set
+	# the close first: the realm opens no sale of the genesis before one is set
 	CLOSE=$(($(chaintime) + days * 86400))
 	ok "seed: close in $days days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
 	ok "seed: open the sale" "open" test1 "$GN" SetMintOpen true; must
@@ -375,13 +372,8 @@ if [ "${SEED:-}" = 1 ]; then
 		is "seed: $k holes garden/3 (a record)" "store.Has(\"totals\",\"assisted <$k>\")" "true" "$(recorded "$a")"; must
 	done
 	NOW=$(chaintime)
-	# (SEED_LAUNCH=1: the launch, as the series' sale says it (launch all): one wave of every id, no wave 2)
-	[ "${SEED_LAUNCH:-}" = 1 ] && W1L=$(pl -1 "['last']") SEED_WAVE2=0
-	ok "seed: wave 1 ($W1F-$W1L) open, 1 h player window" "added" test1 "$GN" AddWave "$W1F" "$W1L" "$((NOW - 60))" 1; must
-	W1UNTIL=$((NOW - 60 + 3600)) W2AT=$((NOW + 2 * 86400))
-	if [ "${SEED_WAVE2:-1}" = 1 ]; then
-		ok "seed: wave 2 ($W2F-$W2L) in 2 days" "added" test1 "$GN" AddWave "$W2F" "$W2L" "$W2AT" "$WIN2"; must
-	else W2AT=""; fi
+	ok "seed: the genesis on sale, 1 h player window" "opened" test1 "$GN" OpenSale genesis "$((NOW - 60))" 1; must
+	UNTIL=$((NOW - 60 + 3600))
 	C2=$((C1 + 1)) C3=$((C1 + 2))
 	SEND=$(($(price "$C1") + $(price "$C2")))ugnot ok "seed: p1 buys Commons $C1, $C2" "sold" p1 "$GN" Buy "$C1,$C2"; must
 	SEND=$(price "$R1")ugnot ok "seed: p1 buys Rare $R1" "sold" p1 "$GN" Buy "$R1"; must
@@ -415,10 +407,8 @@ if [ "${SEED:-}" = 1 ]; then
 		echo "GNOKEY=$GNOKEY"
 		echo "WORK=$WORK"
 		echo "DEV_PID=$DEV"
-		echo "WAVE1=$W1F-$W1L"
-		echo "WAVE1_PLAYERS_UNTIL=$W1UNTIL"
-		echo "WAVE2=$W2F-$W2L"
-		echo "WAVE2_START=$W2AT"
+		echo "SALE_START=$((NOW - 60))"
+		echo "SALE_PLAYERS_UNTIL=$UNTIL"
 		echo "CLOSE_AT=$CLOSE"
 		echo "LEGENDARY=$L1"
 		echo "P1_GNOMES=$C1,$C2,$R1"
@@ -449,26 +439,55 @@ REALM_ADDR=$(py realm "$GN")
 SEND=36000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
 NOW=$(chaintime)
 no "sale: not before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" SetMintOpen true
-no "waves: not before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" AddWave 1 104 "$NOW" 1
+no "sale: no series opened before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" OpenSale genesis "$NOW" 1
 ok "close: set a year off, before any sale" "set" test1 "$GN" SetCloseAt "$((NOW + 365 * 86400))"
 ok "sale: open" "open" test1 "$GN" SetMintOpen true
 is "sale: MintOpen()" "MintOpen()" "true" "$(qg 'MintOpen()')"
 
-# ------------------------------------------------------------------- waves
-no "waves: owner only" "only the owner" p0 "$GN" AddWave 1 104 0 1
+# -------------------------------------------------- the genesis's one sale
+# its guards, then opened for later and withdrawn before it starts
+SEND=36000000ugnot no "sale: none opened yet" "gnome 1 is not on sale" p0 "$GN" Buy 1
+no "sale: owner only" "only the owner" p0 "$GN" OpenSale genesis 0 1
 NOW=$(chaintime)
-no "waves: 0 to 168 hours" "a player window is 0 to 168 hours" test1 "$GN" AddWave 1 104 "$NOW" 169
-ok "waves: Garden wave 1-104, 1 h player window" "added" test1 "$GN" AddWave 1 104 "$NOW" 1
-no "waves: no overlap" "are in a wave already" test1 "$GN" AddWave 100 110 "$NOW" 0
-SEND=36000000ugnot no "player window: no record, refused" "players only until" p0 "$GN" Buy 1
+no "sale: no such series" "no series drop2" test1 "$GN" OpenSale drop2 "$NOW" 0
+no "sale: 0 to 168 hours" "a player window is 0 to 168 hours" test1 "$GN" OpenSale genesis "$NOW" 169
+# a start from a day back to a year ahead, in seconds (one in milliseconds
+# would hold every close after it), and before the close
+no "sale: a start in milliseconds" "a sale starts from a day before now to a year after" test1 "$GN" OpenSale genesis "$((NOW * 1000))" 0
+no "sale: more than a day back" "a sale starts from a day before now to a year after" test1 "$GN" OpenSale genesis "$((NOW - 86400 - 60))" 0
+no "sale: more than a year ahead" "a sale starts from a day before now to a year after" test1 "$GN" OpenSale genesis "$((NOW + 366 * 86400))" 0
+no "sale: never from the close on" "the genesis sale starts before it closes" test1 "$GN" OpenSale genesis "$((NOW + 365 * 86400))" 0
+LATER=$((NOW + 3600))
+ok "sale: the genesis in an hour" "opened" test1 "$GN" OpenSale genesis "$LATER" 0
+is "sale: Collection().series[0].sale" "Collection().series[0].sale start,playersUntil,prices" "$LATER $LATER 36000000,72000000,336000000,1296000000" \
+	"$(qg 'Collection()' | jf '" ".join((str(d["series"][0]["sale"]["start"]), str(d["series"][0]["sale"]["playersUntil"]), ",".join(str(p) for p in d["series"][0]["sale"]["prices"])))')"
+no "sale: once a series" "series genesis is on sale already" test1 "$GN" OpenSale genesis "$NOW" 0
+SEND=36000000ugnot no "sale: not yet" "gnome 1 is not on sale yet" p0 "$GN" Buy 1
+no "close: never before the genesis's sale starts" "the genesis sale starts on" test1 "$GN" SetCloseAt "$((LATER - 30))"
+no "cancel: owner only" "only the owner" p0 "$GN" CancelSale genesis
+no "cancel: no such sale" "series drop2 is on no sale" test1 "$GN" CancelSale drop2
+ok "cancel: withdrawn before it starts" "withdrawn" test1 "$GN" CancelSale genesis
+is "cancel: on no sale again" "Collection().series[0].sale" "None" "$(qg 'Collection()' | jf 'd["series"][0]["sale"]')"
+SEND=36000000ugnot no "cancel: nothing on sale" "gnome 1 is not on sale" p0 "$GN" Buy 1
 
 # a record: p1 holes garden/3 on golf/v2 (published here alone: the local
-# Garden cup is that one hole)
+# Garden cup is that one hole), before the sale opens: its window runs on
+# chain time, and finding the shot may wait out the weather
 ok "record: publish garden/3" "published" test1 "$GOLF" Publish garden/3 "$(awk '$1=="garden/3"{print $4}' "$root/data/holes.txt")" e2e
 findshot
 is "record: a holing shot this weather" "SimulateRound(garden/3/v1, …)" "found ($shot)" "$([ -n "$shot" ] && echo "found ($shot)" || echo none)"
 ok "record: p1 holes garden/3" "holed" p1 "$GOLF" PlayRound garden/3/v1 "$shot"
 is "record: store totals" "store.Has(\"totals\",\"assisted <p1>\")" "true" "$(q "$STORE" "Has(\"totals\",\"assisted $P1\")")"
+
+# the sale for good: started an hour back less WINDOW seconds, its player
+# window an hour, so the window ends WINDOW seconds from now (a start is
+# taken from a day back: what the window's own steps take)
+WINDOW=${WINDOW:-240}
+NOW=$(chaintime)
+UNTIL=$((NOW + WINDOW))
+ok "sale: the genesis, every gnome, its player window to $UNTIL" "opened" test1 "$GN" OpenSale genesis "$((UNTIL - 3600))" 1
+no "cancel: a sale under way" "a sale is withdrawn only before it starts" test1 "$GN" CancelSale genesis
+SEND=36000000ugnot no "player window: no record, refused" "players only until" p0 "$GN" Buy 1
 
 # buys in the window
 SEND=35999999ugnot no "buy: underpaid" "wrong payment, send exactly 36000000ugnot" p1 "$GN" Buy 5
@@ -490,7 +509,7 @@ SEND=72000000ugnot no "caps: no third Rare in the window" "the player window tak
 SEND=336000000ugnot ok "caps: 1 Epic in the window" "sold" p1 "$GN" Buy 94
 SEND=336000000ugnot no "caps: no second Epic in the window" "the player window takes 1 epic a wallet" p1 "$GN" Buy 95
 
-# a Legendary: sold as any gnome, by Buy at its wave's fixed price, to its
+# a Legendary: sold as any gnome, by Buy at its sale's fixed price, to its
 # first buyer, one a wallet
 is "legendary: its price" "Gnome(\"104\").price" "1296000000" "$(qg 'Gnome("104")' | jf 'd["price"]')"
 SEND=1295999999ugnot no "legendary: underpaid" "wrong payment, send exactly 1296000000ugnot" p1 "$GN" Buy 104
@@ -500,7 +519,8 @@ is "legendary: treasury up by the price" "balance(treasury) after - before" "129
 is "legendary: the realm keeps nothing" "balance(realm)" "0" "$(bal "$REALM_ADDR")"
 is "legendary: OwnerOf(104)" "OwnerOf(\"104\")" "$P1" "$(qg 'OwnerOf("104")')"
 SEND=1296000000ugnot no "legendary: a second buyer refused" "this gnome is already sold" b1 "$GN" Buy 104
-ok "legendary: #208 on sale alone, no window" "added" test1 "$GN" AddWave 208 208 "$(chaintime)" 0
+# the window over: anyone buys, the lifetime caps alone
+wait_until "$UNTIL" "the player window's end"
 SEND=1296000000ugnot no "legendary: one a wallet" "the cap is 1 legendary a wallet" p1 "$GN" Buy 208
 SEND=1296000000ugnot ok "legendary: b1 buys #208" "sold" b1 "$GN" Buy 208
 SEND=1296000000ugnot no "legendary: #208 sold once" "this gnome is already sold" b2 "$GN" Buy 208
@@ -511,36 +531,21 @@ ok "pause: SetMintOpen(false)" "paused" test1 "$GN" SetMintOpen false
 SEND=36000000ugnot no "pause: no buy" "the sale is closed" p0 "$GN" Buy 1
 ok "pause: SetMintOpen(true)" "open" test1 "$GN" SetMintOpen true
 
-# a wave with no window, and the lifetime cap
+# the prices: a sale keeps its own; SetPrice moves the sales yet to open (a
+# later series'), and the lifetime cap
 no "price: owner only" "only the owner" p0 "$GN" SetPrice common 40000000
 no "price: bounds" "a price is between" test1 "$GN" SetPrice common 999999
-ok "price: Common 40 GNOT for the next waves" "set" test1 "$GN" SetPrice common 40000000
-is "price: a wave keeps its prices" "Gnome(\"8\").price" "36000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
-NOW=$(chaintime)
-ok "waves: 105-207, no window (208 on sale alone already)" "added" test1 "$GN" AddWave 105 207 "$NOW" 0
-W209=$((NOW + 90))
-ok "waves: 209-310, in a minute and a half" "added" test1 "$GN" AddWave 209 310 "$W209" 0
-SEND=40000000ugnot no "waves: not yet" "is not on sale yet" p0 "$GN" Buy 209
-no "close: never before a genesis wave yet to open" "a genesis wave starts on" test1 "$GN" SetCloseAt "$((W209 - 30))"
-SEND=36000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
-# a start from a day back to a year ahead, in seconds (one in milliseconds
-# would hold every close after it); a wave yet to open can be withdrawn
-NOW=$(chaintime)
-no "waves: a start in milliseconds" "a wave starts from a day before now to a year after" test1 "$GN" AddWave 311 320 "$((NOW * 1000))" 0
-no "waves: more than a day back" "a wave starts from a day before now to a year after" test1 "$GN" AddWave 311 320 "$((NOW - 86400 - 60))" 0
-no "waves: more than a year ahead" "a wave starts from a day before now to a year after" test1 "$GN" AddWave 311 320 "$((NOW + 366 * 86400))" 0
-ok "waves: 311-320 tomorrow" "added" test1 "$GN" AddWave 311 320 "$((NOW + 86400))" 0
-no "cancel: owner only" "only the owner" p0 "$GN" CancelWave 311
-no "cancel: no such wave" "no wave starts at id 312" test1 "$GN" CancelWave 312
-no "cancel: a wave under way" "a wave is withdrawn only before it opens" test1 "$GN" CancelWave 1
-ok "cancel: 311-320 withdrawn before it opens" "withdrawn" test1 "$GN" CancelWave 311
-is "cancel: its ids in no wave" "Collection().waves has 311" "False" "$(qg 'Collection()' | jf 'str(any(w["first"] == 311 for w in d["waves"]))')"
+ok "price: Common 40 GNOT for the sales yet to open" "set" test1 "$GN" SetPrice common 40000000
+is "price: a sale keeps its prices" "Gnome(\"8\").price" "36000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
+ok "price: a later series, drop2 (#721)" "published" test1 "$GN" AddSeries drop2 "721|common|Pip Frost|01"
+is "price: on no sale, the next sale's price" "Gnome(\"721\").price" "40000000" "$(qg 'Gnome("721")' | jf 'd["price"]')"
+ok "price: drop2's sale, no window" "opened" test1 "$GN" OpenSale drop2 "$(chaintime)" 0
+is "price: its sale at the new price" "Collection().series[1].sale.prices[0]" "40000000" "$(qg 'Collection()' | jf 'd["series"][1]["sale"]["prices"][0]')"
 commons=$(awk -F'|' '$1>=105 && $1<=207 && $2=="common"{print $1}' "$ROWS" | head -11 | tr '\n' ' ')
 set -- $commons
-is "price: the new wave at the new price" "Gnome(\"$1\").price" "40000000" "$(qg "Gnome(\"$1\")" | jf 'd["price"]')"
-SEND=200000000ugnot ok "caps: p0 (no record) buys 5 Commons, no window" "sold" p0 "$GN" Buy "$1,$2,$3,$4,$5"
-SEND=200000000ugnot ok "caps: 5 more (10 Commons)" "sold" p0 "$GN" Buy "$6,$7,$8,$9,${10}"
-SEND=40000000ugnot no "caps: lifetime, 10 Commons" "the cap is 10 common a wallet" p0 "$GN" Buy "${11}"
+SEND=180000000ugnot ok "caps: p0 (no record) buys 5 Commons, no window" "sold" p0 "$GN" Buy "$1,$2,$3,$4,$5"
+SEND=180000000ugnot ok "caps: 5 more (10 Commons)" "sold" p0 "$GN" Buy "$6,$7,$8,$9,${10}"
+SEND=36000000ugnot no "caps: lifetime, 10 Commons" "the cap is 10 common a wallet" p0 "$GN" Buy "${11}"
 is "buy: SoldOfTier(0)" "SoldOfTier(0)" "13" "$(qg 'SoldOfTier(0)')"
 
 # --------------------------------------------------------- equip, locker
@@ -577,8 +582,8 @@ ok "treasury: treas accepts" "taken" treas "$GN" AcceptTreasury
 is "treasury: moved" "Treasury(), PendingTreasury()" "$TREAS " "$(qg 'Treasury()') $(qg 'PendingTreasury()')"
 is "treasury: royalty follows" "RoyaltyInfo(\"5\", 1000000)" "$TREAS 50000" "$(qraw 'RoyaltyInfo("5",1000000)' | sed 's/^data: //' | head -2 | tr -d '()"' | awk '{print $1}' | paste -sd' ' -)"
 t_before=$(bal "$TREAS")
-SEND=40000000ugnot ok "treasury: a buy pays the new treasury" "sold" b2 "$GN" Buy "${11}"
-is "treasury: up by the price" "balance(treas) after - before" "40000000" "$(($(bal "$TREAS") - t_before))"
+SEND=36000000ugnot ok "treasury: a buy pays the new treasury" "sold" b2 "$GN" Buy "${11}"
+is "treasury: up by the price" "balance(treas) after - before" "36000000" "$(($(bal "$TREAS") - t_before))"
 is "treasury: the owner unchanged" "Owner()" "$OWNER" "$(qg 'Owner()')"
 
 # a coin sent to the realm's address stays there until swept to the treasury
@@ -631,9 +636,6 @@ HEAVY=$3 HTIER=$4
 within "portrait: the heaviest, #$HEAVY ($HTIER)" "its SVG's bytes (6 KiB)" 6144 "$5"
 heavyuri=$6
 if [ "$HTIER" != legendary ]; then
-	if [ "$HEAVY" -gt 208 ]; then # (105 to 208 are on sale with no window; 104 and under are players' still)
-		ok "portrait: a wave of #$HEAVY alone" "added" test1 "$GN" AddWave "$HEAVY" "$HEAVY" "$(chaintime)" 0
-	fi
 	SEND=$(qg "Gnome(\"$HEAVY\")" | jf 'd["price"]')ugnot ok "portrait: b2 buys #$HEAVY" "sold" b2 "$GN" Buy "$HEAVY"
 	is "portrait: TokenURI is the page's portrait" "TokenURI(\"$HEAVY\") == its page's image" "True" "$([ "$(qg "TokenURI(\"$HEAVY\")")" = "$heavyuri" ] && echo True || echo False)"
 	within "portrait: TokenURI gas, the heaviest (#$HEAVY)" "MsgRun TokenURI(\"$HEAVY\") - MsgRun OwnerOf" "$URIMAX" "$(urigas "$HEAVY")"
@@ -671,26 +673,25 @@ is "earned: TokenURI SVG" "TokenURI(\"1000001\") parsed as XML" "svg" "$(qg 'Tok
 within "portrait: TokenURI gas, an earned gnome" "MsgRun TokenURI(\"1000001\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 1000001)"
 
 # ------------------------------------------------------------------- close
-wait_until "$((W209 + 5))" "wave 209-310 open" # (a close comes after every genesis wave's start)
 NOW=$(chaintime)
 no "close: owner only" "only the owner" p0 "$GN" SetCloseAt "$((NOW + 600))"
 no "close: in the future" "a closing date is in the future" test1 "$GN" SetCloseAt "$((NOW - 10))"
 ok "close: brought forward, to 10 minutes" "set" test1 "$GN" SetCloseAt "$((NOW + 600))"
 no "close: never later" "never later than" test1 "$GN" SetCloseAt "$((NOW + 900))"
-no "close: no genesis wave from it on" "before the genesis sale closes" test1 "$GN" AddWave 400 410 "$((NOW + 600))" 0
 NOW=$(chaintime)
 CLOSE=$((NOW + 60))
 ok "close: brought forward" "set" test1 "$GN" SetCloseAt "$CLOSE"
 is "close: CloseAt()" "CloseAt()" "$CLOSE" "$(qg 'CloseAt()')"
 wait_until "$CLOSE" "the close"
 SEND=36000000ugnot no "close: buys refused" "the genesis sale closed on" p1 "$GN" Buy 1
-no "close: no wave for its ids" "the genesis sale closed on" test1 "$GN" AddWave 400 410 "$CLOSE" 0
+no "close: no sale of it again" "the genesis sale closed on" test1 "$GN" OpenSale genesis "$CLOSE" 0
 no "close: no date after" "the genesis sale closed on" test1 "$GN" SetCloseAt "$((CLOSE + 600))"
 is "close: Collection genesis closed, sold" "Collection().series[0] closed,sold" "True $sold" "$(qg 'Collection()' | jf 'str(d["series"][0]["closed"]) + " " + str(d["series"][0]["sold"])')"
 is "close: an unsold gnome closed" "Gnome(\"1\").closed" "True" "$(qg 'Gnome("1")' | jf 'd["closed"]')"
 is "close: a sold Legendary is not closed" "Gnome(\"104\").closed" "False" "$(qg 'Gnome("104")' | jf 'd["closed"]')"
 is "close: an unsold Legendary is" "Gnome(\"311\").closed" "True" "$(qg 'Gnome("311")' | jf 'd["closed"]')"
 is "close: final supply" "Collection().series[0].sold, tiers sold" "$sold $c,$r,$e,$l" "$(qg 'Collection()' | jf 'str(d["series"][0]["sold"]) + " " + ",".join(str(t["sold"]) for t in d["tiers"])')"
+SEND=40000000ugnot ok "close: a later series sells on" "sold" b2 "$GN" Buy 721
 
 # ------------------------------------------------------------- the owner
 no "owner: only the offered accepts" "no transfer of the collection is offered to you" p0 "$GN" Accept

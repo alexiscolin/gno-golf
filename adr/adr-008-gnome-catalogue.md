@@ -1,4 +1,4 @@
-# ADR-008: The gnome catalogue as data, in series and waves
+# ADR-008: The gnome catalogue as data, in series and worlds
 
 ## Status
 
@@ -14,9 +14,9 @@ Legendary, the user's supply), and more later: seasonal drops. Each token's
 look, name and line must be known before anything is sold, written down
 once, and read by three readers that must agree: the realm (its table and
 portraits), the client (the ball, the ghost, the boards) and the screens
-(gallery, token page, mint, locker). The research brief recommends selling
-in waves, one home of the course at a time, each opened as a range of ids,
-with prices and windows the owner sets between waves.
+(gallery, token page, mint, locker). A series is sold in one sale, all its
+ids at once, at the prices and with the window the owner sets as it opens
+(ADR-013).
 
 Writing 720 gnomes by hand would make them inconsistent; generating them at
 random would make them noise and could not be reviewed. The Epics and
@@ -26,20 +26,20 @@ designing as a system.
 ## Decision
 
 - **A series is data.** `data/gnomes/series.json` holds every series: its
-  code, first id, supply per tier, waves (one home each), generator seed and
+  code, first id, supply per tier, worlds (its homes), generator seed and
   the realm's starting sale settings. It is the one place a count is
-  written; ids, waves and per-wave counts are derived (`planSeries`).
+  written; ids and each world's counts are derived (`planSeries`).
   `data/gnomes/<series>/` holds its recipe: archetypes with curated
   palettes, names and lines (`archetypes.json`), and the hand designs
   (`epics.json`, `legendaries.json`). A new drop is a new entry and folder:
   no code.
-- **Ids run by wave.** Each wave is one run of ids, its Commons, Rares,
-  Epics and Legendary in turn, the tiers shared evenly over the waves, so
-  the realm opens a wave as one range. (The spec's draft ran ids by tier:
-  1–500 Common; a wave would then be four ranges.)
+- **Ids run by world.** Each world is one run of ids, its Commons, Rares,
+  Epics and Legendary in turn, the tiers shared evenly over the worlds, so
+  a world's gnomes sit together. (The spec's draft ran ids by tier:
+  1–500 Common.)
 - **The catalogue is made, never edited.** `scripts/gnomes.ts` (`npm run
   gnomes`) writes `data/gnomes.json`: every series with its plan, every
-  token's id, series, wave, tier, home, archetype, name, line, traits
+  token's id, series, tier, home, archetype, name, line, traits
   (ADR-009) and skin, the code tables, and the nine earned gnomes' traits.
   The generator is deterministic from the seed; `--check` (in
   `scripts/check.sh`) fails if the file is not what the data makes.
@@ -64,8 +64,8 @@ designing as a system.
   each row's tier equal to its traits' tier byte, which the realm stores
   apart and does not compare.
 - **The prices are golf numbers** (the user's decision, 2026-10-06; the
-  realm's starting settings in `series.json`, set by its owner between
-  waves, never lower on what is on sale):
+  realm's starting settings in `series.json`, set by its owner before a
+  series' sale opens, frozen in it from then on):
 
   | tier | GNOT | why |
   |---|---|---|

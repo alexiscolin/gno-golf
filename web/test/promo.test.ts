@@ -16,8 +16,7 @@ const T0 = Date.UTC(2026, 9, 10, 18) / 1000;
 const COLLECTION: Collection = {
   version: 1, open: true, earnedOpen: true, closesAt: 0, owner: "", treasury: "", pendingTreasury: "", site: "", royaltyBps: 500,
   tiers: ["common", "rare", "epic", "legendary"].map((name, i) => ({ name, price: [36e6, 72e6, 336e6, 1296e6][i], cap: 10, playerCap: 3, sold: 0 })),
-  series: [{ name: "genesis", first: 1, last: 720, sold: 0, closed: false }],
-  waves: [{ first: 1, last: 104, start: T0, playersUntil: T0 + 3600, prices: [36e6, 72e6, 336e6, 1296e6] }],
+  series: [{ name: "genesis", first: 1, last: 720, sold: 0, closed: false, sale: { start: T0, playersUntil: T0 + 3600, prices: [36e6, 72e6, 336e6, 1296e6] } }],
 };
 /** A chain that answers Collection() and Sold(), counting its reads (fail: the first read fails). */
 function chainOf(fail = false) {
