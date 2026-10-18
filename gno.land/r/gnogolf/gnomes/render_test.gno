@@ -53,3 +53,21 @@ func TestGNOTIsWrittenPlainly(t *testing.T) {
 	uassert.Equal(t, "815.85 GNOT", gnot(815_850_000))
 	uassert.Equal(t, "0.000001 GNOT", gnot(1))
 }
+
+// Behind the rows' rule, the page escapes a name as Markdown wherever it
+// goes (the title, the portrait's alt text, a link's text): even a name the
+// rule had let by could never close the brackets and swap the portrait for
+// an image from elsewhere, nor write markup.
+func TestANameOnThePageIsMarkdownEscaped(cur realm, t *testing.T) {
+	fresh(t, cur)
+	g := mustGnome(1)
+	g.name = "x](https://e.vil/p) ![t](https://e.vil/t.png"
+	page := renderGnome("1", g)
+	uassert.False(t, strings.Contains(page, "](https://e.vil"), page)
+	has(t, page, `# x\]\(https\:\/\/e\.vil\/p\) \!\[t\]\(https\:\/\/e\.vil\/t\.png`+"\n")
+	has(t, page, `![x\]\(https\:\/\/e\.vil\/p\) \!\[t\]\(https\:\/\/e\.vil\/t\.png](data:image/svg+xml;base64,`)
+	g.name = "Pip <script>alert(1)</script> & co"
+	has(t, renderGnome("1", g), `# Pip \<script\>alert\(1\)\<\/script\> \& co`+"\n")
+	uassert.Equal(t, `Heat\-Suit O\'Brien Jr\.`, markdownEscape("Heat-Suit O'Brien Jr."))
+	uassert.Equal(t, "Zoë Brambleföot", markdownEscape("Zoë Brambleföot"))
+}

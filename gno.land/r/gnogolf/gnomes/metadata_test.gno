@@ -75,13 +75,14 @@ func TestAnEarnedTokensMetadataNamesItsKind(cur realm, t *testing.T) {
 	uassert.True(t, strings.HasPrefix(uri, svgDataPrefix))
 }
 
-// A name is escaped in the JSON as it is in the SVG.
-func TestMetadataEscapesTheName(cur realm, t *testing.T) {
+// A name goes into the JSON quoted (jsonq: a quote, a backslash or a byte
+// not UTF-8 never breaks out; AddSeries lets none of them in a name).
+func TestMetadataQuotesTheName(cur realm, t *testing.T) {
 	fresh(t, cur)
-	urequire.NoError(t, addSeries("odd", `721|common|Pip "the" \ Q|v0.a`))
+	urequire.NoError(t, addSeries("odd", `721|common|Pip O'Brien Jr.|v0.a`))
 	urequire.NoError(t, addWave(721, 721, now(), 0))
 	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
 	Buy(cross(cur), "721")
 	md, _ := TokenMetadata("721")
-	uassert.True(t, strings.HasPrefix(md, `{"name":"Pip \"the\" \\ Q",`), md)
+	uassert.True(t, strings.HasPrefix(md, `{"name":"Pip O'Brien Jr.",`), md)
 }

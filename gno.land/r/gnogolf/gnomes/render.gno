@@ -9,8 +9,9 @@ import (
 
 // The pages gnoweb shows: the collection (""), a gnome ("<id>"), an earned
 // kind ("<kind>"), a player ("<address>"). Every string on them comes from
-// the catalogue, the config or an address; names are the owner's rows, and
-// escaped where they go into markup.
+// the catalogue, the config or an address; names are the owner's rows, held
+// to plain letters by AddSeries (rows.gno plainName), and escaped as Markdown
+// wherever they go all the same (markdownEscape).
 
 // self is this realm's pkgpath, hub its gnoweb path: every link follows
 // from them, so the same code serves under any namespace.
@@ -60,7 +61,7 @@ func renderHome() string {
 
 func renderGnome(tid string, g gnome) string {
 	var b strings.Builder
-	name := xmlEscape(g.name)
+	name := markdownEscape(g.name)
 	b.WriteString("# " + name + "\n\n")
 	b.WriteString("![" + name + "](" + portrait(g) + ")\n\n")
 	b.WriteString("Gnome " + tid + ", " + tierName(g.tier) + ", of the " + g.series + " series.\n\n")
@@ -87,7 +88,7 @@ func renderPlayer(player address) string {
 	b.WriteString("# " + player.String() + "\n\n")
 	if v := equipped.Get(player.String()); v != nil && Equipped(player) != "" {
 		g, _ := tokenAt(parseID(v.(string)))
-		b.WriteString("Equipped: [" + xmlEscape(g.name) + "](" + hub + ":" + v.(string) + ")\n\n")
+		b.WriteString("Equipped: [" + markdownEscape(g.name) + "](" + hub + ":" + v.(string) + ")\n\n")
 	}
 	ids, more := heldPage(player, 0, pageSize)
 	for _, id := range ids {
@@ -95,6 +96,22 @@ func renderPlayer(player address) string {
 	}
 	if more {
 		b.WriteString("- …\n")
+	}
+	return b.String()
+}
+
+// markdownEscape writes s as Markdown text: every ASCII punctuation mark
+// backslashed, which CommonMark reads as the mark itself, so a name can
+// never close a link's brackets, open an image or a tag, nor start an
+// entity, wherever it goes (a title, an alt text, a link's text).
+func markdownEscape(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~' {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
 	}
 	return b.String()
 }

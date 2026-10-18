@@ -244,6 +244,12 @@ test("rows: what the realm receives decodes to the catalogue's traits, id for id
   assert.match(checkRows(row("common", "zz"), 1).join(), /do not decode/);
   assert.match(checkRows(row("common", g.traits, 2), 1).join(), /id 2, not 1/);
   assert.match(checkRows(row("common", g.traits, 1, "x".repeat(49)), 1).join(), /name/);
+  assert.match(checkRows(row("common", g.traits, 1, "é".repeat(25)), 1).join(), /name/, "48 bytes, not 48 characters");
+  // the realm's rule (rows.gno plainName): the audit's payloads refused, accented letters taken
+  for (const bad of ["x](https://e.vil/p) ![t](https://e.vil/t.png", "Pip \u202egnp.evil", "Pip <script>alert(1)</script>", "Pip \ufffd", "Pi\u200bp", "Pip \u00d7", "Пип"])
+    assert.match(checkRows(row("common", g.traits, 1, bad), 1).join(), /name/, bad);
+  for (const ok of ["Heat-Suit Hal", "O'Brien Jr.", "Zo\u00eb Bramblef\u00f6ot", "\u0141ucja \u00d8ster", "Gnome 721"])
+    assert.deepEqual(checkRows(row("common", g.traits, 1, ok), 1), [], ok);
   assert.match(checkRows("1|common|x", 1).join(), /not id\|tier\|name\|traits/);
 });
 

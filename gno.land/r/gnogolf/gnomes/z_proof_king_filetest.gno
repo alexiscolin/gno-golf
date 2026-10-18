@@ -47,4 +47,4 @@ func main(cur realm) {
 // {"version":1,"kind":"king","player":"g1dd5kue6lta047h6lta047h6lta047h6l9pfacj","ok":true,"minted":"","holes":72,"finished":72,"strokes":216,"par":216,"missing":[]}
 
 // Gas:
-// 112405846
+// 112445258

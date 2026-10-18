@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // A series' rows are read in place. Its ids follow on with no gap, so the
@@ -72,22 +73,45 @@ func parseRow(row string) (gnome, error) {
 	if ti < 0 {
 		return gnome{}, errors.New("gnomes: unknown tier " + f[1])
 	}
-	if !printable(f[2], maxGnomeName) {
-		return gnome{}, errors.New("gnomes: a name is 1 to 48 printable bytes")
+	if !plainName(f[2]) {
+		return gnome{}, errors.New("gnomes: a name is 1 to 48 bytes of letters, digits, spaces and - ' .")
 	}
 	if !printable(f[3], maxTraits) {
-		return gnome{}, errors.New("gnomes: traits are 1 to 256 printable bytes")
+		return gnome{}, errors.New("gnomes: traits are 1 to 256 bytes of printable ASCII")
 	}
 	return gnome{id: id, tier: ti, name: f[2], traits: f[3]}, nil
 }
 
-// printable: 1 to max bytes, none of them a control character.
+// plainName: what a name may be, wherever it is shown (gnoweb's Markdown, a
+// wallet's text, a market's JSON, the portrait's SVG): 1 to maxGnomeName
+// bytes of valid UTF-8, each rune a letter (a-z, A-Z, or an accented Latin
+// one: Latin-1's and Latin Extended-A's), a digit, a space or one of - ' .
+// Nothing a page reads as markup or a link ([ ] ( ) < > & ! * _ # ...),
+// and nothing unseen: no control, no bidi override or isolate (text running
+// backwards), no zero width, no combining mark.
+func plainName(s string) bool {
+	if s == "" || len(s) > maxGnomeName || !utf8.ValidString(s) {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
+			r == ' ', r == '-', r == '\'', r == '.':
+		case r >= 0xc0 && r <= 0x17f && r != 0xd7 && r != 0xf7: // À to ſ, less × and ÷
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// printable: 1 to max bytes of printable ASCII, a space included.
 func printable(s string, max int) bool {
 	if s == "" || len(s) > max {
 		return false
 	}
 	for i := 0; i < len(s); i++ {
-		if s[i] < 0x20 || s[i] == 0x7f {
+		if s[i] < 0x20 || s[i] > 0x7e {
 			return false
 		}
 	}

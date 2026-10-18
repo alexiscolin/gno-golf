@@ -1,6 +1,7 @@
 package gnomes
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -99,4 +100,40 @@ func TestASeriesIsBounded(cur realm, t *testing.T) {
 	}
 	id := lastID() + 1
 	uassert.ErrorContains(t, addSeries("one-too-many", itoa(id)+"|common|A|v0.a"), "series")
+}
+
+// A name is shown by gnoweb as Markdown, by a wallet as text, by a market as
+// JSON: it is letters, digits, spaces and - ' . alone, in valid UTF-8, so
+// none can turn into a link, an image, markup or text running backwards.
+// The audit's payloads first, the bidi and other invisible runes after.
+func TestANameIsLettersAndPlainMarks(cur realm, t *testing.T) {
+	fresh(t, cur)
+	for _, name := range []string{
+		"x](https://e.vil/p) ![t](https://e.vil/t.png",
+		"Pip \u202egnp.evil",
+		"Pip \xff\xfe\"bad",
+		"Pip <script>alert(1)</script>",
+		"Pip [1]", "Pip (1)", "Pip & Co", "Pip #1", "Pip *", "Pip_1", "Pip `x`", "Pip \\", "Pip ~", "Pip !",
+		"\u202aPip", "\u202bPip", "\u202cPip", "\u202dPip", "\u2066Pip", "\u2067Pip", "\u2068Pip", "\u2069Pip",
+		"\u200ePip", "\u200fPip", "Pi\u200bp", "Pi\ufeffp", "Pip\u00ad", "Pip\u0301", "Pip\x7f", "Pip\u0085", "Pip\u00a0",
+		"Pip \xc3", "Pip \xe2\x80", "Pip \xed\xa0\x80", "Pip \xc0\xaf",
+		"Пип", "Πιπ", "Pip ×", "Pip ÷",
+	} {
+		uassert.ErrorContains(t, addSeries("spring", "721|common|"+name+"|v0.a"), "gnomes: a name is", strconv.Quote(name))
+	}
+	for _, name := range []string{
+		"Juniper Troutbridge", "Heat-Suit Hal", "O'Brien", "Pip Jr.", "Gnome 721", "Zoë Brambleföot", "Ñandú", "Łucja Øster", "Æsc Œuvre ß",
+	} {
+		urequire.NoError(t, addSeries("s"+itoa(lastID()+1), itoa(lastID()+1)+"|common|"+name+"|v0.a"), name)
+		uassert.Equal(t, name, mustGnome(lastID()).name)
+	}
+}
+
+// Traits are the designer's encoding, opaque here: printable ASCII alone,
+// so they too are valid UTF-8 wherever they go.
+func TestTraitsArePrintableASCII(cur realm, t *testing.T) {
+	fresh(t, cur)
+	for _, traits := range []string{"v0.\xff", "v0.é", "v0.\u202e", "v0\x7f"} {
+		uassert.ErrorContains(t, addSeries("spring", "721|common|A|"+traits), "gnomes: traits are", strconv.Quote(traits))
+	}
 }

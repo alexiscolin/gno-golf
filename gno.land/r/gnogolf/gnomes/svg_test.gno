@@ -30,16 +30,11 @@ func TestTokenURIIsAnOnChainSVG(cur realm, t *testing.T) {
 	uassert.True(t, strings.HasSuffix(svg, "</svg>"), svg)
 }
 
-// A name is the catalogue's, which only the owner writes; it is escaped all
-// the same, so no row can inject markup into a wallet.
-func TestANameCannotInjectMarkup(cur realm, t *testing.T) {
-	fresh(t, cur)
-	urequire.NoError(t, addSeries("evil", `721|common|<script>"x"</script>|v0.a`))
-	urequire.NoError(t, addWave(721, 721, now(), 0))
-	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
-	Buy(cross(cur), "721")
-	uri, _ := TokenURI("721")
-	svg := decodeDataURI(t, uri)
+// A name is the catalogue's, which only the owner writes and AddSeries
+// holds to plain letters (TestANameIsLettersAndPlainMarks); it is escaped
+// all the same, so not even a row let by could inject markup into a wallet.
+func TestANameCannotInjectMarkup(t *testing.T) {
+	svg := drawGnome(gnome{tier: 0, name: `<script>"x"</script>`, traits: classic})
 	uassert.False(t, strings.Contains(svg, "<script>"), svg)
 	uassert.True(t, strings.Contains(svg, "&lt;script&gt;&quot;x&quot;"), svg)
 }
