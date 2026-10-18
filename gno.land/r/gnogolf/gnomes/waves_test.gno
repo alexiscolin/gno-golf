@@ -140,12 +140,12 @@ func TestAWaveStartsWithinADayBackAndAYearAhead(cur realm, t *testing.T) {
 		func() { AddWave(cross(cur), 105, 208, now()*1000, 0) }, "milliseconds")
 	SetCloseAt(cross(cur), now()+3600) // the close is the owner's still
 	for name, w := range map[string][2]int64{
-		"a day and a second back":  {now() - maxWaveBehind - 1, 0},
-		"a year and a second on":   {now() + maxWaveAhead + 1, 0},
-		"negative":                 {-1, 0},
-		"its window overflows":     {1<<63 - 3600, maxHours},
-		"the far end of int64":     {1<<63 - 1, 0},
-		"the far end, backwards":   {-1 << 63, 0},
+		"a day and a second back": {now() - maxWaveBehind - 1, 0},
+		"a year and a second on":  {now() + maxWaveAhead + 1, 0},
+		"negative":                {-1, 0},
+		"its window overflows":    {1<<63 - 3600, maxHours},
+		"the far end of int64":    {1<<63 - 1, 0},
+		"the far end, backwards":  {-1 << 63, 0},
 	} {
 		uassert.ErrorContains(t, addWave(1, 104, w[0], w[1]), "a wave starts from", name)
 	}
