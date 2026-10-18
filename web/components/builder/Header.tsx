@@ -6,13 +6,14 @@
 // right the difficulty chip (a click shows the meter's line on the board),
 // the history and the mode's one action (Play, in Build). A step done or
 // open is a link back to it; a locked one says why; Publish, once open, is
-// lit: the way on. The world a hole is in changes from the "…" menu.
+// lit: the way on. The world a hole is in changes from its menu, a button saying it.
 import { useRef } from "react";
 import { MOD } from "./Inspector";
 import { worldName } from "@/lib/builder/rules";
 import { CHECKING, shortWhy } from "@/lib/builder/editor";
 import type { Level } from "@/lib/builder/difficulty";
 import { Button, Dice } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 
 export type Step = "edit" | "play" | "publish";
 
@@ -58,12 +59,15 @@ const HistoryIcon = ({ redo = false }: { redo?: boolean }) => (
 /** Undo's or redo's keys as aria-keyshortcuts names them (MOD: ⌘ on a Mac, Ctrl elsewhere). */
 const keys = (redo: boolean) => `${MOD === "⌘" ? "Meta" : "Control"}+${redo ? "Shift+" : ""}Z`;
 
-/** The "…" menu: the hole moved to another world (judged there first: Editor's world), the one it is in ticked. */
+/** The world menu, a button of the game's that says the world: the hole moved to another (judged there first: Editor's world), the one it is in ticked. */
 function More({ world, worlds, onWorld }: { world: string; worlds: readonly string[]; onWorld: (w: string) => void }) {
   const menu = useRef<HTMLDetailsElement>(null);
   return (
     <details ref={menu} className="bhead__more" onKeyDown={(e) => e.key === "Escape" && menu.current?.open && (e.stopPropagation(), (menu.current.open = false))}>
-      <summary aria-label="More: the hole's world" title="The hole's world">…</summary>
+      <summary className={buttonClass({ size: "s" })} aria-label={`The hole's world: ${worldName(world)}. Change it`} title="Change the hole's world">
+        {worldName(world)}
+        <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </summary>
       <div className="bhead__menu" role="group" aria-label="The hole's world">
         {worlds.map((w) => (
           <button key={w} type="button" data-world={w} aria-pressed={w === world} onClick={() => ((menu.current!.open = false), w !== world && onWorld(w))}>{worldName(w)}</button>
@@ -108,7 +112,7 @@ export default function Header({ title, world, worlds = [], step, steps, action,
         </Button>
         <span className="bhead__name">
           <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
-          {onRoll && <button type="button" className="bhead__roll" aria-label="Suggest a name" title="Suggest a name (again: another)" onClick={onRoll}><Dice /></button>}
+          {onRoll && <Button variant="icon" size="s" type="button" className="bhead__roll" aria-label="Suggest a name" title="Suggest a name (again: another)" onClick={onRoll}><Dice /></Button>}
         </span>
         {onWorld && worlds.length > 1 && <More world={world} worlds={worlds} onWorld={onWorld} />}
       </div>

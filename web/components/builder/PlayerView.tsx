@@ -1,6 +1,6 @@
 "use client";
 
-// The player's view, a small picture under the piece in the right column, titled and said: the
+// The player's view, a small picture on top of the right side, still (the piece's settings scroll under it): the
 // hole from its tee through the game's own lens, as a round opens on it.
 // Painted from the board's own scene (Scene.tsx paint: no second build, no
 // second context), once an edit has settled and the hole is built, never a

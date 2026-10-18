@@ -402,11 +402,14 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
             <Checks broken={brokenLine({ errors: errors.length, proved, rounds: rounds && key?.of === shape && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
-          <aside className="col" aria-label="The selected piece">
-            <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={blinking} onPlay={() => setBlinking((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove}
-              onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />
-            {gl && <PlayerView eye={eye} large={large} onLarge={setLarge} />}
-          </aside>
+          {/* the right side: the player's view on top, still; the piece's settings under it, scrolling in themselves */}
+          <div className="bside">
+            {gl && <div className="col col--still"><PlayerView eye={eye} large={large} onLarge={setLarge} /></div>}
+            <aside className="col" aria-label="The selected piece">
+              <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={blinking} onPlay={() => setBlinking((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove}
+                onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />
+            </aside>
+          </div>
         </>
       ) : (
         unloaded ? (

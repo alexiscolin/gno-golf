@@ -22,22 +22,21 @@
 .bhead { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--sp-4); min-width: 0; }
 .bhead__start { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
 .bhead .btn { margin: 0; white-space: nowrap; }
-.bhead__name { flex: 0 1 320px; display: flex; align-items: center; gap: var(--sp-1); min-width: 0; line-height: 1.15; }
-.bhead__roll { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; }
-.bhead__roll:hover .rival__dice, .bhead__roll:focus-visible .rival__dice { fill: var(--gold); }
+.bhead__name { flex: 0 1 320px; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; line-height: 1.15; }
+.bhead__roll { flex: none; }
+.bhead__roll .rival__dice { width: 20px; height: 20px; transition: transform .12s; }
 .bhead__roll:active .rival__dice { transform: rotate(-20deg); }
-.bhead__roll .rival__dice { width: 22px; height: 22px; transition: transform .12s; }
 @media (prefers-reduced-motion: reduce) { .bhead__roll .rival__dice { transition: none; } }
 .bhead__name > input { min-width: 0; width: 100%; border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 20px; font-weight: 700; color: var(--ink); padding: 0 0 2px; text-overflow: ellipsis; }
 .bhead__end { display: flex; align-items: center; gap: var(--sp-3); justify-self: end; }
 @media (max-width: 1100px) { .bhead__end { gap: var(--sp-2); } }
 /* Play keeps its width as the reason beside it changes */
 .bhead__act { min-width: 104px; }
-/* the "…" menu: the hole's world, moved there from here (a few words each, the one it is in ticked) */
+/* the world menu (a small button saying the world, its caret turned while open): the hole moved to another from here (the one it is in ticked) */
 .bhead__more { position: relative; flex: none; }
-.bhead__more > summary { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; list-style: none; cursor: pointer; font-size: 20px; font-weight: 800; line-height: 1; color: var(--ink-soft); }
+.bhead__more > summary { list-style: none; gap: 6px; white-space: nowrap; }
 .bhead__more > summary::-webkit-details-marker { display: none; }
-.bhead__more > summary:hover, .bhead__more[open] > summary { background: rgba(var(--ink-rgb), .08); color: var(--ink); }
+.bhead__more[open] > summary svg { transform: rotate(180deg); }
 .bhead__menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 6; display: grid; min-width: 160px; padding: var(--sp-1); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); }
 .bhead__menu button { padding: var(--sp-2) var(--sp-3); border: 0; border-radius: 8px; background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); text-align: left; cursor: pointer; }
 .bhead__menu button:hover { background: rgba(var(--ink-rgb), .06); }
@@ -67,6 +66,11 @@
 .col { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-4); padding: var(--sp-4); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
 .col hr { border: 0; border-top: var(--rule); margin: 0; width: 100%; }
 .col h3 { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+/* the right side: the player's view on top, its own panel that never scrolls; the piece's settings under it, the rest of the height */
+.bside { min-height: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+.bside > aside { flex: 1; }
+.col--still { flex: none; overflow: visible; }
+.nothing b { display: block; margin-bottom: 4px; color: var(--ink); }
 
 /* the palette: the world's pieces by what they do, under the world's colour; each piece one row, the game's own picture of
    it beside its name and what it does, its looks (a piece of several) under it; groups that fold */
@@ -556,4 +560,4 @@ button.issue__why:hover { text-decoration-style: solid; }
 .pview__big::backdrop { background: var(--dim); }
 .pview__big canvas { display: block; width: 100%; aspect-ratio: 16 / 10; max-height: calc(92dvh - 96px); border-radius: 14px; background: #3f9a72; }
 .pview__big form { display: flex; justify-content: flex-end; margin-top: var(--sp-3); }
-@media (max-width: 1099px) { .pview { display: none; } }
+@media (max-width: 1099px) { .col--still { display: none; } }
