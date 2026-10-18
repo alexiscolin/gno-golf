@@ -324,14 +324,25 @@ function Retry({ onRetry }: { onRetry: () => void }) {
   return <p className="banner__retry" aria-live="polite">Trying again in {Math.max(0, left)} s…</p>;
 }
 
-/** A word over the course for a moment. Taken away by a timer, not by its animation: with reduced motion there is none. */
+/** Whether a dialog is open over the page (an order, a receipt, the menu): its words are never under a toast. */
+const dialogOpen = () => !!document.querySelector('[aria-modal="true"]');
+/** A word over the course for a moment. Taken away by a timer, not by its animation: with reduced motion there is none.
+ *  News (center: not about the shot, e.g. a card filled from the chain) waits while a dialog is open, then has its whole time. */
 function Toast({ text, onDone, ms = 3200, center }: { text: string; onDone: () => void; ms?: number; center?: boolean }) {
   const done = useRef(onDone);
   done.current = onDone;
+  const [held, setHeld] = useState(() => !!center && dialogOpen());
   useEffect(() => {
+    if (!center) return;
+    const t = setInterval(() => setHeld(dialogOpen()), 250);
+    return () => clearInterval(t);
+  }, [center]);
+  useEffect(() => {
+    if (held) return;
     const t = setTimeout(() => done.current(), ms);
     return () => clearTimeout(t);
-  }, [ms]);
+  }, [ms, held]);
+  if (held) return null;
   return <div className={center ? "toast toast--center" : "toast"} role="status" style={ms !== 3200 ? { animationDuration: `${ms}ms` } : undefined}>{text}</div>;
 }
 
