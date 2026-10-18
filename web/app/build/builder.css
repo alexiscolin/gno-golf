@@ -465,7 +465,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the first run's hints: three short notes by the palette, Play and the steps, gone at the first drag */
 .bhints { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 .bhint { position: absolute; display: flex; align-items: center; gap: var(--sp-2); max-width: 260px; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); font-size: 15px; font-weight: 700; color: var(--ink); }
-.bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--gold); font-size: 13px; }
+.bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; } /* (as About's steps) */
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Play's at the board's top right, under the
    steps'; the palette's lower, by its tiles; the pointer through them all (gone at the first drag) */
 .bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
@@ -547,13 +547,13 @@ button.issue__why:hover { text-decoration-style: solid; }
 .insp__fine summary { font-size: 13px; }
 
 /* the player's view (PlayerView.tsx): under the inspector, the hole from the tee; large in a dialog on a click; not on a narrow screen */
-.pview { display: grid; gap: var(--sp-2); justify-self: end; width: min(176px, 100%); }
+.pview { display: grid; gap: var(--sp-2); }
 .pview .pill { height: 22px; padding: 0 var(--sp-2); font-size: 11px; }
 .pview .pill kbd { margin-left: 4px; padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; font: inherit; font-family: var(--mono); }
-.pview__pic { display: block; width: 100%; margin: 0; padding: 0; cursor: zoom-in; }
+.pview__pic { display: block; width: 100%; margin: 0; padding: 0; font: inherit; cursor: zoom-in; }
 .pview__pic:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .pview__big { width: min(92vw, 1040px); max-height: 92dvh; padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
-.pview__big::backdrop { background: rgba(0, 0, 0, .45); }
+.pview__big::backdrop { background: var(--dim); }
 .pview__big canvas { display: block; width: 100%; aspect-ratio: 16 / 10; max-height: calc(92dvh - 96px); border-radius: 14px; background: #3f9a72; }
 .pview__big form { display: flex; justify-content: flex-end; margin-top: var(--sp-3); }
 @media (max-width: 1099px) { .pview { display: none; } }
