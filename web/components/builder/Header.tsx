@@ -68,9 +68,9 @@ function More({ world, worlds, onWorld }: { world: string; worlds: readonly stri
         {worldName(world)}
         <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </summary>
-      <div className="bhead__menu" role="group" aria-label="The hole's world">
+      <div className="resets__menu bhead__menu" role="group" aria-label="The hole's world">
         {worlds.map((w) => (
-          <button key={w} type="button" data-world={w} aria-pressed={w === world} onClick={() => ((menu.current!.open = false), w !== world && onWorld(w))}>{worldName(w)}</button>
+          <Button key={w} size="s" type="button" data-world={w} aria-pressed={w === world} onClick={() => ((menu.current!.open = false), w !== world && onWorld(w))}>{worldName(w)}</Button>
         ))}
       </div>
     </details>
@@ -80,7 +80,7 @@ function More({ world, worlds, onWorld }: { world: string; worlds: readonly stri
 export default function Header({ title, world, worlds = [], step, steps, action, history, meter, lineOn = false, bump, onLine, onTitle, onWorld, onStep, onBack, onHelp, onRoll }: {
   title: string;
   world: string;
-  /** the worlds the hole may move to (the "…" menu, in Build only) */
+  /** the worlds the hole may move to (the world menu, in Build only) */
   worlds?: readonly string[];
   step: Step;
   steps: Record<Step, StepState>;
@@ -106,6 +106,7 @@ export default function Header({ title, world, worlds = [], step, steps, action,
   const waits = !!action?.off && action.off !== CHECKING;
   return (
     <header className="bhead">
+      <h1 className="sr-only">The Builder</h1>
       <div className="bhead__start">
         <Button variant="icon" size="m" type="button" aria-label="Back to your holes (the draft is kept)" title="Back to your holes" onClick={onBack}>
           <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>

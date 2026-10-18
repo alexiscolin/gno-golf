@@ -26,7 +26,6 @@
 .galbum { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); background: var(--paper); border: var(--edge); border-radius: var(--r-card); min-width: 0; }
 .galbum__head, .galbum__rank { text-align: left; }
 .galbum__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); }
-.galbum__head h2 { margin: 0; font-size: 18px; }
 .galbum__rank { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .galbum__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
 .galbum__row > summary { text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name count" "track track"; gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0; cursor: pointer; list-style: none; font-weight: 700; font-size: 14px; }
@@ -60,8 +59,7 @@
 .galbum--fold { display: block; }
 .galbum--fold > summary { list-style: none; cursor: pointer; }
 .galbum--fold > summary::-webkit-details-marker { display: none; }
-.galbum--fold > summary h2::after { content: " ▸"; font-size: .8em; }
-.galbum--fold[open] > summary h2::after { content: " ▾"; }
-.galbum--fold > summary:focus-visible { outline: var(--ring); outline-offset: 4px; border-radius: 8px; }
+.galbum--fold > summary h3::after { content: " ▸"; font-size: .8em; }
+.galbum--fold[open] > summary h3::after { content: " ▾"; }
 .galbum--fold[open] > * + * { margin-top: 10px; }
 @media (max-width: 600px) { .galbum { padding: 10px 12px; } .galbum__slots { grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 5px; } }

@@ -26,7 +26,7 @@ export const ShopPitch = () => <p className="shop__pitch">{SHOP_HEAD.pitch}</p>;
 export const BlankShelf = ({ n = 12 }: { n?: number }) => <ul className="gshelf" aria-busy="true">{Array.from({ length: n }, (_, i) => <li key={i}><BlankCard /></li>)}</ul>;
 /** The sale's card while it is read: its room, blank (its height fixed: app/gnomes.css .wcard), with its closing line's
  *  (closes) where a date is set, or while it is not known (lib/gnomes/shop.ts closingSlot: anything but "none"). */
-export const SaleSlot = ({ closes }: { closes: boolean }) => <div className={`wcard wcard--skel${closes ? " wcard--closes" : ""}`} aria-hidden="true" />;
+export const SaleSlot = ({ closes }: { closes: boolean }) => <div className={`wcard${closes ? " wcard--closes" : ""}`} aria-hidden="true" />;
 /** The toolbar while it is read: its rows' room, blank (their heights fixed: app/gnomes.css .gbar). */
 export const BarSlot = () => <div className="gbar gbar--skel" aria-hidden="true" />;
 

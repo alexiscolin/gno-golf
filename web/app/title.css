@@ -435,8 +435,8 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: calc(var(--chip-room) 
 .rival .lb { margin-top: 8px; text-align: left; }
 /* the heading says what the board is; players with no name have no Race here */
 .rival .lb--full > h3, .rival .unnamed { display: none; }
-/* a section's heading on these screens: a friend's bar's, the board's */
-.rival__h { margin: 0; font-size: 20px; font-weight: 700; white-space: nowrap; }
+/* a section's heading on these screens (.h-section, globals.css): a friend's bar's, the board's, on one line */
+.rival__h { white-space: nowrap; }
 /* a friend, first: one paper bar, its heading and (i), the field and Race; what went wrong under them, in it */
 .rival__friend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; width: min(100%, 720px); padding: 6px 6px 6px 20px; background: var(--paper); border: var(--edge-bold); border-radius: var(--r-card); }
 .rival__friend > .tip { margin: 0 -6px 0 -10px; }
@@ -576,7 +576,6 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .rival__friend .rival__go { padding: 4px 14px; font-size: 16px; }
   .rival__friend > .tip { order: 1; margin: 0 -4px 0 -6px; }
   .rival__friend .note { order: 2; margin: 0 4px 4px; }
-  .rival__h { font-size: 17px; }
 }
 /* their ghosts: all the cups in one frame (the board's own, globals.css), the
    screen's all; each cup a band in its colours as its card on the cups'

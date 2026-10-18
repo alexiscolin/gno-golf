@@ -141,7 +141,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
     <FrontScreen className="front--fit modes" inner="rival" back="Back to the games" onBack={onBack} onAbout={onAbout} eyebrow="Choose your rival" title="Who do we race?">
       {/* someone you know, typed, first; then three picked for you; then anyone on the board, in the one frame that scrolls */}
       <section className="rival__friend">
-        <h3 className="rival__h">Race a friend</h3>
+        <h3 className="h-section rival__h">Race a friend</h3>
         <InfoTip label="How do I get it?" note="Their gno.land name or address. Ask them for it, or for their dare link: it opens the duel straight away, nothing to type." />
         <form className="friends__add" onSubmit={(e) => void go(e)}>
           <input value={typed} onChange={(e) => (setTyped(e.target.value), setNote(""))} placeholder="A friend: nym-… or g1…" aria-label="Your friend's gno.land name or address" />
@@ -159,7 +159,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
       {/* (a board with nobody keeps its blank stickers and says so: nothing moves once it is read) */}
       <section className="rival__board">
         <div className="rival__boardhead">
-          <h3 className="rival__h">Or anyone who played</h3>
+          <h3 className="h-section rival__h">Or anyone who played</h3>
           <span className="rival__links">
             {/* (there, not pressable, while the board is read or has nobody: the links beside it do not move) */}
             {(!picks || !picks.rows[0] || picks.surprise) && <button className="linkish rival__all rival__surprise" disabled={!picks?.surprise} onClick={() => picks?.surprise && (sound("select"), onPick(picks.surprise.player, undefined, "surprise"))}><Dice /> Surprise me</button>}

@@ -266,6 +266,23 @@ html, body {
   color: var(--ink-soft);
 }
 
+/* the headings, one scale for the game's screens, the shop and the Builder:
+   a page's title is a front screen's (About.tsx FrontHead: the outlined
+   .worlds__title; h1 on a page of its own, h2 on a screen of the game, whose
+   page's h1 is its own, off screen: app/intro.tsx); a sheet's, its h2 (.sheet
+   h2); a section's on a screen (.h-section: "Or anyone who played", "Your
+   holes"), sentence case, bold; what groups a few things under it, or heads a
+   panel (.h-sub: "Start from a template", the piece selected, a Builder
+   panel's ink band: builder.css .col__head); a label over a group
+   (.eyebrow, above), small caps */
+:root { --fs-section: 20px; --fs-sub: 15px; }
+@media (max-width: 600px) { :root { --fs-section: 17px; } }
+.h-section, .h-sub { margin: 0; font-weight: 700; line-height: 1.2; color: var(--ink); }
+.h-section { font-size: var(--fs-section); }
+.h-sub { font-size: var(--fs-sub); }
+/* said to a screen reader only (the Builder's page title: its name is a field) */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
 /* inked display text: paper, a thick ink outline, standing on its drop. The
    one recipe; each piece sets only its size, --ink-w and --ink-drop (at no
    weight: a piece's own rules win) */
@@ -1035,7 +1052,7 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
    and that shadow, even on every side; anything else, an outline on an ink
    rim. Fields show it on their own frame. */
 /* (in :where, the plain default: any control's own rule wins over it) */
-:where(button, a, summary, [tabindex]:not([tabindex="-1"])):where(:not(.btn, .burger, .adena, .round, .share__icon)):focus-visible { outline: var(--ring); outline-offset: 2px; box-shadow: 0 0 0 2px var(--ink); }
+:where(button, a, summary, input:is([type="checkbox"], [type="range"]), [tabindex]:not([tabindex="-1"])):where(:not(.btn, .burger, .adena, .round, .share__icon)):focus-visible { outline: var(--ring); outline-offset: 2px; box-shadow: 0 0 0 2px var(--ink); }
 :is(.btn, .burger, .adena, .round, .share__icon):focus-visible { outline: none; }
 /* a link in a line: a highlighter's stroke under it, not a box round it */
 :is(.linkish, p a, li a):not(.btn):focus-visible { outline: none; border-radius: 6px; background: color-mix(in srgb, var(--gold) 60%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 60%, transparent); }
@@ -1920,7 +1937,8 @@ body:has(.netbanner) .screen.worlds { padding-bottom: var(--chip-room); } /* the
 /* a text field: the friend to add, the gnokey key's name */
 .friends__add input, .gnokey__key, .feedback__text { min-width: 0; min-height: 48px; padding: 0 12px; border-radius: 12px; border: var(--edge); font: inherit; font-size: 14px; background: var(--white); color: var(--ink); }
 /* the ring drawn as the field's own border: an outline beside the ink border reads as two frames */
-.friends__add input:focus-visible, .gnokey__key:focus-visible, .feedback__text:focus-visible, .nameform__field:focus-within { outline: none; border-color: var(--ink); box-shadow: var(--ring-shadow); }
+.friends__add input:focus-visible, .gnokey__key:focus-visible, .feedback__text:focus-visible, .nameform__field:focus-within, .gsearch:focus-within,
+:is(.bhead__name, .bholes__hole, .tmode__addr, .pub__field) :is(input, textarea):focus-visible { outline: none; border-color: var(--ink); box-shadow: var(--ring-shadow); }
 .friends__add input { flex: 1; }
 .feedback__text { padding: 10px 12px; resize: vertical; }
 .friends__list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; font-size: 13px; }

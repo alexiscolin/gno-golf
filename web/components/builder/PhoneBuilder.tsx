@@ -11,7 +11,7 @@ import "@/app/title.css";
 import "@/app/build/phone.css";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BackButton } from "@/components/About";
+import { BackButton, FrontHead } from "@/components/About";
 import { useCopied } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
 import { Button } from "@/components/ui";
@@ -65,20 +65,17 @@ export default function PhoneBuilder() {
     <div className="screen worlds front bphone tint--garden">
       <BackButton label="Back to the game" onClick={() => goToMenu(router, keep)} />
       <div className="worlds__in bphone__in">
-        <div className="front__head">
-          <span className="eyebrow">The Builder</span>
-          <h2 className="worlds__title">For a computer</h2>
-        </div>
+        <FrontHead eyebrow="The Builder" title="For a computer" h1 />
         <p className="bphone__lead">Drawing a hole takes a mouse and a keyboard. Playing them works right here.</p>
         <Button variant="primary" className="btn--wide" onClick={() => void copy(window.location.href)}>{copied ? "Copied: open it on your computer" : "Copy the link for my computer"}</Button>
         {mine.length > 0 && (
           <section className="bphone__list" aria-label="Your holes">
-            <h3>Your holes</h3>
+            <h2 className="h-section">Your holes</h2>
             <ul>{mine.map(mineRow)}</ul>
           </section>
         )}
         <section className="bphone__list" aria-label="Community holes">
-          <h3>Community holes</h3>
+          <h2 className="h-section">Community holes</h2>
           {failed ? <p className="bphone__note" role="status">The holes can&apos;t be read right now. Try again in a moment.</p>
             : !lists ? <ul aria-busy="true">{[0, 1, 2].map((k) => <li key={k} className="bphone__row skel" />)}</ul>
             : !community.length ? <p className="bphone__note">None checked on this device yet.</p>

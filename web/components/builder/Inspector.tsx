@@ -140,7 +140,7 @@ export default function Inspector({ draft, piece, quick, full, playing, onPlay, 
   const unit = c.k === "substep" ? "substeps" : "strokes";
   return (
     <div className="insp">
-      <div className="insp__head">{entryName(ent)}</div>
+      <h3 className="h-sub">{entryName(ent)}</h3>
       <div className="insp__acts">
         {/* (a round piece: off, the reason its title, as R says it) */}
         <Button size="s" type="button" keycap="R" aria-disabled={notTurned(p, draft.tee) ? true : undefined} title={notTurned(p, draft.tee) || "Turn it a quarter (R)"} onClick={onTurn}>Turn</Button>
@@ -176,16 +176,16 @@ export default function Inspector({ draft, piece, quick, full, playing, onPlay, 
           leaves the way, its cycle playing as it plays on the board; the numbers under Fine */}
       {ent.clocks.length > 1 && (
         <div className="range"><span>Timing</span>
-          <Segmented className="seg--s insp__clock" label="When it is there" value={c.k} options={ent.clocks.map((k) => [k, CLOCKS[k]] as const)} onChange={(k) => setDraft(withClock(draft, p.id, k, ent))} />
+          <Segmented className="seg--s" label="When it is there" value={c.k} options={ent.clocks.map((k) => [k, CLOCKS[k]] as const)} onChange={(k) => setDraft(withClock(draft, p.id, k, ent))} />
         </div>
       )}
       {c.k === "substep" && (
         <>
           <div className="range"><span>Blinks</span>
-            <Segmented<Speed | ""> className="seg--s insp__blink" label="How fast it blinks" value={blinkOf(c).speed ?? ""} options={SPEEDS} onChange={(v) => v && setDraft(withBlink(draft, p.id, { speed: v }))} />
+            <Segmented<Speed | ""> className="seg--s" label="How fast it blinks" value={blinkOf(c).speed ?? ""} options={SPEEDS} onChange={(v) => v && setDraft(withBlink(draft, p.id, { speed: v }))} />
           </div>
           <div className="range"><span>Open</span>
-            <Segmented<Open | ""> className="seg--s insp__open" label="How much of the time the way is open" value={blinkOf(c).open ?? ""} options={OPENS} onChange={(v) => v && setDraft(withBlink(draft, p.id, { open: v }))} />
+            <Segmented<Open | ""> className="seg--s" label="How much of the time the way is open" value={blinkOf(c).open ?? ""} options={OPENS} onChange={(v) => v && setDraft(withBlink(draft, p.id, { open: v }))} />
             <small>{blinkOf(c).open ? `the way open ${blinkOf(c).open} of the time` : `the way open ${Math.round((1 - c.on / c.every) * 100)}% of the time`}</small>
           </div>
         </>

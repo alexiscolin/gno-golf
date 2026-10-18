@@ -42,7 +42,7 @@ export default function Album({ cat, owned, given = null, chain, player, mine, o
   const toggle = (key: string, on: boolean) => setOpen((s) => (on === s.has(key) ? s : new Set(on ? [...s, key] : [...s].filter((k) => k !== key))));
   const head = (
     <div className="galbum__head">
-      <h2>{mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}</h2>
+      <h3 className="h-section">{mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}</h3>
       <Collector chain={chain} player={player} full />
     </div>
   );

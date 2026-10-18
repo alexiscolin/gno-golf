@@ -15,7 +15,7 @@ import { BackButton, FrontHead } from "@/components/About";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
 import { Emblem } from "@/components/Worlds";
-import { Button, Sheet } from "@/components/ui";
+import { Button, Segmented, Sheet } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import { gnomeById } from "@/lib/scene";
 import { exportDraft, type Draft } from "@/lib/builder/draft";
@@ -95,21 +95,15 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   const fresh = (
     <section className="bholes__new" aria-labelledby="bholes-new">
       <div className="bholes__bar">
-        <h2 id="bholes-new" className="bholes__h">Start a new hole</h2>
-        {/* the worlds as tabs, each in its colours with its emblem (the cups' own) */}
-        <div className="bholes__worlds" role="radiogroup" aria-label="Its world">
-          {WORLDS.map((w) => (
-            <button key={w} type="button" role="radio" aria-checked={w === world} className={`bholes__world tint--${w}${w === world ? " on" : ""}`} onClick={() => setWorld(w)}>
-              <Emblem id={w} />{worldName(w)}
-            </button>
-          ))}
-        </div>
+        <h2 id="bholes-new" className="h-section">Start a new hole</h2>
+        {/* the worlds as the game's choices side by side, each with its emblem (the cups' own) */}
+        <Segmented label="Its world" className="bholes__worlds" options={WORLDS.map((w) => [w, <><Emblem id={w} />{worldName(w)}</>] as const)} value={world} onChange={setWorld} />
       </div>
       {/* the starters are templates, ready-made holes to change; the blank lane one card of the same row, under its own label */}
       <div className="bholes__starts">
         {([["Start from a template", false], ["Or start blank", true]] as const).map(([label, blank]) => (
           <section key={label} className={`bholes__set${blank ? " bholes__set--blank" : ""}`} aria-label={label}>
-            <h3 className="bholes__group">{label}</h3>
+            <h3 className="h-sub bholes__group">{label}</h3>
             <ul>
               {starts.filter((s) => s.blank === blank).map((s) => (
                 <li key={s.name}>
@@ -119,7 +113,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                     <span className="bholes__line">{s.line}</span>
                     <span className="bholes__foot" aria-hidden="true">
                       <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
-                      <span className="bholes__go">Start <i>→</i></span>
+                      <span className={buttonClass({ variant: "gold", size: "s" }, "bholes__go")}>Start <i>→</i></span>
                     </span>
                   </button>
                 </li>
@@ -132,7 +126,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   );
   const mine = (
     <section className="bholes__mine" aria-labelledby="bholes-mine">
-      <h2 id="bholes-mine" className="bholes__h">Your holes {any && <small>{count}</small>}</h2>
+      <h2 id="bholes-mine" className="h-section bholes__h">Your holes {any && <small>{count}</small>}</h2>
       {got && author && got.rows.length > 0 && <BuilderBadges facts={factsOf(got.rows, got.saved, author)} />}
       {any ? (
         <ul className="bholes__list">

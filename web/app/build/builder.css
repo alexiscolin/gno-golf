@@ -6,8 +6,6 @@
    themselves (no chaining); the board takes the wheel, the pinch and the
    drag (touch-action: none). */
 
-.bench, .bholes, .tbench, .pbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; }
-
 .bench { --palette-w: 212px; --col-w: 292px; position: fixed; inset: 0; display: grid; grid-template: 44px minmax(0, 1fr) / var(--palette-w) minmax(0, 1fr) var(--col-w); gap: var(--sp-5) var(--sp-4); padding: var(--sp-4) max(var(--sp-4), env(safe-area-inset-right)) var(--sp-4) max(var(--sp-4), env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: none; font-family: var(--font); color: var(--ink); background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0, var(--paper)); }
 @media (min-width: 1280px) { .bench { --palette-w: 240px; } }
 @media (min-width: 1400px) { .bench { --palette-w: 256px; --col-w: 332px; grid-template-columns: var(--palette-w) minmax(0, 1fr) var(--col-w); } }
@@ -32,15 +30,13 @@
 @media (max-width: 1100px) { .bhead__end { gap: var(--sp-2); } }
 /* Play keeps its width as the reason beside it changes */
 .bhead__act { min-width: 104px; }
-/* the world menu (a small button saying the world, its caret turned while open): the hole moved to another from here (the one it is in ticked) */
+/* the world menu (a small button saying the world, its caret turned while open): the hole moved to another from here (the
+   one it is in gold), the game's menu (globals.css .resets__menu) opening under the button's start */
 .bhead__more { position: relative; flex: none; }
 .bhead__more > summary { list-style: none; gap: 6px; white-space: nowrap; }
 .bhead__more > summary::-webkit-details-marker { display: none; }
 .bhead__more[open] > summary svg { transform: rotate(180deg); }
-.bhead__menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 6; display: grid; min-width: 160px; padding: var(--sp-1); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); }
-.bhead__menu button { padding: var(--sp-2) var(--sp-3); border: 0; border-radius: 8px; background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); text-align: left; cursor: pointer; }
-.bhead__menu button:hover { background: rgba(var(--ink-rgb), .06); }
-.bhead__menu button[aria-pressed="true"]::after { content: " ✓"; color: var(--green); }
+.bhead__menu { left: 0; right: auto; z-index: 6; min-width: 160px; }
 
 /* the steps: Edit, Test, Publish; done green, the current gold, the next open or locked with its reason */
 .stepper { justify-self: center; display: flex; align-items: center; gap: var(--sp-1); height: 40px; margin: 0; padding: 2px; list-style: none; border: var(--edge); border-radius: var(--pill); background: var(--paper); }
@@ -65,7 +61,6 @@
 /* ------------------------------------------------------------ a column: a paper panel that scrolls in itself */
 .col { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-4); padding: var(--sp-4); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
 .col hr { border: 0; border-top: var(--rule); margin: 0; width: 100%; }
-.col h3 { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
 /* the right side: the player's view on top, its own panel that never scrolls; the piece's settings under it, the rest of the height */
 .bside { min-height: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
 .bside > aside { flex: 1; }
@@ -75,11 +70,12 @@
 /* the palette: the world's pieces by what they do, under the world's colour; each piece one row, the game's own picture of
    it beside its name and what it does, its looks (a piece of several) under it; groups that fold */
 .palette { gap: var(--sp-4); }
-/* a panel's head (the palette's, the player's view's, the piece's settings'): ink, the world's colour its edge */
-.col__head { display: flex; align-items: center; gap: var(--sp-2); margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0; padding: var(--sp-2) var(--sp-4); border-radius: 18px 18px 0 0; background: var(--ink); box-shadow: inset 0 -6px 0 var(--c2, var(--green)); color: var(--paper); font-size: 15px; font-weight: 700; }
+/* a panel's head (the palette's, the player's view's, the piece's settings': an h2 under the page's): ink, the world's colour
+   its edge, its words a group's title (globals.css .h-sub) */
+.col__head { display: flex; align-items: center; gap: var(--sp-2); margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0; padding: var(--sp-2) var(--sp-4); border-radius: 18px 18px 0 0; background: var(--ink); box-shadow: inset 0 -6px 0 var(--c2, var(--green)); color: var(--paper); font-size: var(--fs-sub); font-weight: 700; line-height: 1.2; }
 .palette__group { display: grid; gap: var(--sp-3); }
 .palette__group + .palette__group { margin-top: var(--sp-5); }
-.palette__group > summary { cursor: pointer; width: max-content; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.palette__group > summary { display: list-item; cursor: pointer; width: max-content; } /* (its label the game's: .eyebrow) */
 .ptiles { display: grid; gap: var(--sp-3); --pic: 52px; }
 @media (min-width: 1280px) { .ptiles { --pic: 60px; } }
 /* a piece's card: its row, and its looks' tray under a hairline */
@@ -98,7 +94,8 @@
 .look[aria-pressed="true"] { background: var(--gold); outline: 3px solid var(--gold); outline-offset: 1px; }
 .look:disabled { opacity: .45; cursor: not-allowed; }
 .palette__more { display: grid; gap: var(--sp-3); }
-.palette__more > summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+/* what opens in place (More pieces, Details, Open a file, gnokey): a dashed link, the game's (.linkish) at the panel's size */
+:is(.palette__more, .bholes__more, .insp__details, .pub__gnokey) > summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
 .palette__more[open] > summary { margin-bottom: var(--sp-3); }
 /* "From other worlds" under the world's own, a rule between them */
 .palette__more + .palette__more { padding-top: var(--sp-4); border-top: var(--rule); }
@@ -179,8 +176,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .preview .pill { position: absolute; left: var(--sp-2); top: var(--sp-2); display: inline-flex; align-items: center; height: 26px; padding: 0 var(--sp-3); border-radius: var(--pill); background: rgba(var(--paper-rgb), .95); border: var(--info-edge); font-size: 12px; font-weight: 700; }
 .insp { display: grid; gap: var(--sp-4); }
-.insp__head { display: flex; align-items: center; gap: var(--sp-2); font-size: 17px; font-weight: 700; }
-.insp__head small { margin-left: auto; font-size: 13px; color: var(--ink-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
 /* a setting: its label, slider and value on one grid (the same columns row after row), its range under the slider in small type */
 .range { display: grid; grid-template-columns: 64px minmax(0, 1fr) 52px; gap: 2px 10px; align-items: center; font-size: 13px; font-weight: 700; }
 .range input[type="range"] { width: 100%; margin: 0; accent-color: var(--green); }
@@ -206,8 +201,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* a window too narrow for the column beside the corner's Back: the column starts under it */
 @media (max-width: 1240px) { .screen.bholes { padding-top: 76px; } }
 .bholes__in { width: min(1040px, 100%); margin: 0 auto; justify-items: stretch; gap: var(--sp-5); padding: 0 var(--sp-5) var(--sp-5); text-align: left; }
-.bholes__h { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
-.bholes__h small { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; letter-spacing: 0; }
+/* a section's title (.h-section), its count in an ink pill beside it */
+.bholes__h { display: flex; align-items: center; gap: var(--sp-2); }
+.bholes__h small { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; }
 
 /* the workshop's sign: a blueprint (the build emblem's), the Miner out of his disc on its left, its words, its three steps */
 /* the blueprint (the build emblem's): the sign's paper, and the blank lane's picture */
@@ -233,20 +229,16 @@ button.issue__why:hover { text-decoration-style: solid; }
 .front .bholes__say .worlds__title { font-size: var(--fs-fit); }
 .bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
 
-/* a new hole: its world as tabs (each its emblem and colours), its starters as cards */
+/* a new hole: its world as the game's choices (Segmented, each its emblem), its starters as cards */
 .bholes__new { display: grid; gap: var(--sp-4); }
 .bholes__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
-.bholes__worlds { display: flex; gap: var(--sp-2); padding: 4px; border: var(--edge); border-radius: var(--pill); background: var(--paper); }
-.bholes__world { display: inline-flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-4) 0 4px; border: 0; border-radius: var(--pill); background: none; font: inherit; font-size: 15px; font-weight: 700; color: var(--ink); cursor: pointer; }
-.bholes__world svg { width: 32px; height: 32px; }
-.bholes__world:hover:not(.on) { background: color-mix(in srgb, var(--c1) 35%, var(--paper)); }
-.bholes__world.on { background: var(--gold); color: var(--ink); } /* (selected: the one look, globals.css) */
-.bholes__world:focus-visible { outline: var(--ring); outline-offset: 2px; }
+.bholes__worlds button { flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 4px var(--sp-4) 4px var(--sp-2); white-space: nowrap; }
+.bholes__worlds svg { width: 32px; height: 32px; }
 /* the starts: the templates under their label, the blank lane under its own, every card one column of the same four */
 .bholes__starts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--sp-5); row-gap: var(--sp-3); }
 .bholes__set { display: grid; grid-column: span 3; grid-template-columns: subgrid; grid-template-rows: subgrid; grid-row: span 2; }
 .bholes__set--blank { grid-column: span 1; }
-.bholes__group { grid-column: 1 / -1; margin: 0; font-size: 14px; font-weight: 800; color: var(--ink-soft); }
+.bholes__group { grid-column: 1 / -1; }
 .bholes__set ul { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; margin: 0; padding: 0; list-style: none; }
 .bholes__start {
   display: grid; grid-template-rows: auto auto 1fr auto; justify-items: start; gap: 4px; width: 100%; height: 100%; padding: 0 0 var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card);
@@ -263,7 +255,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__start--blank .bholes__map { background: var(--blueprint); }
 .bholes__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); width: 100%; padding: var(--sp-1) var(--sp-3) 0; }
 .bholes__par { padding: 2px 10px; border: 2px solid var(--ink); border-radius: var(--pill); font-size: 13px; font-weight: 800; }
-.bholes__go { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border: var(--edge); border-radius: var(--pill); background: var(--gold-grad); font-size: 14px; font-weight: 800; }
+/* Start, a small gold button's look (the whole card is the button) */
 .bholes__go i { font-style: normal; transition: transform .2s; }
 .bholes__start:hover .bholes__go i { transform: translateX(3px); }
 
@@ -317,7 +309,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 }
 .bholes__none { margin: 0; padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .3); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .7); font-size: 15px; font-weight: 600; text-align: center; }
 .bholes__more { width: 100%; text-align: left; }
-.bholes__more summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
 .bholes__open { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
 .bholes__open .btn { margin: 0; }
 .bholes__hole { display: flex; flex: 1; min-width: 240px; gap: var(--sp-2); }
@@ -427,7 +418,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 .pub__bill dd { margin: 0; text-align: right; }
 .pub__beat { font-weight: 800; color: var(--green); }
 .pub__field b { font-size: 17px; overflow-wrap: anywhere; }
-.pub__gnokey summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
 .pub__gnokey pre { max-height: 160px; overflow: auto; overscroll-behavior: contain; padding: var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
 .pub__row { display: flex; gap: var(--sp-2); }
 .pub__row .btn { margin: 0; }
@@ -437,7 +427,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* its looks: a row of the game's pictures, the one it has gold (the next placed takes the last chosen) */
 .insp__looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: var(--sp-2); }
 .insp__details { display: grid; gap: 10px; }
-.insp__details summary { cursor: pointer; width: max-content; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.insp__details > summary { width: max-content; }
 
 /* the big button's reason, in a few words, in a slot of its own width */
 .bhead__slot { flex: none; display: flex; justify-content: flex-end; width: 118px; }
@@ -469,7 +459,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .meter--none { color: var(--ink-soft); }
 
 /* the first run's hints: three short notes by the palette, Play and the steps, gone at the first drag */
-.bhints { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+.bhints { position: fixed; inset: 0; z-index: 4; pointer-events: none; } /* (under a sheet: the player's view large) */
 .bhint { position: absolute; display: flex; align-items: center; gap: var(--sp-2); max-width: 260px; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); font-size: 15px; font-weight: 700; color: var(--ink); }
 .bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; } /* (as About's steps) */
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Play's at the board's top right, under the
@@ -486,7 +476,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bgloss .bgloss__keys { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 600; line-height: 1.7; color: var(--ink); }
 .bgloss__keys kbd { font: inherit; font-weight: 800; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
 .board--pan, .board--pan * { cursor: grab !important; }
-.bgloss h2 { margin: var(--sp-2) 0 0; font-size: 15px; }
+.bgloss h2 { margin: var(--sp-2) 0 0; font-size: var(--fs-sub); } /* (a group's title in the sheet: .h-sub's size) */
 .bgloss ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--sp-2) var(--sp-3); }
 .bgloss__piece { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .bgloss__piece img { flex: none; border-radius: 10px; background: #4f8a6b; }
@@ -550,16 +540,15 @@ button.issue__why:hover { text-decoration-style: solid; }
 .cycle__row .cycle { flex: 1; margin-left: 0; }
 .cycle__row .btn--icon { font-size: 11px; }
 .cycle i.now { outline: 2px solid var(--ink); outline-offset: 1px; }
-.insp__fine summary { font-size: 13px; }
+.insp__fine > summary { font-size: 13px; }
 
-/* the player's view (PlayerView.tsx): under the inspector, the hole from the tee; large in a dialog on a click; not on a narrow screen */
+/* the player's view (PlayerView.tsx): on top of the right side, the hole from the tee; large in the game's sheet on a click (ui.tsx
+   Sheet: its dim, its X, its title beside the X), wider; not on a narrow screen */
 .pview { display: grid; gap: var(--sp-2); }
 .pview__say { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-soft); }
 .pview__say kbd { padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; font: inherit; font-family: var(--mono); color: var(--ink); }
 .pview__pic { display: block; width: 100%; margin: 0; padding: 0; font: inherit; cursor: zoom-in; }
-.pview__pic:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
-.pview__big { width: min(92vw, 1040px); max-height: 92dvh; padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
-.pview__big::backdrop { background: var(--dim); }
-.pview__big canvas { display: block; width: 100%; aspect-ratio: 16 / 10; max-height: calc(92dvh - 96px); border-radius: 14px; background: #3f9a72; }
-.pview__big form { display: flex; justify-content: flex-end; margin-top: var(--sp-3); }
+.pview__big.sheet__in { display: grid; gap: var(--sp-3); width: min(92vw, 1040px); max-width: none; max-height: 92dvh; padding: 22px var(--sp-5) var(--sp-5); }
+.pview__big h2 { margin: 0 52px 0 0; }
+.pview__big canvas { display: block; width: 100%; aspect-ratio: 16 / 10; max-height: calc(92dvh - 120px); border: var(--edge); border-radius: 14px; background: #3f9a72; }
 @media (max-width: 1099px) { .col--still { display: none; } }

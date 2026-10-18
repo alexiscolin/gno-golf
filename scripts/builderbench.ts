@@ -232,14 +232,14 @@ await builtIn(c, "island", islandBuilds + offline.built).catch(() => null);
 await settled(c, `window.__builds`, "the island's build", 800);
 const world = { ...offline, builtAgain: (await builds()) - islandBuilds - offline.built };
 
-// the player's view large (its dialog): its picture of the dialog canvas's own size, not the board's, stretched
+// the player's view large (its sheet): its picture of the sheet canvas's own size, not the board's, stretched
 await c.js(`document.querySelector(".pview__pic").click()`);
 const e1 = await eyes();
-await waitFor(c, `document.querySelector(".pview__big")?.open && (window.__eyes ?? 0) > ${e1 - 1}`, "the player's view large");
+await waitFor(c, `document.querySelector(".pview__big") && (window.__eyes ?? 0) > ${e1 - 1}`, "the player's view large");
 await settled(c, `window.__eyes`, "the large view painted", 600);
 const large = await c.js<{ css: number; px: number; dpr: number }>(`(() => { const e = document.querySelector(".pview__big canvas"); return { css: e.clientWidth, px: e.width, dpr: devicePixelRatio }; })()`);
-await c.js(`document.querySelector(".pview__big form button").click()`);
-await until(`!document.querySelector(".pview__big")?.open`, "the large view closed");
+await c.js(`document.querySelector(".pview__big .sheet__close").click()`);
+await until(`!document.querySelector(".pview__big")`, "the large view closed");
 let lent = { renders: 0, frames: 0, shape: 0, window: 0 }, testLost = { said: false, unsaid: false };
 // round the worlds and back: each built with its own scenery (Scene's ?camlog __scenery: the module that drew it), the player's view painted with it
 const scenery: { world: string; drawn: string; built: number; eyes: number }[] = [{ world: "island", drawn: await c.js<string>(`window.__scenery`), built: 1, eyes: 0 }];

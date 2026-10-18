@@ -194,13 +194,13 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
     assert.ok(more.b <= h - 16, `${at}: "Open a file" cut by the window's frame (${more.b} > ${h - 16})`);
   }
   // its world tabs: the one chosen gold (the one selected look), and so the next one chosen, its box kept
-  assert.equal(await c.js(gold(".bholes__world.on")), true, `${at}: the world chosen is not gold`);
-  const tab = await c.js<object>(footprint(".bholes__world:not(.on)"));
-  await c.js(`document.querySelector(".bholes__world:not(.on)").click()`);
+  assert.equal(await c.js(gold(".bholes__worlds .on")), true, `${at}: the world chosen is not gold`);
+  const tab = await c.js<object>(footprint(".bholes__worlds button:not(.on)"));
+  await c.js(`document.querySelector(".bholes__worlds button:not(.on)").click()`);
   await sleep(300);
-  assert.equal(await c.js(gold(".bholes__world.on")), true, `${at}: the world chosen next is not gold`);
-  assert.deepEqual(await c.js<object>(footprint(".bholes__world.on")), tab, `${at}: a world tab's box changes as it is chosen`);
-  await c.js(`document.querySelector(".bholes__world").click()`);
+  assert.equal(await c.js(gold(".bholes__worlds .on")), true, `${at}: the world chosen next is not gold`);
+  assert.deepEqual(await c.js<object>(footprint(".bholes__worlds .on")), tab, `${at}: a world tab's box changes as it is chosen`);
+  await c.js(`document.querySelector(".bholes__worlds button").click()`);
   await sleep(300);
   // scrolled to its foot, nothing under the network chip (the game's, bottom left: none on this page today)
   assert.deepEqual(await c.js<string[]>(underChip()), [], `${at}: a control under the network chip`);
@@ -669,9 +669,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 {
   const c = await editor(1280, 800);
   await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__world")`)); k++) await sleep(300);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__worlds button")`)); k++) await sleep(300);
   const net = await cdp.offline(c); // (the island's chunk among the scripts not loaded yet, whatever a build names it)
-  await c.js(`[...document.querySelectorAll(".bholes__world")].find((b) => /Island/.test(b.textContent)).click()`);
+  await c.js(`[...document.querySelectorAll(".bholes__worlds button")].find((b) => /Island/.test(b.textContent)).click()`);
   await sleep(300);
   await c.js(`document.querySelector(".bholes__starts .bholes__start").click()`);
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`/could not load/.test(document.querySelector(".bench__wait")?.textContent ?? "")`)); k++) await sleep(300);

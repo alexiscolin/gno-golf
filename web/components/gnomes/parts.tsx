@@ -7,6 +7,7 @@
 // the game's own tokens (app/gnomes.css).
 import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Button, Segmented } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import { useCopied } from "@/components/common";
 import { retryIn } from "@/lib/retry";
 import { siteURL } from "@/lib/site";
@@ -98,13 +99,13 @@ export function GnomeCard({ g, fact, mine, never, buy = false, onChain = null, o
       <Tile id={g.id} tier={g.tier} never={never} onChain={onChain} />
       <span className="gcard__name"><span>{g.name}</span><small>#{g.id}</small></span>
       <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{fact}</span></span>
-      {buy && <span className="gcard__buy" aria-hidden="true">Buy</span>}
+      {buy && <span className={buttonClass({ variant: "chain", size: "s" }, "gcard__buy")} aria-hidden="true">Buy</span>}
     </button>
   );
 }
 /** A card's place while the grid is read: the same size, blank. */
 export const BlankCard = () => (
-  <span className="gcard gcard--skel" aria-hidden="true"><span className="gtile" /><span className="gcard__name">&nbsp;</span><span className="gcard__foot" /><span className="gcard__buy gcard__buy--skel">&nbsp;</span></span>
+  <span className="gcard gcard--skel" aria-hidden="true"><span className="gtile" /><span className="gcard__name">&nbsp;</span><span className="gcard__foot" /><span className={buttonClass({ size: "s" }, "gcard__buy gcard__buy--skel")}>&nbsp;</span></span>
 );
 
 /** The closing date: a date in UTC (the player's own time on hover and for a screen reader), never a countdown. */
@@ -213,9 +214,9 @@ export function SearchRow({ search: s }: { search: Search }) {
     <div ref={s.row} className="gsearch" id="gsearch" role="search" onKeyDown={s.key} onBlur={s.blur}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
       <input ref={s.field} type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={s.value} onChange={(e) => s.onChange(e.target.value)} />
-      <button type="button" className="gsearch__close" aria-label="Close the search" onClick={s.close}>
+      <Button variant="icon" size="s" type="button" className="gsearch__close" aria-label="Close the search" onClick={s.close}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-      </button>
+      </Button>
     </div>
   );
 }
