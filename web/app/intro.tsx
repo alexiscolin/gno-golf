@@ -8,13 +8,12 @@ import { REALM_PATH } from "@/lib/chain";
 /** The gnoweb page of the course, or of one of its paths ("garden", "garden/3"): the game as text. */
 export const gnoweb = (path = "") => (process.env.NEXT_PUBLIC_WEB ? `${process.env.NEXT_PUBLIC_WEB.replace(/\/$/, "")}${REALM_PATH}${path && ":" + path}` : "");
 
-const OFF: CSSProperties = { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" };
 const CARD: CSSProperties = { position: "fixed", zIndex: 10, left: 16, right: 16, bottom: 16, maxWidth: 560, margin: "0 auto", padding: "12px 16px", borderRadius: 12, background: "#fdf6e9", color: "#144134", lineHeight: 1.4 };
 
 export default function Intro({ title, text, web, links = [], ld }: { title: string; text: string; web: string; links?: { href: string; label: string }[]; ld: object }) {
   return (
     <>
-      <h1 style={OFF}>{title}</h1>
+      <h1 className="sr-only">{title}</h1>
       <noscript>
         <div style={CARD}>
           <p>{text}</p>

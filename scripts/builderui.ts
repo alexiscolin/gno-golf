@@ -206,6 +206,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.deepEqual(await c.js<string[]>(underChip()), [], `${at}: a control under the network chip`);
   // its head the game's (a front screen's pill and outlined title)
   assert.deepEqual(await c.js(`[...document.querySelectorAll(".bholes__sign .front__head > *")].map((e) => e.tagName + " " + e.className + " " + e.textContent)`), ["SPAN eyebrow The Builder", "H2 worlds__title Hard hats on!"], `${at}: the head is not a front screen's`);
+  // one h1, the page's name off screen (build/gate.tsx), as the game's pages
+  assert.deepEqual(await c.js(`[...document.querySelectorAll("h1")].map((e) => e.className + " " + e.textContent)`), ["sr-only The Builder"], `${at}: the page's h1`);
   // the starters as templates, the blank lane as one of the cards, as big, under its own label, its own picture
   assert.deepEqual(await c.js<string[]>(`[...document.querySelectorAll(".bholes__group")].map((e) => e.textContent)`), ["Start from a template", "Or start blank"], `${at}: the start's groups`);
   const blank = cards[3], first = cards[0];

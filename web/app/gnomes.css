@@ -134,7 +134,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "tiers mine end"; grid-template-rows: 32px; align-items: center; gap: var(--sp-2) var(--sp-4); }
 .gbar__tiers { grid-area: tiers; } .gbar__mine { grid-area: mine; } .gbar__end { grid-area: end; justify-self: end; display: flex; align-items: center; gap: var(--sp-2); }
 /* every control the same height, on one line: the toolbar's rhythm */
-.gbar .seg button { min-height: 28px; white-space: nowrap; } /* (the small switch, in its 2 px edge: 32 all told; one line) */
+.gbar .seg button { min-height: 28px; } /* (in the segment's 2 px edge: 32 all told) */
 .gbar__tiers { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .tierbtn__unit { font-size: 11px; }
 /* a tier's chip as the shelf's filter (Button, small): its shape and colour its tier's, its name bold, its price

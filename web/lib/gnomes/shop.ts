@@ -154,7 +154,7 @@ export function utcDate(unix: number, now: number, short = false) {
   const p = dateParts(unix), hm = `${p.hm} UTC`;
   if (new Date(now * 1000).toISOString().slice(0, 10) === new Date(unix * 1000).toISOString().slice(0, 10)) return `today, ${hm}`;
   if (short && unix > now && unix - now < 6 * 86400) return `${p.weekday} ${hm}`;
-  return `${p.weekday} ${p.day}${p.year === dateParts(now).year ? "" : ` ${p.year}`}, ${hm}`;
+  return `${p.weekday} ${p.day}${p.year === new Date(now * 1000).getUTCFullYear() ? "" : ` ${p.year}`}, ${hm}`;
 }
 /** The same time in the player's own clock, for a hover and a screen reader. */
 export const localDate = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -335,7 +335,7 @@ export type Bill = ReturnType<typeof bill>;
 // ------------------------------------------------------------ the shelf (A1)
 /** A page of the gallery's grid. */
 export const PAGE = 48;
-export type View = "mine" | "all";
+type View = "mine" | "all";
 interface Seen { c: Collection; sold: (id: number) => boolean; mine: ReadonlySet<number>; now: number }
 /** Whether a gnome is on sale now: his series' sale started, not sold, not the closed genesis's. */
 export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, now: number) {
