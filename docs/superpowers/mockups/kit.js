@@ -50,14 +50,14 @@ const HATS = ["a bobble hat", "a tall red cone", "a straw brim", "a felt tricorn
 const BEARDS = ["a white beard", "a ginger beard", "a long grey beard", "a moustache", "no beard"];
 const EXTRAS = ["a sunflower behind the ear", "round glasses", "a leaf in the hat", "rosy cheeks", "a striped shirt", "a snail on the brim", "a mole friend"];
 
-/** A stand-in gnome for an id: wave w's world, a tier by its place in the
- *  wave, traits picked by the id (the realm's table decides, not the page). */
+/** A stand-in gnome for an id: its world w, a tier by its place in the
+ *  world's run of ids, traits picked by the id (the realm's table decides, not the page). */
 function gnome(id, owners = {}) {
   const w = WORLDS[Math.floor((id - 1) / 104) % WORLDS.length];
-  // the genesis table's waves (nft spec): 104 ids, Commons 1-72, Rares 73-93, Epics 94-103, the Legendary 104
+  // the genesis table's worlds (nft spec): 104 ids, Commons 1-72, Rares 73-93, Epics 94-103, the Legendary 104
   const k = (id - 1) % 104;
   const tier = k < 72 ? "common" : k < 93 ? "rare" : k < 103 ? "epic" : "legendary";
-  // the seven Legendaries, one a wave, by their own names (nft spec)
+  // the seven Legendaries, one a world, by their own names (nft spec)
   const LEGEND = { 104: "The Miller", 208: "The Admiral", 311: "Ancient Mushroom", 414: "Summit Gnome", 516: "Crystal Gnome", 618: "Lava Gnome", 720: "Storm Gnome" };
   const name = LEGEND[id] || `${w.names[id % w.names.length]} ${w.of}`;
   const traits = { Hat: HATS[id % HATS.length], Beard: BEARDS[(id * 7) % BEARDS.length], Extra: EXTRAS[(id * 3) % EXTRAS.length] };

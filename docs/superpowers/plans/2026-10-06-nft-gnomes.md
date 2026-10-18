@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `gno.land/r/gnogolf/gnomes` (a GRC721 whose catalogue is data published in series: the genesis is 720 gnomes, 504 Common, 144 Rare, 65 Epic and 7 Legendary, every one sold by id at a fixed price in seven waves of one world each (a Legendary a wave, one a wallet), until a closing date that can only come earlier; plus the nine earned gnomes minted free once store proves the feat, and the gnome each player shows, their best owned one unless they equip another) and the client that draws, sells, shows and shares them, without touching golf/v2, store, the physics or the wasm.
+**Goal:** Build `gno.land/r/gnogolf/gnomes` (a GRC721 whose catalogue is data published in series: the genesis is 720 gnomes, 504 Common, 144 Rare, 65 Epic and 7 Legendary, every one sold by id at a fixed price in one sale of the whole series (its seven Legendaries with it, one a wallet), until a closing date that can only come earlier; plus the nine earned gnomes minted free once store proves the feat, and the gnome each player shows, their best owned one unless they equip another) and the client that draws, sells, shows and shares them, without touching golf/v2, store, the physics or the wasm.
 
 **Architecture:** One new realm beside golf/v2 and store. It imports grc721 v0 and royalty v0, and reads store's rows (never golf/v2) for the earned proofs (through a small interface the tests replace) and for the player window. The catalogue is data: `data/gnomes/` (`series.json`, and each series' `archetypes.json`, `epics.json`, `legendaries.json`) makes `data/gnomes.json` through `scripts/gnomes.ts`, which `check.sh` holds to the data and to every rule; `scripts/gnomesrows.ts` writes from it the rows the owner publishes with `AddSeries`. A token's traits are format 1 of `web/lib/gnomes/codec.ts`, the version first, opaque to the realm; the client maps them to the `Skin` it already draws, plain where it does not know a code. Every gnomes call is a transaction of its own; each gnome gets a static page, and its picture is the game's own drawing, made once in headless Chrome.
 
@@ -10,11 +10,11 @@
 
 **Spec:** [docs/superpowers/specs/2026-10-06-nft-gnomes-design.md](../specs/2026-10-06-nft-gnomes-design.md). Read it before any task; section numbers below ("§7") are its sections. Read also README.md ("Running it locally"), CLIENT.md, docs/golf.md, ADR-003, ADR-004's notes on store, and the research brief ([docs/superpowers/research/2026-10-06-nft-best-practices.md](../research/2026-10-06-nft-best-practices.md)).
 
-**Revised 2026-10-06** to the user's final decisions (the spec's Status lists them): 720 gnomes (504/144/65/7); prices Common 36 GNOT (the par of nine holes), Rare 72 (the par of a course), Epic 336 (the dimples on a golf ball), Legendary 1296 (18 holes × par 72), the owner's to change between waves, never lower on what is on sale; waves of one world each opening with a 48-hour player window, the next wave opened by the owner; a hard closing date for the genesis (`SetCloseAt`: earlier, never later; set at launch; what is unsold then is never minted); the catalogue versioned in series, traits with a version prefix, unknown traits drawn plain, every count defined once; no Legendary named King or wearing a crown.
+**Revised 2026-10-06** to the user's final decisions (the spec's Status lists them): 720 gnomes (504/144/65/7); prices Common 36 GNOT (the par of nine holes), Rare 72 (the par of a course), Epic 336 (the dimples on a golf ball), Legendary 1296 (18 holes × par 72), the owner's to change before a sale opens, never lower on what is on sale; one sale a series, every gnome of it at once, opening with a 48-hour player window (first planned as waves of one world each; waves removed 2026-10-18, ADR-013); a hard closing date for the genesis (`SetCloseAt`: earlier, never later; set at launch; what is unsold then is never minted); the catalogue versioned in series, traits with a version prefix, unknown traits drawn plain, every count defined once; no Legendary named King or wearing a crown.
 
 **Revised again 2026-10-06**, final: **no auction.** The seven Legendaries are sold at their fixed price by the same `Buy`, one a wallet. The auction was dropped for simplicity (no escrow, no refunds, less code and fewer tests) and for legal clarity (no bid as an order, no auction rules to publish, no coins held by the realm). The built `auction.gno` is removed (Milestone 4). Also decided: wearing is free by default (`Worn`: everyone shows their best owned gnome, derived from the chain; any owned gnome plays free in the player's browser; `Equip` is optional); a treasury apart from the owner, changed in two steps; the site URL set by the owner (`SetSiteURL`); the portrait drawn on chain from the traits; the shop (never the game) refused by Netlify country rules for CN, CU, IR, KP, SY, RU and BY, the EU and the UK not blocked for now; no free gift to buyers; the seller an individual in Japan.
 
-**Much of it is built** in two worktrees, uncommitted (the spec's "Built so far vs this spec" compares them with the spec): the realm's sale, waves, auction (to remove) and equip in `.claude/worktrees/nft-gnomes`, the catalogue, codec and drawing in `.claude/worktrees/gnome-designs`. A task marked **(built)** has code there. For it, the steps are: read the built code against the task's tests and the spec, add the tests it lacks, make the changes the spec's table assigns to the code, and land it. Where the built realm names a thing differently from a task not rewritten here (`held` for `owned`, the payment inline in `Buy` rather than in `pay.gno`, ids as `string`), the built name wins, and the task's snippets are read in that light.
+**Much of it is built** in two worktrees, uncommitted (the spec's "Built so far vs this spec" compares them with the spec): the realm's sale, waves (since replaced by one sale a series, ADR-013), auction (to remove) and equip in `.claude/worktrees/nft-gnomes`, the catalogue, codec and drawing in `.claude/worktrees/gnome-designs`. A task marked **(built)** has code there. For it, the steps are: read the built code against the task's tests and the spec, add the tests it lacks, make the changes the spec's table assigns to the code, and land it. Where the built realm names a thing differently from a task not rewritten here (`held` for `owned`, the payment inline in `Buy` rather than in `pay.gno`, ids as `string`), the built name wins, and the task's snippets are read in that light.
 
 ## Global constraints
 
@@ -25,12 +25,12 @@ Copied from the spec. Every task's requirements include these.
 - No random draw anywhere: every token is chosen by id, its traits public before the call (§2, §15).
 - The catalogue is published in series by `AddSeries`, rows `id|tier|name|traits`, ids following on with no gap, checked whole, never changed; at most 64 series of 1,000 rows. The genesis is the first series, ids 1 to 720 (§2, §9).
 - Every count is defined once: `data/gnomes/series.json`'s `supply` (504, 144, 65, 7 for the genesis); the realm's `genesisSupply` and every client number are held to it by a check (§2).
-- The genesis's waves, one world each, one range of ids each (its Commons, Rares, Epics, then its Legendary): 1–104 Garden, 105–208 Island, 209–311 Town, 312–414 Mountain, 415–516 Mines, 517–618 volcano, 619–720 storm (§2). The Legendaries are ids 104, 208, 311, 414, 516, 618, 720.
+- The genesis's worlds, one range of ids each (its Commons, Rares, Epics, then its Legendary), all sold in the one sale: 1–104 Garden, 105–208 Island, 209–311 Town, 312–414 Mountain, 415–516 Mines, 517–618 volcano, 619–720 storm (§2). The Legendaries are ids 104, 208, 311, 414, 516, 618, 720.
 - Ids: decimal, no leading zero; `"1"` to the catalogue's last id for its gnomes, `"1000001"` up for earned tokens; anything else is "no such gnome" (§2, §5, §14).
-- Starting settings: closed (`SetMintOpen(false)`), no closing date; prices Common 36 GNOT, Rare 72, Epic 336, Legendary 1296 (36, 72, 336, 1,296 × 10⁶ ugnot); `SetPrice` 1 to 10,000 GNOT, for the waves opened after it, set between waves; a wave keeps the prices it opened with, so nothing on sale ever gets cheaper (§6). If all 720 sold at these prices: 504 × 36 + 144 × 72 + 65 × 336 + 7 × 1,296 = 18,144 + 10,368 + 21,840 + 9,072 = 59,424 GNOT.
-- The closing date: `SetCloseAt(at)`, owner only; `AddWave` and `SetMintOpen(true)` are refused while it is unset, so it is set at launch; once set it only moves earlier, never later and never into the past; a wave cannot start at or after it; from it on, `Buy` refuses every genesis id ("sale closed") and what is unsold is never minted (§6).
-- Waves: `AddWave(first, last, start, playerHours)`, owner only, no overlap, at most 64; the genesis's waves open with a 48-hour player window: wallets with a standing in store's `totals`, at most 3 Commons, 2 Rares, 1 Epic, 1 Legendary each per wave; lifetime caps Common 10, Rare 5, Epic 2, Legendary 1 (§6).
-- `Buy`: 1 to 5 ids, any tier, Legendaries included; guard order `IsUserCall`, the closing date, ids (each in a started wave, unsold), player window and caps, `OriginSend()` exactly one `ugnot` coin of the exact sum of the wave prices, the state, then one `OriginSend` banker send to the treasury (§6).
+- Starting settings: closed (`SetMintOpen(false)`), no closing date; prices Common 36 GNOT, Rare 72, Epic 336, Legendary 1296 (36, 72, 336, 1,296 × 10⁶ ugnot); `SetPrice` 1 to 10,000 GNOT, for the sales opened after it; a sale keeps the prices it opened with, so nothing on sale ever gets cheaper (§6). If all 720 sold at these prices: 504 × 36 + 144 × 72 + 65 × 336 + 7 × 1,296 = 18,144 + 10,368 + 21,840 + 9,072 = 59,424 GNOT.
+- The closing date: `SetCloseAt(at)`, owner only; the genesis's `OpenSale` and `SetMintOpen(true)` are refused while it is unset, so it is set at launch; once set it only moves earlier, never later and never into the past; the genesis's sale cannot start at or after it; from it on, `Buy` refuses every genesis id ("sale closed") and what is unsold is never minted (§6).
+- The sale (ADR-013): `OpenSale(series, start, playerHours)`, owner only, once a series, every id of it at once, start from a day back to a year ahead, the prices in force frozen into it; `CancelSale(series)` only before it starts, nothing of it sold; the genesis's sale opens with a 48-hour player window: wallets with a standing in store's `totals`, at most 3 Commons, 2 Rares, 1 Epic, 1 Legendary each in that window (counted per series and buyer); lifetime caps Common 10, Rare 5, Epic 2, Legendary 1 (§6).
+- `Buy`: 1 to 5 ids, any tier, Legendaries included; guard order `IsUserCall`, the closing date, ids (each in a started sale, unsold), player window and caps, `OriginSend()` exactly one `ugnot` coin of the exact sum of the sale prices, the state, then one `OriginSend` banker send to the treasury (§6).
 - No auction, no escrow: the realm never holds coins (a sale is forwarded in its own call; `Sweep` forwards anything sent by mistake) (§6).
 - The treasury is not the owner: a staged constant per chain at deploy, checked in `init` (valid, not the realm's, not the owner's), changed in two steps (`SetTreasury` offers, the new address calls `AcceptTreasury`). Royalty 5% (500 bps) by default to the treasury (§4, §5). The site's URL is the owner's setting (`SetSiteURL`, `https://`, at most 128 bytes), read by `TokenMetadata` and `Render`.
 - Wearing: `Worn(player)` is the gnome a player shows everyone: their `Equip` choice while they still own it, else their best owned gnome (Legendary, Epic, Rare, Common, then earned; ties to the lowest id) among the first 100 rows of their `owned` index. Any owned gnome plays free in its owner's browser; `Equip` is optional and always a transaction of its own (§5, §11).
@@ -44,7 +44,7 @@ Copied from the spec. Every task's requirements include these.
 - Sharing adds no server: static pages, pictures made once and committed (§12, ADR-003).
 - No Common, Rare or Epic copies a gnome of `GNOMES`; no sale token wears `stars`, `horns`, `parrot`, `mask`, `sash`, `crown`, `cape` or `lamp`, nor an earned gnome's signature combination; no Legendary is named King or wears a crown (§3).
 - Names match `[A-Za-z' -]{3,24}` and are unique; no player text enters the portrait, and the realm escapes the name anyway (§10, §14).
-- The repo's writing style: plain, precise sentences; English; no marketing words. Shop copy never speaks of floors, returns, flipping or "early is cheaper"; counters count a wave up, never a collection down; no fake timers; no free gift to buyers (a "Founding Gnome" or the like is a premium under Japan's 景品表示法) (§15).
+- The repo's writing style: plain, precise sentences; English; no marketing words. Shop copy never speaks of floors, returns, flipping or "early is cheaper"; counters count the sale up, never a collection down; no fake timers; no free gift to buyers (a "Founding Gnome" or the like is a premium under Japan's 景品表示法) (§15).
 - The shop, never the game, is refused by Netlify country rules (`netlify.toml`, `Country` conditions) for CN, CU, IR, KP, SY, RU and BY; the EU and the UK are not blocked for now; the realm itself cannot be geoblocked (§15). The seller is an individual living in Japan.
 
 ## Conventions for every task
@@ -76,7 +76,7 @@ Realm, `gno.land/r/gnogolf/gnomes/` (as built, then what is to add):
 | `owner.gno` | owner, pending; `Transfer`, `Accept`, `Renounce`; the treasury (`SetTreasury`, `AcceptTreasury`); `SetSiteURL` |
 | `close.gno` (to add) | `closeAt`, `SetCloseAt`, `closed(now)` |
 | `catalogue.gno`, `rows.gno` | `AddSeries`, the series, a row found by bisection, `parseRow` |
-| `waves.gno` | `AddWave`, `SetPrice`, `waveAt` |
+| `sale.gno` (first built as `waves.gno`; ADR-013) | `OpenSale`, `CancelSale`, `SetPrice`, `saleOf`, `saleAt` |
 | `players.gno` | `hasRecord`: the player window's read of store |
 | `buy.gno` | `Buy`, `parseIDs` |
 | `sweep.gno` | `Sweep` (moved out of the built `auction.gno`, which is deleted with the auction: Milestone 4) |
@@ -1387,7 +1387,7 @@ Decisions this milestone makes (recorded in the ADR, Task 69):
 - **The tables are append only** (`vocab.ts`, `props.ts`): a code keeps its meaning for good. A new field is appended to format 1; a changed meaning is a new format.
 - **The palette** is `vocab.ts`' `COLOURS`, 82 today; the first 27 are every colour `GNOMES` draws with, so an earned gnome writes exactly as it is drawn.
 - **An earned token's traits** are tier 0 and its kind; the client draws `GNOMES`' own gnome for it.
-- **Ids by wave**: `planSeries` lays a series out wave by wave, each wave its Commons, Rares, Epics and Legendary in turn, the counts shared over the waves as evenly as they go (§2).
+- **Ids by world**: `planSeries` lays a series out world by world (`series.json`'s `worlds`), each world its Commons, Rares, Epics and Legendary in turn, the counts shared over the worlds as evenly as they go (§2).
 - **Rows for the realm**: `id|tier|name|traits`, the tier as its name, taken from the same entry as the traits' tier byte.
 
 ### Task 10: the codec **(built)**
@@ -1406,11 +1406,11 @@ Decisions this milestone makes (recorded in the ADR, Task 69):
 **Files:** `data/gnomes/series.json`, `data/gnomes/genesis/{archetypes,epics,legendaries}.json`, `web/lib/gnomes/catalogue.ts`, `web/lib/gnomes/generate.ts`, `scripts/gnomes.ts`, `data/gnomes.json`; `scripts/check.sh` and `web/package.json` (`npm run gnomes`, `gnomes:thumbs`)
 
 **Interfaces:**
-- Produces: `SeriesConfig`, `planSeries(s): Wave[]`, `makeCatalogue(read): Catalogue`, `TIER_LOOK`, `traitRows`, `filterGnomes`, `entryOf`, `thumbOf`; `data/gnomes.json` (`version`, `format`, `series` with their `plan`, `vocab`, `earned`, `gnomes`).
+- Produces: `SeriesConfig`, `planSeries(s)` (a plan a world), `makeCatalogue(read): Catalogue`, `TIER_LOOK`, `traitRows`, `filterGnomes`, `entryOf`, `thumbOf`; `data/gnomes.json` (`version`, `format`, `series` with their `plan`, `vocab`, `earned`, `gnomes`).
 
-- [ ] **Step 1: Check the plan.** `planSeries` on the genesis gives the seven waves of the Global constraints, ids 1 to 720 with no gap, 504/144/65/7 in all. A test asserts the seven ranges and the Legendaries' ids.
+- [ ] **Step 1: Check the plan.** `planSeries` on the genesis gives the seven worlds' ranges of the Global constraints, ids 1 to 720 with no gap, 504/144/65/7 in all. A test asserts the seven ranges and the Legendaries' ids.
 - [ ] **Step 2: The earned ids.** `series.json`'s `earned.first` becomes `1000001` (§2: above 64 series of 1,000 rows), and `data/gnomes.json` is made again (`npm run gnomes`).
-- [ ] **Step 3: Run** `(cd web && npm run gnomes -- --check)`. Expected: the counts per tier, wave and home printed, and `ok   720 gnomes, data/gnomes.json as made`.
+- [ ] **Step 3: Run** `(cd web && npm run gnomes -- --check)`. Expected: the counts per tier and home printed, and `ok   720 gnomes, data/gnomes.json as made`.
 - [ ] **Step 4: Commit.**
 
 ### Task 12: `skinOf`: the nine earned kinds are `GNOMES`, byte for byte **(built)**
@@ -1462,7 +1462,7 @@ Decisions this milestone makes (recorded in the ADR, Task 69):
 
 **Files:** Modify: `gno.land/r/gnogolf/gnomes/z_storage_genesis_filetest.gno`
 
-- [ ] **Step 1:** Its rows laid out as `planSeries` lays the genesis (each wave its Commons, Rares, Epics, Legendary), with names and traits of the real lengths (58 hex), then `SetCloseAt` a date past the wave (Task 30: no wave opens without one) and `AddWave(1, 104, <start>, 48)`.
+- [ ] **Step 1:** Its rows laid out as `planSeries` lays the genesis (each world its Commons, Rares, Epics, Legendary), with names and traits of the real lengths (58 hex), then `SetCloseAt` a date past the sale's start (Task 30: no genesis sale opens without one) and `OpenSale("genesis", <start>, 48)`.
 - [ ] **Step 2: Fill the golden.** `-run TestFiles/z_storage_genesis -update-golden-tests`. Expected: about 46 KB for gnomes (it measured 46,230 bytes with the Legendaries first), 4.6 GNOT; a figure far off is a finding. Write it in the file's comment.
 - [ ] **Step 3: Milestone check.** `scripts/check.sh` → `all checks passed`. **Commit.**
 
@@ -1515,20 +1515,22 @@ func TestTheRoleIsHandedOnInTwoSteps(cur realm, t *testing.T) {
 
 - [ ] **Step 5: Commit.**
 
-### Task 18: the waves, the prices, the switch, and `Collection` **(built)**
+### Task 18: the sale, the prices, the switch, and `Collection` **(built)**
 
-**Files:** `gno.land/r/gnogolf/gnomes/config.gno`, `waves.gno`, `gnomes.gno` (`SetMintOpen`), `read.gno` (`Collection`), `waves_test.gno`, `read_test.gno`
+*First built as waves (`waves.gno`, `AddWave`); waves removed 2026-10-18, one sale a series (ADR-013). This task is written for the sale.*
+
+**Files:** `gno.land/r/gnogolf/gnomes/config.gno`, `sale.gno`, `gnomes.gno` (`SetMintOpen`), `read.gno` (`Collection`), `sale_test.gno`, `read_test.gno`
 
 **Interfaces:**
-- Produces: `type wave struct { first, last, start, playersUntil int64; prices [len(tiers)]int64 }`; `waves []wave`; `prices [len(tiers)]int64` (in force for the next wave); `AddWave(cur realm, first, last, start, playerHours int64)`; `SetPrice(cur realm, tier string, ugnot int64)`; `SetMintOpen(cur realm, open bool)`, `MintOpen() bool`; `waveAt(id int64) int`; `Collection() string`; events `WaveAdded`, `PriceSet`, `MintOpen`.
+- Produces: `type sale struct { series string; start, playersUntil int64; prices [len(tiers)]int64 }`; `sales []sale`; `prices [len(tiers)]int64` (in force for the next sale); `OpenSale(cur realm, series string, start, playerHours int64)`; `CancelSale(cur realm, series string)`; `SetPrice(cur realm, tier string, ugnot int64)`; `SetMintOpen(cur realm, open bool)`, `MintOpen() bool`; `saleOf(series string) int`, `saleAt(id int64) int`; `Collection() string`; events `SaleOpened`, `SaleCancelled`, `PriceSet`, `MintOpen`.
 
 - [ ] **Step 1: Read the tests against §5 and §6, and add what is missing:**
   - a deploy is closed, at 36, 72, 336 and 1,296 GNOT (`config.gno`'s `tiers` change from the built 30/99/333 and the 777 reserve; `Collection` shows them, with the caps 10/5/2/1 and 3/2/1/1, the Legendary now a sold tier like the others);
-  - only the owner adds a wave, sets a price, opens or closes;
-  - `AddWave` refuses an overlap, a range past the catalogue or starting at 0, a player window over 168 hours, a 65th wave, and (Task 30) any wave while no closing date is set or starting at or after it;
-  - `SetPrice` refuses an unknown tier and a price outside 1 to 10,000 GNOT; it changes the next wave's prices, never an opened wave's (`TestAWaveKeepsItsPrices`): nothing on sale ever gets cheaper;
-  - `Collection` lists the series, the waves with their prices, the closing date (`closeAt`, 0 while unset), the treasury and the pending one, the site URL.
-- [ ] **Step 2: Run** `-run 'TestAWave|TestTheWaves|TestADeploy|TestCollection'`. Expected: PASS.
+  - only the owner opens or cancels a sale, sets a price, opens or closes;
+  - `OpenSale` refuses an unknown series, a second sale of a series, a start more than a day back or a year ahead, a player window over 168 hours, and (Task 30) the genesis's sale while no closing date is set or starting at or after it; `CancelSale` refuses a sale under way or with a gnome sold;
+  - `SetPrice` refuses an unknown tier and a price outside 1 to 10,000 GNOT; it changes the next sale's prices, never an opened sale's (`TestASaleKeepsItsPrices`): nothing on sale ever gets cheaper;
+  - `Collection` lists the series, each with its sale and its prices (null before one), the closing date (`closeAt`, 0 while unset), the treasury and the pending one, the site URL.
+- [ ] **Step 2: Run** `-run 'TestASale|TestEachSale|TestAWindow|TestADeploy|TestCollection'`. Expected: PASS.
 - [ ] **Step 3: Commit.**
 
 ### Task 19: `Buy` **(built)**
@@ -1536,18 +1538,18 @@ func TestTheRoleIsHandedOnInTwoSteps(cur realm, t *testing.T) {
 **Files:** `gno.land/r/gnogolf/gnomes/buy.gno`, `players.gno`, `buy_test.gno`
 
 **Interfaces:**
-- Produces: `Buy(cur realm, ids string) string`; `parseIDs(ids string) []int64`; `parseID(s string) int64`; `hasRecord(addr address) bool`; trees `bought` (buyer → counts per tier), `inWindow` (`"<wave> <buyer>"` → counts per tier); event `GnomeBought` (`id`, `buyer`, `price`, `treasury`).
+- Produces: `Buy(cur realm, ids string) string`; `parseIDs(ids string) []int64`; `parseID(s string) int64`; `hasRecord(addr address) bool`; trees `bought` (buyer → counts per tier), `inWindow` (`"<series> <buyer>"` → counts per tier, so a sale cancelled and opened again hands no fresh window); event `GnomeBought` (`id`, `buyer`, `price`, `treasury`).
 
-- [ ] **Step 1: Read `Buy` against §6's order, and change it where it differs:** `IsUserCall`; the switch; the closing date (Task 30); the ids parsed strictly; for each, in the catalogue, in a wave, the wave started, unsold, a Legendary taken like any other tier (the built refusal "sold by auction" goes); in a player window, `hasRecord` once and the window's cap; the lifetime caps for the whole batch (a Legendary: one a wallet, in the window and for life); the envelope exactly one `ugnot` coin of the sum of the wave prices; the state (caps, then the mints); then the forward to the treasury with an `OriginSend` banker. Every refusal panics before any coin moves.
+- [ ] **Step 1: Read `Buy` against §6's order, and change it where it differs:** `IsUserCall`; the switch; the closing date (Task 30); the ids parsed strictly; for each, in the catalogue, in a sale, the sale started, unsold, a Legendary taken like any other tier (the built refusal "sold by auction" goes); in a player window, `hasRecord` once and the window's cap; the lifetime caps for the whole batch (a Legendary: one a wallet, in the window and for life); the envelope exactly one `ugnot` coin of the sum of the sale prices; the state (caps, then the mints); then the forward to the treasury with an `OriginSend` banker. Every refusal panics before any coin moves.
 - [ ] **Step 2: Read the tests** (`TestBuyTakesUpToFiveAtTheirSum`, `TestBuyRefusesAnyOtherPayment`, `TestBuyMustBeADirectUserCall`, `TestAGnomeSellsOnce`, `TestBuyReadsItsIDsStrictly`), and add `TestALegendaryIsBoughtLikeAnyGnome`: id 104 bought alone at 1,296 GNOT; the treasury's balance after a buy of two gnomes of different tiers is their sum, the realm's 0.
 - [ ] **Step 3: Run** `-run 'TestBuy|TestAGnome'`. Expected: PASS. **Commit.**
 
 ### Task 20: what `Buy` refuses **(built)**
 
-**Files:** `buy_test.gno`, `waves_test.gno` (and `buy.gno` only if a case fails)
+**Files:** `buy_test.gno`, `sale_test.gno` (and `buy.gno` only if a case fails)
 
-- [ ] **Step 1: Hold the tests to this list, adding what is missing:** paused; the sale closed (Task 30); `""`, six ids, an id twice, `"07"`, `"x"`; a second Legendary for a wallet that has one ("One Legendary a wallet"), in one batch and across waves; an earned id and an id past the catalogue ("no such gnome"); an id in no wave; a wave not started; a sold id; in a player window, a wallet with no `totals` row refused and one with a row in either mode taken (`TestThePlayerWindowIsForPlayers`, `TestARecordInEitherModeCounts`); the window's cap in one batch and across batches, then the lifetime cap after the window (`TestAWalletBuysUpToItsLifetimeCap`); a price changed by `SetPrice` before the wave opened, refused by the exact check, coins kept; a call from a code realm and from a run script's realm.
-- [ ] **Step 2: Run** `-run 'TestBuy|TestAWave|TestThePlayer|TestARecord|TestAWallet|TestALegendary'`. Expected: PASS. **Commit.**
+- [ ] **Step 1: Hold the tests to this list, adding what is missing:** paused; the sale closed (Task 30); `""`, six ids, an id twice, `"07"`, `"x"`; a second Legendary for a wallet that has one ("One Legendary a wallet"), in one batch and across batches; an earned id and an id past the catalogue ("no such gnome"); an id in no sale; a sale not started; a sold id; in a player window, a wallet with no `totals` row refused and one with a row in either mode taken (`TestThePlayerWindowIsForPlayers`, `TestARecordInEitherModeCounts`); the window's cap in one batch and across batches, then the lifetime cap after the window (`TestAWalletBuysUpToItsLifetimeCap`); a price changed by `SetPrice` before the sale opened, refused by the exact check, coins kept; a call from a code realm and from a run script's realm.
+- [ ] **Step 2: Run** `-run 'TestBuy|TestASale|TestThePlayer|TestARecord|TestAWallet|TestALegendary'`. Expected: PASS. **Commit.**
 
 ### Task 21: `Sold` and `Gnome` **(built, two fixes)**
 
@@ -1556,7 +1558,7 @@ func TestTheRoleIsHandedOnInTwoSteps(cur realm, t *testing.T) {
 **Interfaces:**
 - Produces: `Sold() string` (a bit per catalogue id, bit id-1 once minted, hex: 180 digits for the genesis); `Gnome(tid string) string`.
 
-- [ ] **Step 1: Write the failing tests:** `Gnome("0")` and `Gnome("721")` answer `{"version":1,"id":""}`, not `null` (every answer starts with its version, §5); `Gnome` of an id in an opened wave shows that wave's price after a `SetPrice`, and of an id in no wave the price in force; `Sold()` of a fresh genesis is 180 zeros, and after a buy of ids 1 and 10, `"0102"` then zeros.
+- [ ] **Step 1: Write the failing tests:** `Gnome("0")` and `Gnome("721")` answer `{"version":1,"id":""}`, not `null` (every answer starts with its version, §5); `Gnome` of an id in an opened sale shows that sale's price after a `SetPrice`, and of an id in no sale the price in force; `Sold()` of a fresh genesis is 180 zeros, and after a buy of ids 1 and 10, `"0102"` then zeros.
 - [ ] **Step 2: Run** → FAIL on `null`. **Fix** `Gnome`. **Run** → PASS. **Commit.**
 
 ### Task 22: approvals, and the GRC721 reads a wallet makes
@@ -2046,7 +2048,7 @@ func Sweep(cur realm) {
 
 **Files:** `gno.land/r/gnogolf/gnomes/z_storage_buy_filetest.gno` (built), `z_storage_buy2_filetest.gno`, `z_storage_equip_filetest.gno` (to add)
 
-- [ ] **Step 1:** Each filetest publishes the genesis as Task 16's does, sets a closing date, opens wave 1 with no player window, and as a user buys `"1"` (a Common, 36 GNOT, with the envelope issued to the realm's address); `buy2` then buys `"2"`; `equip` then calls `Equip("1")`. Their comments say what they store.
+- [ ] **Step 1:** Each filetest publishes the genesis as Task 16's does, sets a closing date, opens the genesis's sale with no player window, and as a user buys `"1"` (a Common, 36 GNOT, with the envelope issued to the realm's address); `buy2` then buys `"2"`; `equip` then calls `Equip("1")`. Their comments say what they store.
 - [ ] **Step 2: Fill the goldens.** `-run 'TestFiles/z_storage_(buy|equip)' -update-golden-tests`. Expected: a first buy of about 3.5 KB for gnomes (measured 3,535 bytes), a second a few hundred bytes to 2 KB more, an equip a bptree row. A figure far off is a finding: look for what was stored before accepting it.
 - [ ] **Step 3: Write the figures** into each comment ("measured: N bytes, N/10,000 GNOT"), and keep them for Task 43.
 - [ ] **Step 4: Milestone check.** `scripts/check.sh`. Expected: `all checks passed`. **Commit.**
@@ -2063,7 +2065,7 @@ func Sweep(cur realm) {
 - Delete: `gno.land/r/gnogolf/gnomes/auction.gno`, `auction_test.gno` (after Task 26 moved `Sweep`)
 - Modify: `config.gno` (`auctionTier`, `softClose`, `minRaiseBps`, `minRaise`, `maxHours` gone; `lifetimeCap` and `playerCap` gain the Legendary's 1), `buy.gno` (the Legendary refusal gone), `build` (no `running`, `last`), `read.gno` (`Collection` without an auction), `render.gno` later (Task 40)
 
-- [ ] **Step 1: Write the failing test** `TestALegendaryIsBoughtLikeAnyGnome` (Task 19): with wave 1 open, alice buys `"104"` with exactly 1,296 GNOT attached; the treasury's balance rises by that, the realm's stays 0; alice's second Legendary (`"208"`, wave 2 open) is refused with "One Legendary a wallet."; in wave 1's player window, a Legendary counts against a window cap of 1.
+- [ ] **Step 1: Write the failing test** `TestALegendaryIsBoughtLikeAnyGnome` (Task 19): with the genesis's sale open, alice buys `"104"` with exactly 1,296 GNOT attached; the treasury's balance rises by that, the realm's stays 0; alice's second Legendary (`"208"`) is refused with "One Legendary a wallet."; in the sale's player window, a Legendary counts against a window cap of 1.
 - [ ] **Step 2: Run** → FAIL ("sold by auction"). **Implement:** delete the files and constants above; `Buy` treats `legendary` as a tier like the others.
 - [ ] **Step 3: Check that nothing is left:** `grep -n "auction\|Bid\|Settle\|escrow\|softClose\|minRaise" gno.land/r/gnogolf/gnomes/*.gno` → nothing.
 - [ ] **Step 4: Run** the whole package. Expected: PASS. **Commit.**
@@ -2077,7 +2079,7 @@ func Sweep(cur realm) {
 
 **Files:**
 - Create: `gno.land/r/gnogolf/gnomes/close.gno`, `close_test.gno`
-- Modify: `waves.gno` (`AddWave`), `gnomes.gno` (`SetMintOpen`), `buy.gno`, `read.gno` (`Collection`)
+- Modify: `sale.gno` (`OpenSale`; `waves.gno`'s `AddWave` before ADR-013), `gnomes.gno` (`SetMintOpen`), `buy.gno`, `read.gno` (`Collection`)
 
 **Interfaces:**
 - Produces: `closeAt int64` (0 while unset); `SetCloseAt(cur realm, at int64)`; `closed(now int64) bool`; event `CloseAtSet` (`at`); refusals `errNoClose`, `errLater`, `errPast`, `errClosed`.
@@ -2089,7 +2091,7 @@ func TestTheClosingDateOnlyComesEarlier(cur realm, t *testing.T) {
 	fresh(cur)
 	now := time.Now().Unix()
 	testing.SetRealm(testing.NewUserRealm(boss))
-	urequire.AbortsContains(t, cur, "set the closing date first", func() { AddWave(cross(cur), 1, 104, now+60, 48) })
+	urequire.AbortsContains(t, cur, "set the closing date first", func() { OpenSale(cross(cur), "genesis", now+60, 48) })
 	testing.SetRealm(testing.NewUserRealm(boss))
 	urequire.AbortsContains(t, cur, "set the closing date first", func() { SetMintOpen(cross(cur), true) })
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -2104,11 +2106,11 @@ func TestTheClosingDateOnlyComesEarlier(cur realm, t *testing.T) {
 	SetCloseAt(cross(cur), now+60*86400) // earlier: taken
 	uassert.Equal(t, now+60*86400, closeAt)
 	testing.SetRealm(testing.NewUserRealm(boss))
-	urequire.AbortsContains(t, cur, "after the close", func() { AddWave(cross(cur), 1, 104, now+60*86400, 48) })
+	urequire.AbortsContains(t, cur, "after the close", func() { OpenSale(cross(cur), "genesis", now+60*86400, 48) })
 }
 
 func TestNothingSellsAfterTheClose(cur realm, t *testing.T) {
-	// wave 1 open, closeAt a block ahead; SkipHeights past it (SetRealm and
+	// the genesis's sale open, closeAt a block ahead; SkipHeights past it (SetRealm and
 	// SetOriginSend again after it, §16): Buy("1") refused "sale closed" and
 	// the coins kept; Sold() unchanged; MintEarned still works (it sells nothing).
 }
@@ -2130,7 +2132,7 @@ const (
 	errLater   = "gnomes: the closing date can come earlier, never later"
 	errPast    = "gnomes: the closing date cannot be in the past"
 	errClosed  = "gnomes: sale closed"
-	errAfter   = "gnomes: a wave cannot start at or after the close"
+	errAfter   = "gnomes: the genesis sale starts before it closes"
 )
 
 // closeAt is the genesis sale's end, unix seconds; 0 until the owner sets it
@@ -2154,7 +2156,7 @@ func SetCloseAt(cur realm, at int64) {
 func closed(now int64) bool { return closeAt == 0 || now >= closeAt }
 ```
 
-`AddWave` refuses with `errNoClose` while `closeAt` is 0 and with `errAfter` when `start >= closeAt`; `SetMintOpen(true)` refuses with `errNoClose` while it is 0; `Buy` refuses with `errClosed` when `closed(now)` for any genesis id (a later series carries its own dates, §2); `build` resets `closeAt`; `Collection` reports `"closeAt"`.
+`OpenSale` refuses the genesis's sale with `errNoClose` while `closeAt` is 0 and with `errAfter` when `start >= closeAt`; `SetMintOpen(true)` refuses with `errNoClose` while it is 0; `Buy` refuses with `errClosed` when `closed(now)` for any genesis id (a later series carries its own dates, §2); `build` resets `closeAt`; `Collection` reports `"closeAt"`.
 - [ ] **Step 3: Run** → PASS. **Commit.**
 
 ### Task 31: the treasury, changed in two steps
@@ -2169,7 +2171,7 @@ func closed(now int64) bool { return closeAt == 0 || now >= closeAt }
 
 ### Task 32: after `Renounce`
 
-- [ ] **Step 1: Write the tests:** after `Renounce`, `SetPrice`, `AddWave`, `AddSeries`, `SetMintOpen`, `SetCloseAt`, `SetTreasury`, `SetSiteURL`, `SetRoyaltyBps` and `Sweep` refused; a pending treasury can still be accepted; the waves opened stay on sale at their prices until the closing date as set; nothing new opens. A renounced realm sells what it opened, until its close, and nothing more.
+- [ ] **Step 1: Write the tests:** after `Renounce`, `SetPrice`, `OpenSale`, `CancelSale`, `AddSeries`, `SetMintOpen`, `SetCloseAt`, `SetTreasury`, `SetSiteURL`, `SetRoyaltyBps` and `Sweep` refused; a pending treasury can still be accepted; the sales opened stay on sale at their prices until the closing date as set; nothing new opens. A renounced realm sells what it opened, until its close, and nothing more.
 - [ ] **Step 2: Implement** in `owner.gno`. **Run** → PASS. **Commit.**
 
 ### Task 33: the site's URL
@@ -2395,7 +2397,7 @@ The portrait is the token's wallet picture, drawn by the realm on every read fro
 
 **Files:** Create: `gno.land/r/gnogolf/gnomes/z_wallet_filetest.gno`
 
-- [ ] **Step 1:** Publish the genesis, set a closing date, open wave 1, buy `"1"`, then print `Name()`, `Symbol()`, `BalanceOf`, `OwnerOf("1")`, the first 60 characters of `TokenURI("1")` and `TokenMetadata("1")`'s keys. `// Output:` golden.
+- [ ] **Step 1:** Publish the genesis, set a closing date, open its sale, buy `"1"`, then print `Name()`, `Symbol()`, `BalanceOf`, `OwnerOf("1")`, the first 60 characters of `TokenURI("1")` and `TokenMetadata("1")`'s keys. `// Output:` golden.
 - [ ] **Step 2: Fill it.** Expected: `Gnogolf Gnomes`, `GNOME`, 1, the buyer, `data:image/svg+xml;base64,…`, the five keys. **Commit.**
 
 ### Task 40: `Render`
@@ -2404,7 +2406,7 @@ The portrait is the token's wallet picture, drawn by the realm on every read fro
 - Create: `gno.land/r/gnogolf/gnomes/render.gno`, `render_test.gno`
 
 **Interfaces:**
-- Produces: `Render(path string) string`: `""` the collection (the series; the waves, each its world, ids, prices in GNOT, dates and how many found a player; the closing date; the site's link); `"<id>"` a gnome's page (portrait image, name, tier, owner or "unsold", price, and while it is on sale a `gnokey` line to buy it); `"<kind>"` an earned kind's page (portrait, what earns it, "minted free once the chain proves it"); `"<address>"` a player's page (the gnome they show, `Worn`, and their tokens' first page). Anything else: "Not found." with a link home.
+- Produces: `Render(path string) string`: `""` the collection (the series; a Sale table, a row a series: its ids, prices in GNOT, dates and how many found a player; the closing date; the site's link); `"<id>"` a gnome's page (portrait image, name, tier, owner or "unsold", price, and while it is on sale a `gnokey` line to buy it); `"<kind>"` an earned kind's page (portrait, what earns it, "minted free once the chain proves it"); `"<address>"` a player's page (the gnome they show, `Worn`, and their tokens' first page). Anything else: "Not found." with a link home.
 
 - [ ] **Step 1: Write the failing test:**
 
@@ -2547,7 +2549,7 @@ test("gnomes: wornMany asks 50 at a time, and once a visit", async () => {
   - `gnomesRealm`, `GNOMES_REALM` beside `storePath`: `export const gnomesRealm = (realm: string) => realm.replace(/\/v[0-9]+$/, "").replace(/[^/]+$/, "") + "gnomes";`, `const GNOMES_ENV = process.env.NEXT_PUBLIC_GNOMES_REALM || "";`, `export const GNOMES_REALM = isRealmPath(GNOMES_ENV) ? GNOMES_ENV : gnomesRealm(REALM);`.
   - `soldSet(hex)`: `/^([0-9a-f]{2})*$/` or empty set; for byte i, bit j set → id `8*i + j + 1`.
   - `qeval`'s signature gains `realm = REALM` as its last parameter and passes it to `vm`.
-  - `checks` gains shape guards in the file's own style: `gnomeRow` (id, name, tier, traits 58 hex, owner, price number, sold boolean), `wornRow` (player, id, and when `id` is not empty name, tier, traits, `how` one of `equipped`, `best`), `wornMany` (`rows` an array of `wornRow`), `gnomesPage` (owner, total, next, rows of id/tier/traits), `proofRow` (kind, player, ok, minted, holes, finished, strokes, par, missing array of strings, optional reason), `collectionRow` (owner, treasury, pendingTreasury, site, royaltyBps, open, closeAt number, tiers of tier/price/cap/playerCap/sold/size, series, waves).
+  - `checks` gains shape guards in the file's own style: `gnomeRow` (id, name, tier, traits 58 hex, owner, price number, sold boolean), `wornRow` (player, id, and when `id` is not empty name, tier, traits, `how` one of `equipped`, `best`), `wornMany` (`rows` an array of `wornRow`), `gnomesPage` (owner, total, next, rows of id/tier/traits), `proofRow` (kind, player, ok, minted, holes, finished, strokes, par, missing array of strings, optional reason), `collectionRow` (owner, treasury, pendingTreasury, site, royaltyBps, open, closeAt number, tiers of tier/price/cap/playerCap/sold/size, series each with its `sale` or null).
   - `makeChain` returns `gnomes`: each read a `qeval(…, checks.x, undefined, undefined, undefined, GNOMES_REALM)`; `worn` parsed and checked, `null` when its `id` is `""`; `wornMany` dedups, filters `isAddress`, consults a `Map<string, WornRow | null>` kept for the makeChain's life, asks the missing in chunks of 50, records `null` for those not in the answer; `sold` maps `Sold()` through `soldSet`; `gnome(id)` refuses an id that is not `isTokenId` before asking.
 
 - [ ] **Step 4: Run.** `(cd web && node … --test test/chain.test.ts)` then `npx tsc --noEmit`. Expected: PASS.
@@ -2946,7 +2948,7 @@ Run → FAIL.
 
 ## Milestone 9: the screens
 
-Each screen's logic is a pure function in `web/lib/gnomes/game.ts`, tested first; the component is then written against it and checked by hand on the dev server against a local chain with gnomes deployed (gnodev loads the repo's packages; as `test1`, publish the genesis, then `gnokey maketx call -pkgpath gno.land/r/gnogolf/gnomes -func SetCloseAt -args <unix> …`, `AddWave` and `SetMintOpen true`). Everything renders only when `gnomesOn()`.
+Each screen's logic is a pure function in `web/lib/gnomes/game.ts`, tested first; the component is then written against it and checked by hand on the dev server against a local chain with gnomes deployed (gnodev loads the repo's packages; as `test1`, publish the genesis, then `gnokey maketx call -pkgpath gno.land/r/gnogolf/gnomes -func SetCloseAt -args <unix> …`, `OpenSale` and `SetMintOpen true`). Everything renders only when `gnomesOn()`.
 
 ### Task 57: the picker lists the account's gnomes
 
@@ -2982,7 +2984,7 @@ test("the picker: the account's tokens, and when to offer the optional Equip", (
 - Modify: `web/lib/gnomes/game.ts`, `web/test/gnomes.test.ts`, `web/components/Golf.tsx` (a "Gnomes" entry in the menu, and `?screen=shop`), `web/app/globals.css`
 
 **Interfaces:**
-- Produces: `cartCheck({ ids, collection, catalogue, sold, bought, window, now }): { ok: boolean; total: number; why: string }` where `collection` is `Collection()`'s answer (its waves with their prices and player windows), `catalogue` is `data/gnomes.json`, `bought` the account's lifetime count per tier and `window` its count in the current wave's window, if known (the realm checks again); the component `Shop`.
+- Produces: `cartCheck({ ids, collection, catalogue, sold, bought, window, now }): { ok: boolean; total: number; why: string }` where `collection` is `Collection()`'s answer (each series' sale with its prices and player window), `catalogue` is `data/gnomes.json`, `bought` the account's lifetime count per tier and `window` its count in the current sale's window, if known (the realm checks again); the component `Shop`.
 
 - [ ] **Step 1: Write the failing test:**
 
@@ -2996,15 +2998,15 @@ const COLL = {
     { name: "epic", price: 336e6, cap: 2, playerCap: 1 }, { name: "legendary", price: 1296e6, cap: 1, playerCap: 1 },
   ],
   closeAt: 1000 + 90 * 86400,
-  // wave 1 (the Garden) open since 1000 with its window until 1000 + 48 h; wave 2 (the Island Cup) not yet open
-  waves: [{ first: 1, last: 104, start: 1000, playersUntil: 1000 + 48 * 3600, prices: [36e6, 72e6, 336e6, 1296e6] }],
+  // the genesis's one sale open since 1000 with its window until 1000 + 48 h
+  series: [{ name: "genesis", first: 1, last: 720, sale: { start: 1000, playersUntil: 1000 + 48 * 3600, prices: [36e6, 72e6, 336e6, 1296e6] } }],
 };
 const at = { collection: COLL, catalogue: CATALOGUE, sold: new Set<number>(), bought: [0, 0, 0, 0], window: [0, 0, 0, 0], player: true };
 
-test("the cart: ids of an open wave, unsold, five at most, within the caps, its exact total", () => {
+test("the cart: ids of an open sale, unsold, five at most, within the caps, its exact total", () => {
   const after = 1000 + 49 * 3600; // the window over
   assert.deepEqual(cartCheck({ ...at, ids: ["42", "94"], now: after }), { ok: true, total: 372e6, why: "" });
-  assert.equal(cartCheck({ ...at, ids: ["105"], now: after }).why, "#105 is in a wave not yet open.");
+  assert.equal(cartCheck({ ...at, ids: ["105"], now: 999 }).why, "#105 is not on sale yet.");
   assert.equal(cartCheck({ ...at, ids: ["42"], sold: new Set([42]), now: after }).why, "#42 has found a player.");
   assert.equal(cartCheck({ ...at, ids: ["1", "2", "3", "4", "5", "6"], now: after }).why, "Five gnomes at a time.");
   assert.equal(cartCheck({ ...at, ids: ["94", "95"], bought: [0, 0, 1, 0], now: after }).why, "Two Epic gnomes a wallet.");
@@ -3017,8 +3019,8 @@ test("the cart: ids of an open wave, unsold, five at most, within the caps, its 
 ```
 
 - [ ] **Step 2: Run** → FAIL. **Implement** `cartCheck` (the words above; caps spelled "One", "Two", "Three", "Five", "Ten", else digits; `CATALOGUE` is `data/gnomes.json`, imported as the shop imports it).
-- [ ] **Step 3: The component.** `Shop`: the closing date on every shop page and on the confirmation ("The genesis sale closes on <date, the viewer's time and UTC>", from `Collection().closeAt`; nothing counts down to it); the waves as tabs (each its world, its dates, "61 of 104 found a player" counted up, a "sold out" stamp when it is; the Legendary of each wave sold like the rest at its price, one a wallet); filters by tier, world, archetype, hat and trail (`filterGnomes`); a grid of the wave's gnomes, each its thumbnail (`thumbOf(id)`, lazy: no chain read per gnome) on its tier's frame (`TIER_LOOK`), name, `#id`, price, "found a player" from `chain.gnomes.sold()`; the waves not yet open shown "not yet on sale"; a tap opens the gnome on `makePreview`'s turntable; "Add" puts it in the cart (≤ 5). The cart shows `cartCheck`'s total, the deposit line ("plus about N GNOT of storage deposit, returned if you burn it", `gnomeDeposit("buy")`, then `"buyMore"` per extra), the consent box (`CONSENT`, unticked; the button needs it ticked), the trader block (`TRADER`: name, geographic address, contact; with `traderReady()` false the Buy button is replaced by "The shop opens soon."), and "The sale is for adults." On Buy: `buyGnomes` with `cartCheck(...).total` read at that moment from `chain.gnomes.collection()` (an opened wave's prices never change, so a refusal for the amount means the page was stale: say so if it fails with "wrong payment"). On success: the receipt (Task 59), then the bought share (Task 63). No word of value, floors or returns anywhere.
-- [ ] **Step 4: Check by hand** on the local chain, after `AddSeries` and a wave with no player window: buy one Common and one Epic in one cart; the treasury (a second key, not `test1`, the owner) balance rises by the sum; then the wave's Legendary, alone; a second Legendary is refused in the cart; a third Epic is refused in the cart before any send. **Commit.**
+- [ ] **Step 3: The component.** `Shop`: the closing date on every shop page and on the confirmation ("The genesis sale closes on <date, the viewer's time and UTC>", from `Collection().closeAt`; nothing counts down to it); the sale's card (the series' name, "Genesis", its dates, "61 of 720 found a player" counted up, a "sold out" stamp when it is; its seven Legendaries, "7 Legendaries wait at the flag", sold like the rest at their price, one a wallet); filters by tier, world, archetype, hat and trail (`filterGnomes`); a grid of the sale's gnomes, each its thumbnail (`thumbOf(id)`, lazy: no chain read per gnome) on its tier's frame (`TIER_LOOK`), name, `#id`, price, "found a player" from `chain.gnomes.sold()`; gnomes of a sale not yet open shown "not yet on sale"; a tap opens the gnome on `makePreview`'s turntable; "Add" puts it in the cart (≤ 5). The cart shows `cartCheck`'s total, the deposit line ("plus about N GNOT of storage deposit, returned if you burn it", `gnomeDeposit("buy")`, then `"buyMore"` per extra), the consent box (`CONSENT`, unticked; the button needs it ticked), the trader block (`TRADER`: name, geographic address, contact; with `traderReady()` false the Buy button is replaced by "The shop opens soon."), and "The sale is for adults." On Buy: `buyGnomes` with `cartCheck(...).total` read at that moment from `chain.gnomes.collection()` (an opened sale's prices never change, so a refusal for the amount means the page was stale: say so if it fails with "wrong payment"). On success: the receipt (Task 59), then the bought share (Task 63). No word of value, floors or returns anywhere.
+- [ ] **Step 4: Check by hand** on the local chain, after `AddSeries` and a sale with no player window: buy one Common and one Epic in one cart; the treasury (a second key, not `test1`, the owner) balance rises by the sum; then a Legendary, alone; a second Legendary is refused in the cart; a third Epic is refused in the cart before any send. **Commit.**
 
 ### Task 59: the receipt
 
@@ -3181,14 +3183,14 @@ test("each gnome's page: its title, words and picture", () => {
 
 **Files:** Create: `docs/gnomes.md`
 
-- [ ] **Step 1:** Write the API page in `docs/golf.md`'s shape: who can change what (owner; the series and waves; prices between waves, never lower on what is on sale; the closing date, earlier only; the treasury in two steps; the site URL; `Renounce`); ids; units (ugnot, bps, unix seconds); writes (each function's signature, what it checks in order, what it emits, what it refuses, with the refusal strings); events; reads (each JSON shape with an example); the earned proof (§7's table, what fails closed); storage and gas (the measured figures of Tasks 9, 27, 35); `Worn`'s rule (the equipped gnome while owned, else the best owned among a wallet's first 100 rows); what the realm never does (no mint for anyone by the owner, no coin held, no sale after the close, no golf or store call); a line that the Legendary auction was dropped and why. Link it from README.md's docs list.
+- [ ] **Step 1:** Write the API page in `docs/golf.md`'s shape: who can change what (owner; the series and their sales; prices before a sale opens, never lower on what is on sale; the closing date, earlier only; the treasury in two steps; the site URL; `Renounce`); ids; units (ugnot, bps, unix seconds); writes (each function's signature, what it checks in order, what it emits, what it refuses, with the refusal strings); events; reads (each JSON shape with an example); the earned proof (§7's table, what fails closed); storage and gas (the measured figures of Tasks 9, 27, 35); `Worn`'s rule (the equipped gnome while owned, else the best owned among a wallet's first 100 rows); what the realm never does (no mint for anyone by the owner, no coin held, no sale after the close, no golf or store call); a line that the Legendary auction was dropped and why. Link it from README.md's docs list.
 - [ ] **Step 2: Check:** every exported function of the realm appears: `grep -o '^func [A-Z][A-Za-z]*' gno.land/r/gnogolf/gnomes/*.gno | grep -v _test | sed 's/.*func //' | sort -u` against the page's headings. **Commit.**
 
 ### Task 69: the ADR
 
 **Files:** Create: `adr/adr-<next free number>-gnomes.md`
 
-- [ ] **Step 1:** The ADR from the spec (drafted in the realm's worktree as `adr/adr-007-gnomes.md`; it takes the next free number when it lands), in ADR-003's sections (Status, Context, Decision, What is built, Consequences, Alternatives considered: the Legendary auction among them, dropped for simplicity and legal clarity), with an "As built" section naming the decisions this plan made beyond the spec: the catalogue published as series and read by bisection; traits format 1 and its append-only tables; the palette's order; an earned token's traits as its kind alone; ids laid out by wave; the waves' prices fixed when they open; the counts written once in `series.json`; the portrait drawn from the traits in Gno only, the pictures by the game itself; whatever Tasks 4, 5 and 6 found about the harness; the measured gas and deposits; and the user's answers to the spec's open points. Update the spec's Status to "Accepted" with a link to the ADR.
+- [ ] **Step 1:** The ADR from the spec (drafted in the realm's worktree as `adr/adr-007-gnomes.md`; it takes the next free number when it lands), in ADR-003's sections (Status, Context, Decision, What is built, Consequences, Alternatives considered: the Legendary auction among them, dropped for simplicity and legal clarity), with an "As built" section naming the decisions this plan made beyond the spec: the catalogue published as series and read by bisection; traits format 1 and its append-only tables; the palette's order; an earned token's traits as its kind alone; ids laid out by world; a sale's prices fixed when it opens; the counts written once in `series.json`; the portrait drawn from the traits in Gno only, the pictures by the game itself; whatever Tasks 4, 5 and 6 found about the harness; the measured gas and deposits; and the user's answers to the spec's open points. Update the spec's Status to "Accepted" with a link to the ADR.
 - [ ] **Step 2: Commit.**
 
 ### Task 70: the README, `Tip.tsx`, CLIENT.md
@@ -3202,7 +3204,7 @@ test("each gnome's page: its title, words and picture", () => {
 
 **Files:** Modify: `scripts/smoke.ts`
 
-- [ ] **Step 1:** Add a step that runs when `GNOKEY_NAME` is set (a local key with funds, `test1` under gnodev) and says "skipped (GNOKEY_NAME unset)" otherwise: as the owner, publish the genesis (`npm run gnomes:rows`), set a closing date a day ahead and open wave 1 with no player window, `Buy` one id with its exact `-send` through `gnokey maketx call … -insecure-password-stdin` (password from `GNOKEY_PASSWORD`, default empty), read `Worn` (`"how":"best"`), `Equip` it, then read both back through the client's own `chain.gnomes.gnome` and `chain.gnomes.worn` (`"how":"equipped"`) (their checks throw on any unexpected shape), and in the headless Chrome the picker on `?gnomes&screen=pick` lists it.
+- [ ] **Step 1:** Add a step that runs when `GNOKEY_NAME` is set (a local key with funds, `test1` under gnodev) and says "skipped (GNOKEY_NAME unset)" otherwise: as the owner, publish the genesis (`npm run gnomes:rows`), set a closing date a day ahead and open the genesis's sale with no player window, `Buy` one id with its exact `-send` through `gnokey maketx call … -insecure-password-stdin` (password from `GNOKEY_PASSWORD`, default empty), read `Worn` (`"how":"best"`), `Equip` it, then read both back through the client's own `chain.gnomes.gnome` and `chain.gnomes.worn` (`"how":"equipped"`) (their checks throw on any unexpected shape), and in the headless Chrome the picker on `?gnomes&screen=pick` lists it.
 - [ ] **Step 2: Run** `GNOKEY_NAME=test1 npm run smoke` against a local gnodev with the course published. Expected: every step passes. **Commit.**
 
 ### Task 72: a deploy rehearsed on a local chain
@@ -3225,9 +3227,9 @@ test("each gnome's page: its title, words and picture", () => {
 
 Nothing in this plan deploys. The owner, after Task 73:
 
-1. **Onyx**, closed, staged with `GNOMES_TREASURY` (an address apart from the deployer's): `addpkg` of the staged gnomes with `-max-deposit 40000000ugnot`; `AddSeries("genesis", rows)` from `npm run gnomes:rows -- --series genesis`; `SetCloseAt`, a test wave; buy one of each tier, a Legendary included; move the treasury in two steps and back; mint an earned gnome from a played cup; compare each deposit and the King proof's gas with the goldens; run `scripts/gnomesproof.ts` against onyx; put any differing figure in `GNOME_GAS`/`GNOME_BYTES` and the ADR.
+1. **Onyx**, closed, staged with `GNOMES_TREASURY` (an address apart from the deployer's): `addpkg` of the staged gnomes with `-max-deposit 40000000ugnot`; `AddSeries("genesis", rows)` from `npm run gnomes:rows -- --series genesis`; `SetCloseAt`, a test sale; buy one of each tier, a Legendary included; move the treasury in two steps and back; mint an earned gnome from a played cup; compare each deposit and the King proof's gas with the goldens; run `scripts/gnomesproof.ts` against onyx; put any differing figure in `GNOME_GAS`/`GNOME_BYTES` and the ADR.
 2. **The client on onyx** with `NEXT_PUBLIC_GNOMES=1` and the trader's settings: the dress rehearsal, two weeks before mainnet; the shop's country rules checked on the deploy preview (Task 60).
-3. **Mainnet**, only once store and golf/v2 are live there under the same namespace and the course is published (§17.4): the same staged package with `MAINNET=1`, deployed closed, the genesis published. A lawyer has read §15 and the lawyer pack first. The two weeks before: one Legendary shown a day, the gallery live with nothing on sale. At launch: `SetCloseAt(<the genesis's closing date>)` (it can then only come earlier), `SetSiteURL` if the site differs from the staged one, then wave 1, the Garden, ids 1–104 (`AddWave(1, 104, <start>, 48)`, `SetMintOpen(true)`), its Legendary (104) on sale with the rest at 1,296 GNOT; wave 2, the Island Cup, ids 105–208, about a week later and only once the first has mostly sold, and so on; at the closing date what is unsold is never minted.
+3. **Mainnet**, only once store and golf/v2 are live there under the same namespace and the course is published (§17.4): the same staged package with `MAINNET=1`, deployed closed, the genesis published. A lawyer has read §15 and the lawyer pack first. The two weeks before: one Legendary shown a day, the gallery live with nothing on sale. At launch: `SetCloseAt(<the genesis's closing date>)` (it can then only come earlier), `SetSiteURL` if the site differs from the staged one, then the genesis's sale, ids 1–720 (`OpenSale("genesis", <start>, 48)`, `SetMintOpen(true)`), its seven Legendaries on sale with the rest at 1,296 GNOT; at the closing date what is unsold is never minted.
 
 ---
 
@@ -3238,11 +3240,11 @@ Run each before calling the work done; each line names its evidence.
 - [ ] `scripts/check.sh --smoke` ends with `all checks passed` (Gno tests and goldens, fingerprints, `gnomes --check`, `gnomes:rows --check`, staging both ways, wasm unchanged, types, lint, selfcheck, unit tests over the coverage floor, smoke).
 - [ ] golf/v2, store, `p/gnogolf/*`, `web/lib/sim/golf.wasm` and `scripts/wasm/` have no diff against `main`; `grep -rn "gnomes" gno.land/r/gnogolf/golf gno.land/r/gnogolf/store` finds nothing.
 - [ ] No transaction mixes realms: `adena.test.ts`'s "no golf save ever carries a gnomes message" passes, and each gnomes call test asserts one message.
-- [ ] The counts are written once: `series.json`'s `supply` is 504/144/65/7, the realm's `genesisSupply` is held to it, `data/gnomes.json` has 720 gnomes in the seven waves' ranges.
+- [ ] The counts are written once: `series.json`'s `supply` is 504/144/65/7, the realm's `genesisSupply` is held to it, `data/gnomes.json` has 720 gnomes in the seven worlds' ranges.
 - [ ] Paid calls: tests cover no coin, two coins, another denom, a unit under and over, the exact price, a code realm, a run realm, and the treasury's balance after a buy, the realm's 0 (`TestBuyRefusesAnyOtherPayment`, `TestBuyMustBeADirectUserCall`, `TestBuyTakesUpToFiveAtTheirSum`).
-- [ ] Buy refusals: paused, after the close, an id in no wave or a wave not started, a sold id, an id twice, six ids, an earned id, a second Legendary for a wallet, the player window (no record; its cap), the lifetime cap in a batch and across, a price changed before the wave opened with the coins kept, an opened wave's prices unchanged by `SetPrice`.
+- [ ] Buy refusals: paused, after the close, an id in no sale or a sale not started, a sold id, an id twice, six ids, an earned id, a second Legendary for a wallet, the player window (no record; its cap), the lifetime cap in a batch and across, a price changed before the sale opened with the coins kept, an opened sale's prices unchanged by `SetPrice`.
 - [ ] No auction: `auction.gno` and its tests are gone, and `grep -rn "Bid\|Settle\|escrow" gno.land/r/gnogolf/gnomes web/lib web/components` finds nothing of it; a Legendary is bought at 1,296 GNOT by `Buy`, one a wallet; the prices at deploy are 36/72/336/1,296 GNOT.
-- [ ] Owner settings (Milestone 4's tests): the closing date optional (no end until set), earlier only once set, never in the past, nothing sold after it; the treasury apart from the owner at deploy and moved in two steps; the site URL's bounds; everything frozen after `Renounce` but the opened waves until the close; `Sweep` sends the whole balance.
+- [ ] Owner settings (Milestone 4's tests): the closing date optional (no end until set), earlier only once set, never in the past, nothing sold after it; the treasury apart from the owner at deploy and moved in two steps; the site URL's bounds; everything frozen after `Renounce` but the opened sales until the close; `Sweep` sends the whole balance.
 - [ ] Wearing: `Worn` gives the equipped gnome while owned, else the best owned (tier, then lowest id), `"how"` saying which; `WornMany` with 50 players, junk and repeats; the boards and ghosts show a buyer's gnome without any `Equip`.
 - [ ] Earned: each kind proven and refused one hole short and one stroke over, an archived version, a `copies` row, a bad entry format, bad strokes, another writer, a second mint, transfer and approval refused, burn then mint again (Milestones 1 and 5); earned ids from 1000001.
 - [ ] `z_proof_king_filetest.gno`'s gas minus `z_proof_seed_filetest.gno`'s is written in its comment and is under the gas the client asks (`GNOME_GAS.earned`).
@@ -3251,7 +3253,7 @@ Run each before calling the work done; each line names its evidence.
 - [ ] The codec: unknown codes, colours past the palette, short strings drawn plain; another format the Classic (`gnomes.test.ts`). The nine earned kinds draw exactly as `GNOMES`; the fourteen `GNOMES` are unchanged (`gnome.test.ts`).
 - [ ] The budget test passes for every gnome of the catalogue (triangles, draws, width, height, reach unmoved), at the limits the user settled.
 - [ ] By hand: a trail under the aim line and gone after the stop; holing effect after the drop, no flash; reduced motion gives no trail and a still frame; no entrance on a retry, a ghost or a clip; a ghost wears the gnome its rival shows (`Worn`); a Legendary's pill on the boards.
-- [ ] The shop shows the consent box (required), the seller's identity, address and contact (no sale without them), "for adults", the price and deposit, the wave and its player window, the closing date; it offers no free gift to buyers; it is refused for CN, CU, IR, KP, SY, RU and BY by `netlify.toml` and open elsewhere, the EU and the UK included, while the game is open everywhere; the receipt prints with every line of `receiptLines`; no copy speaks of floors, returns, flipping or "early is cheaper"; the counter counts the wave up.
+- [ ] The shop shows the consent box (required), the seller's identity, address and contact (no sale without them), "for adults", the price and deposit, the sale and its player window, the closing date; it offers no free gift to buyers; it is refused for CN, CU, IR, KP, SY, RU and BY by `netlify.toml` and open elsewhere, the EU and the UK included, while the game is open everywhere; the receipt prints with every line of `receiptLines`; no copy speaks of floors, returns, flipping or "early is cheaper"; the counter counts the sale up.
 - [ ] With `NEXT_PUBLIC_GNOMES` unset, the built site plays as today (no Gnomes menu, the picker unchanged, no gnomes read in the network panel).
 - [ ] `out/g/<id>/index.html` for the 729, each with its title and image; the 720 thumbnails and the seven turntables committed under `media/gnomes/`; seven `web/public/og/legendary/*.jpg` committed.
 - [ ] `docs/gnomes.md`, `docs/gnomes/design.md`, the ADR with "As built", the README and `Tip.tsx` lines corrected, CLIENT.md's rules added.

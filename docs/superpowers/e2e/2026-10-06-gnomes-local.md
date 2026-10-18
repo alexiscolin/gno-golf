@@ -7,8 +7,13 @@ chains side by side, once with the owner's calls and the reads through the
 gno MCP server and once with gnokey alone: the same steps, the same results,
 the gas to within a few dozen.
 
+*Later (2026-10-18): waves removed, one sale per series (ADR-013):
+`AddWave` became `OpenSale(series, start, playerHours)` and `CancelSale`.
+The steps below record the realm as it was run that day, waves and all;
+`scripts/e2e-gnomes.sh` now plays the one sale's guards instead.*
+
 This is the realm without the auction (`0c542d9`): a Legendary is sold like
-any gnome, by `Buy` at its wave's fixed price, to its first
+any gnome, by `Buy` at its fixed price (its wave's, that day), to its first
 buyer, one a wallet. The prices are golf's numbers (ADR-007): a Common 36
 GNOT, a Rare 72, an Epic 336, a Legendary 1,296. The earlier runs of this
 report, with the auction and the old prices, are in this file's history
@@ -136,7 +141,7 @@ Beyond the unit tests:
   window and proves an earned gnome.
 - **The treasury**: moved in two steps, it takes the next sale and the
   royalty, and a stray coin swept.
-- **The close**: refuses every buy and wave of the genesis's unsold gnomes,
+- **The close**: refuses every buy and wave (now: sale) of the genesis's unsold gnomes,
   Legendaries included (#311 closed), and leaves a sold one sold. The final
   supply is 21: 14 Commons, 3 Rares, 2 Epics, 2 Legendaries.
 - **The portraits**: every one of the 720 catalogue gnomes' pages carries
@@ -329,10 +334,11 @@ size, finding 3); the 720 pages through `vm/qrender`.
 
 ## Seed mode and the shop's UI runs (2026-10-06, later)
 
-`SEED=1 scripts/e2e-gnomes.sh` does the setup only, in about 30 seconds,
-and leaves the chain running: the genesis, wave 1 open with an hour's
-players' window, wave 2 in two days, the close in 30 days, p1 and b1 with a
-record, p1 holding Commons 1 and 2 and Rare 73 (wearing 1), b1 Common 3.
+`SEED=1 scripts/e2e-gnomes.sh` does the setup only and leaves the chain
+running: the genesis, the close in 30 days (set first), its one sale of
+every gnome open with an hour's players' window (ADR-013; on the day this
+was run it seeded wave 1 open and wave 2 in two days), p1 and b1 with a
+record, p1 holding two Commons and a Rare (wearing one), b1 a Common.
 `$WORK/seed.env` says where everything is.
 
 `media/gnomes/shop-e2e.mjs` then drives the client (a dev server on that
@@ -349,4 +355,5 @@ its price; Adena failing without saying nothing went ("don't buy again"); my
 gnomes and theirs; the picker's row, a gnome played for free, then shown to
 everyone (Equip, and `Worn` says so) with the share row "Your rivals will
 see …"; the title's live scene, its watcher by the cup in the player's
-gnome; an earned gnome's page; a later wave's.
+gnome; an earned gnome's page; a later wave's (a check gone with the
+waves, ADR-013).

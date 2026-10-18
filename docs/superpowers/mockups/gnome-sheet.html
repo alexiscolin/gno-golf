@@ -70,7 +70,7 @@
 
   // him: the turntable, who he is, his price, one action
   const him = (action, note = "", withTrust = true) => `${tile("stage").replace('class="gtile', 'role="img" aria-label="' + G.name + ', turning: drag, or the arrow keys" class="gtile')}
-    <div class="meta">${tierChip(G.tier)}<span>#${G.id} · Wave 1 · Garden</span></div>
+    <div class="meta">${tierChip(G.tier)}<span>#${G.id} · Garden</span></div>
     <h2 class="gname inked">${G.name}</h2><p class="gline">${G.line}</p>
     ${note}${withTrust ? `<div class="price"><b>${gn(G.price)} GNOT</b><span>+ ≈ 0.46 GNOT deposit and fee</span></div>` : ""}
     ${withTrust ? trust() : ""}
@@ -104,10 +104,10 @@
     open: him(buy),
     legendary: him(buy, `<p class="note note--warn" style="text-align:center">One of one. At most one Legendary per wallet; the first to buy him has him.</p>`),
     locked: him(`<button class="btn btn--chain btn--wide" disabled>Players first until Thu 8 Oct, 18:00 UTC</button>`, `<p class="note note--warn">Save one round on-chain to buy now. <a href="#">Play a hole →</a></p>`),
-    cap: him(`<button class="btn btn--chain btn--wide" disabled>3 of 3 Commons this wave</button>`, `<p class="note note--warn">Your share until Thu 8 Oct, 18:00 UTC. Then open to everyone.</p>`),
+    cap: him(`<button class="btn btn--chain btn--wide" disabled>3 of 3 Commons this window</button>`, `<p class="note note--warn">Your share until Thu 8 Oct, 18:00 UTC. Then open to everyone.</p>`),
     mine: him(`<button class="btn btn--gold btn--wide">Play with him</button>`, `<p class="gline"><b>Yours</b> since 4 Oct · everyone sees him: he is your best</p>`, false),
     taken: him(`<a class="btn btn--gold btn--wide" href="#">Race nym-gnorman's ghost</a>`, `<p class="gline">Plays with <b>nym-gnorman</b></p>`, false),
-    later: him(`<button class="btn btn--ghost btn--wide">♡ Keep him on my list</button>`, `<p class="gline">On sale from Wave 2. A wave not open by ${CLOSES} never opens.</p>`, false),
+    later: him(`<button class="btn btn--ghost btn--wide">♡ Keep him on my list</button>`, `<p class="gline">Not on sale yet. A sale not open by ${CLOSES} never opens.</p>`, false),
     nevermade: him(`<a class="btn btn--ghost btn--wide" href="gnomes-gallery.html?state=closed">See the gnomes that were made</a>`, `<p class="gline"><b>Never made.</b> The sale closed before he found a player.</p>`, false),
     review: `${head("Review your order")}${review()}${legal()}${boxes(false)}${gnokey()}${order(false)}`,
     ticked: `${head("Review your order")}${review()}${legal()}${boxes(true)}${gnokey()}${order(true)}`,

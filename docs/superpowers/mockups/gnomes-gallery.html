@@ -6,14 +6,14 @@
 <title>Gnomes gallery · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
 <!-- The gallery: pick a gnome. Its one action is a card; the rest waits behind a tap.
-     states: ?state=open (default) | players (the players' window, this wallet without a record) | soldout (the wave)
+     states: ?state=open (default) | players (the players' window, this wallet without a record) | soldout (the sale)
      | teaser (nothing open yet) | closed (the sale over: made and never made) | loading | empty | error
      | mine (the Mine view: the player's gnomes, who sees what, Share my team) | mineempty -->
 <style>
   .gal { width: min(1180px, 100%); margin: 0 auto; }
   .front__head .closes { margin-top: 10px; }
 
-  /* the sale now, one row: the wave, the Legendary's auction */
+  /* the sale now, one row: the sale, its Legendaries */
   .now { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--gap-grid); margin: 18px 0 20px; }
   .now > * { display: grid; gap: 8px; align-content: center; color: inherit; text-decoration: none; }
   .now__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); font-size: 15px; font-weight: 700; }
@@ -90,18 +90,18 @@
       <span class="gcard__foot">${tierChip(g.tier)}${fact ? `<span class="gcard__who">${fact}</span>` : `<span class="gcard__price">${g.price} <small>GNOT</small></span>`}</span></button>`;
   };
 
-  const wave = {
-    teaser: `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span>Opens Tue 6 Oct, 18:00 UTC</span></div></div>`,
-    soldout: `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span>All 104 found a player</span></div><div class="track"><i style="width:100%"></i></div></div>`,
-    players: `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span class="tag tag--gold">Players first · until Thu 18:00 UTC</span></div>
+  const sale = {
+    teaser: `<div class="panel"><div class="now__row"><span class="tag">Genesis</span><span>Opens Tue 6 Oct, 18:00 UTC</span></div></div>`,
+    soldout: `<div class="panel"><div class="now__row"><span class="tag">Genesis</span><span>All 720 found a player</span></div><div class="track"><i style="width:100%"></i></div></div>`,
+    players: `<div class="panel"><div class="now__row"><span class="tag">Genesis</span><span class="tag tag--gold">Players first · until Thu 18:00 UTC</span></div>
       <p class="note note--warn" style="margin:0">Save one round on-chain to buy now, or come back Thursday. <a href="#">Play a hole →</a></p></div>`,
-  }[s] || `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span>58 of 104 found a player · 41 players</span></div><div class="track"><i style="width:56%"></i></div></div>`;
+  }[s] || `<div class="panel"><div class="now__row"><span class="tag">Genesis</span><span>58 of 720 found a player · 41 players</span></div><div class="track"><i style="width:8%"></i></div></div>`;
   // the teaser: a daily spotlight on one Legendary; all seven are public (on chain and in the gallery) from the start
   const reveal = `<a class="panel now--auction now--reveal" href="share-card.html?state=reveal"><span class="reveal"><span class="gtile gtile--legendary"><img src="img/g12.png" alt=""></span></span>
       <span>Today's Legendary: The Miller<small>A spotlight a day on one of the seven · all are in the gallery</small></span><span class="btn btn--gold btn--s">See him</span></a>`;
-  // the wave's Legendary: a fixed price as every tier, one per wallet, the first buyer has him
+  // the sale's Legendaries: a fixed price as every tier, one per wallet, the first buyer has him
   const legendary = s === "teaser" ? reveal : `<a class="panel now--auction" href="gnome-sheet.html?state=legendary"><span class="gtile gtile--legendary"><img src="img/g12.png" alt=""></span>
-      <span>The Miller · Legendary<small><b>1,296 GNOT</b> · one of one, one per wallet</small></span><span class="btn btn--gold btn--s">See him</span></a>`;
+      <span>7 Legendaries wait at the flag<small><b>1,296 GNOT</b> · one of one, one per wallet</small></span><span class="btn btn--gold btn--s">See them</span></a>`;
   // Mine: who sees what, one line, and the team shared with the game's own Share row
   const who = `<div class="panel"><div class="now__row"><span>Everyone sees <b>The Miller</b> · You play <b>Tansy</b></span><button class="linkish">Show Tansy to everyone · ≈ 0.01 GNOT</button></div>${shareRow("Share my team")}</div>`;
   const summary = `<div class="panel"><div class="now__row"><span class="tag">Closed on ${CLOSES}</span><span>486 made · 234 never made</span></div>
@@ -133,7 +133,7 @@
         <h1 class="display inked">Who's on the ball?</h1>
         ${closed ? "" : closes()}
       </header>
-      <div class="now${closed || mineView ? " now--closed" : ""}">${closed ? summary : s === "mine" ? who : s === "mineempty" ? "" : wave + legendary}</div>
+      <div class="now${closed || mineView ? " now--closed" : ""}">${closed ? summary : s === "mine" ? who : s === "mineempty" ? "" : sale + legendary}</div>
       ${filters}
       ${body}
       <footer class="foot">${Kit.legal()}<details class="more"><summary>How the gnomes work</summary>

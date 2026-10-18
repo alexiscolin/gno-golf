@@ -25,15 +25,16 @@ The mockups are in `docs/superpowers/mockups/` ("Mockups", at the end).
   auctions.** Defaults, golf numbers: Common 36 (par of nine holes), Rare
   72 (par of a course), Epic 336 (the dimples on a golf ball), Legendary
   1,296 GNOT (18 holes × par 72); 59,424 GNOT if all 720 sell. Owner-settable
-  between waves, never lower on what is on sale. The first buyer of a gnome
+  before a sale opens, never lower on what is on sale. The first buyer of a gnome
   has him. All are bought the same way (`Buy(ids)`). The gallery says the
   golf meaning once, in "How the gnomes work".
-- **Waves** open by id range, one world each: wave 1 the Garden (ids 1 to
-  104: Commons 1-72, Rares 73-93, Epics 94-103, the Legendary The Miller
-  104), wave 2 the Island (105 to 208), and on. A wave's first window is
-  for wallets with a record in `store`.
-- **Caps per wallet**: in a players' window, 3 Commons, 2 Rares, 1 Epic a
-  wave; for life, 10, 5, 2, and **one Legendary**.
+- **One sale** opens the whole series at once (ADR-013): the genesis, ids 1
+  to 720, laid out a world at a time (the Garden 1 to 104: Commons 1-72,
+  Rares 73-93, Epics 94-103, the Legendary The Miller 104; the Island 105
+  to 208; and on). The sale's first window is for wallets with a record in
+  `store`.
+- **Caps per wallet**: in a players' window, 3 Commons, 2 Rares, 1 Epic
+  that window; for life, 10, 5, 2, and **one Legendary**.
 - **The genesis sale closes for good** at its closing date (it can only move
   earlier); unsold gnomes are never made.
 - **Wearing is free.** Everyone sees a player's best gnome by default; a
@@ -65,12 +66,12 @@ The mockups are in `docs/superpowers/mockups/` ("Mockups", at the end).
 7. **Short copy in the game's voice**; never "NFT", "mint", "invest",
    "floor", "returns", "value", "will go up", "early = cheaper", "last
    chance", "only N left" (legal pack §5).
-8. **Honest social proof, no pressure**: counts that go up per wave ("58 of
-   104 found a player · 41 players"), dates not countdowns, no fake timers.
+8. **Honest social proof, no pressure**: counts that go up per sale ("58 of
+   720 found a player · 41 players"), dates not countdowns, no fake timers.
 9. **Nothing interrupts play**, and **nothing of today's game is removed or
    resized**: the collection is one extra line or one compact section where
    needed.
-10. **Data, not code**: tiers, prices, waves, worlds, pieces from the realm,
+10. **Data, not code**: tiers, prices, sales, worlds, pieces from the realm,
     the catalogue and the palette.
 
 ### Layout, readability, scrolling, windows
@@ -147,9 +148,9 @@ the finish card, its clip and the HUD do not change.
 closed, loading, empty, error; phone.
 
 A front screen (the cups' look): the pill "The gnomes", "Who's on the ball?",
-the closing line; one row "now": the wave ("Wave 1 · Garden · 58 of 104 found
-a player · 41 players", its green) and the wave's Legendary ("The Miller ·
-Legendary · 1,296 GNOT · one of one, one per wallet", "See him"); the filters
+the closing line; one row "now": the sale ("Genesis · 58 of 720 found
+a player · 41 players", its green) and its Legendaries ("7 Legendaries wait
+at the flag · 1,296 GNOT · one of one, one per wallet", "See them"); the filters
 (`Segmented` "On sale · Mine · All 720", tier chips, "More filters" behind a
 tap, a search; one "Filters" button on a phone); the grid, paged; the legal
 links and "How the gnomes work" behind a tap.
@@ -158,9 +159,9 @@ links and "How the gnomes work" behind a tap.
 |---|---|
 | mine | "Mine" on; the row "now" becomes who sees what ("Everyone sees **The Miller** · You play **Tansy** · Show Tansy to everyone · ≈ 0.01 GNOT") and the game's Share row "Share my team"; the cards are the player's, the best first, marked "You play" / "Everyone sees" |
 | mineempty | "None yet. You play with the free five and the gnomes you earn on the course." · See the gnomes on sale |
-| teaser | the wave "Opens Tue 6 Oct, 18:00 UTC"; "Today's Legendary: The Miller · A spotlight a day on one of the seven · all are in the gallery" (no secret: the catalogue is public on chain from `AddSeries`) |
+| teaser | the sale "Opens Tue 6 Oct, 18:00 UTC"; "Today's Legendary: The Miller · A spotlight a day on one of the seven · all are in the gallery" (no secret: the catalogue is public on chain from `AddSeries`) |
 | players | "Players first · until Thu 18:00 UTC", "Save one round on-chain to buy now, or come back Thursday. Play a hole →" |
-| soldout | "All 104 found a player", the green full |
+| soldout | "All 720 found a player", the green full |
 | closed | "Closed on Sun 13 Dec, 18:00 UTC · 486 made · 234 never made", one bar, "By tier" behind a tap; never-made cards dashed |
 | loading / empty / error | blank cards in place / "No gnome like that one" · Clear the filters / "The chain did not answer" · Try again |
 | paused | "Paused for a moment: buying picks up where it stopped. The players' window and the closing date keep running." |
@@ -169,7 +170,7 @@ links and "How the gnomes work" behind a tap.
 
 `gnome-sheet.html`, the game's `Sheet` over the gallery, all its states.
 
-**Him**: the turntable tile (drag or arrow keys), tier chip, `#id · Wave ·
+**Him**: the turntable tile (drag or arrow keys), tier chip, `#id ·
 World`, the name inked, one line, the price ("336 GNOT + ≈ 0.46 GNOT deposit
 and fee"), the trust strip, "His traits" behind a tap; pinned, the blue "Buy
 Tansy · 336 GNOT". A Legendary is the same with his note: "One of one. At
@@ -269,9 +270,9 @@ passes; the realm stays callable with gnokey).
 | Phase | The gallery's row "now" |
 |---|---|
 | Teaser | "Opens <date>"; today's Legendary spotlight |
-| Players' window | the wave with "Players first" |
-| Open | the wave counting up; the wave's Legendary at his price |
-| Wave sold out | "All 104 found a player" |
+| Players' window | the sale with "Players first" |
+| Open | the sale counting up; its Legendaries at their price |
+| Sold out | "All 720 found a player" |
 | Paused | buying off; the players' window and the closing date keep running |
 | Closed | made vs never made |
 
@@ -559,7 +560,7 @@ seconds, ids as decimal strings.
 
 | Read | Fields the GUI uses | Screens |
 |---|---|---|
-| `Collection()` | `open`, `closesAt` (0: none set), `tiers[{name, price, cap, playerCap, sold}]` (`price`: the next wave's), `series[{name, first, last, sold, closed}]`, `waves[{first, last, start, playersUntil, prices}]`, `site` | the gallery's head, row "now", filters, closed state, A8 |
+| `Collection()` | `open`, `closesAt` (0: none set), `tiers[{name, price, cap, playerCap, sold}]` (`price`: the next sale's), `series[{name, first, last, sold, closed, sale}]`, each `sale` `{start, playersUntil, prices}` or null before one, `site` | the gallery's head, row "now", filters, closed state, A8 |
 | `Gnome(tid)` | `id, series, name, tier, traits, owner, price, sold, closed`; none: `{"id":""}` | the gnome sheet |
 | `Sold()` | the bitmap (bit id-1) | the grid's taken and never-made marks |
 | `GnomesOf(owner, offset)` | `total, next, rows[{id, tier, traits}]` (100 a page) | Mine, the picker's row, their gnomes |
@@ -577,11 +578,11 @@ Writes, each alone: `Buy(ids)` (1 to 5 ids, `-send` exactly their prices),
 | `gnomes: the sale is closed` | "Paused for a moment: buying picks up where it stopped. Nothing was sent." |
 | `gnomes: this gnome is already sold` | "Someone bought Tansy a moment before you. **Nothing was sent.**" |
 | `gnomes: players only until …: finish a hole first` | "Players first until Thu 8 Oct, 18:00 UTC: save one round on-chain to buy now." |
-| `gnomes: the player window takes K <tier> a wallet` | "3 of 3 Commons this wave, until Thu 8 Oct, 18:00 UTC. Nothing was sent." |
+| `gnomes: the player window takes K <tier> a wallet` | "3 of 3 Commons this window, until Thu 8 Oct, 18:00 UTC. Nothing was sent." |
 | `gnomes: the cap is K <tier> a wallet` | "One wallet keeps at most K <tier>s (one Legendary). Nothing was sent." |
 | `gnomes: wrong payment, send exactly <n>ugnot` | "The price changed while this page was open: it is now N GNOT. Nothing was sent." (the review refreshes) |
 | `gnomes: the genesis sale closed on <date>` | "The sale closed on Sun 13 Dec, 18:00 UTC. Nothing was sent." |
-| `gnomes: gnome N is not on sale yet` | "On sale from Wave 2." |
+| `gnomes: gnome N is not on sale yet` | "Not on sale yet. From the Island." (or "Opens <date>" once its sale is set) |
 | `gnomes: not your gnome` (Equip) | "Tansy is not in this wallet any more." |
 
 **Required of the realm by the owner's decisions** (not in it as written):
@@ -625,7 +626,7 @@ Builder's one phone screen.
 
 ## Evolvability
 
-A new wave, series, world, tier or piece is data (realm rows, the catalogue,
+A new series (and its sale), world, tier or piece is data (realm rows, the catalogue,
 the palette). Copy lives where it is used; the realm's refusals map in one
 table per feature.
 

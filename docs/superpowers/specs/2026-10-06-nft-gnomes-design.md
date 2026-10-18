@@ -24,10 +24,10 @@ the first draft's numbers and sale wherever they differ:
   Rare 72 (the par of a course), Epic 336 (the dimples on a golf ball),
   Legendary 1,296 (18 holes × par 72) (were 30, 99, 333 and a 777
   reserve, and before them 5, 20, 75 and 250); the owner's to change
-  between waves, never during one, and never lower on what is on sale;
-- the sale comes in waves, one world a wave, each a range of ids, each
-  opening with 48 hours kept for wallets with a record in store; the owner
-  opens the next wave (was: each tier opened whole);
+  before a sale opens, never during one, and never lower on what is on sale;
+- a series is sold in one sale, every id of it at once, opening with 48
+  hours kept for wallets with a record in store (was: each tier opened
+  whole, then a wave a world; waves removed, ADR-013);
 - **no auction**: the seven Legendaries are sold at their fixed price by
   the same `Buy` as the other tiers, one Legendary a wallet. The auction
   of the first drafts (48 hours, a reserve, escrowed bids, a soft close)
@@ -55,8 +55,7 @@ the first draft's numbers and sale wherever they differ:
   Gnome" (a premium under 景品表示法).
 
 The research brief (`docs/superpowers/research/2026-10-06-nft-best-practices.md`)
-is applied where it bears on the design: waves that sell out rather than
-one pool, the player window, the tier colours, the words the shop never
+is applied where it bears on the design: the player window, the tier colours, the words the shop never
 uses. Its auction advice is not: the auction was dropped (above). The
 lawyer pack (`docs/superpowers/legal/2026-10-06-lawyer-pack.md`) holds the
 legal questions. Section "Built so far vs this spec", near the end,
@@ -73,7 +72,7 @@ compares this spec with the code being built beside it.
   feat, and never sold.
 - The catalogue is data the owner publishes a series at a time; a later
   series (a season's gnomes) is one more publication, not a new realm.
-- The genesis is sold in seven waves, one world each. A wave's first 48
+- The genesis is sold in one sale, all 720 at once. Its first 48
   hours are for wallets that have a record in store; then anyone. The sale
   ends for good at its closing date; what is unsold then is never minted.
 - Every gnome is seen before it is paid for: a buyer picks a token by its
@@ -257,13 +256,13 @@ is about 200 lines) and is out of scope here.
   Particles are one instanced draw per effect; a trail is one ribbon mesh
   of at most 24 segments.
 
-### 2. The tiers, the series and the waves
+### 2. The tiers, the series and the sale
 
 The catalogue is published in **series**. The first, the genesis, is 720
 gnomes, all written before deploy and published before its sale opens:
 every token's look, name and tier can be read before anyone pays. A later
 series (a season's gnomes, say) is one more publication of rows, of any
-size, with no new code (section 9). Its counts, waves and prices are its
+size, with no new code (section 9). Its counts, sale and prices are its
 own data. Everything below gives the genesis's numbers.
 
 | tier | count | what it is | sold |
@@ -281,11 +280,13 @@ realm keeps, compared with the rows it is given) all follow. 504 is 72 a
 world; 144 and 65 are shared over the seven worlds as evenly as they go,
 the first worlds taking what is left over.
 
-**The waves.** The genesis is sold in seven waves, one world each, in this
-order. A wave is one range of ids: its Commons, then its Rares, its Epics,
-and its Legendary. Ids are fixed by the catalogue; a wave only opens them.
+**The sale and the worlds.** The genesis is sold in one sale: every id of
+it on sale from the same start (`OpenSale`, ADR-013). The catalogue lays
+the ids out a world at a time, in this order (`series.json`'s `worlds`): a
+world is one run of ids, its Commons, then its Rares, its Epics, and its
+Legendary. Ids are fixed by the catalogue; the sale only opens them.
 
-| wave | world | ids | Common | Rare | Epic | Legendary |
+| # | world | ids | Common | Rare | Epic | Legendary |
 |---|---|---|---|---|---|---|
 | 1 | the Garden | 1–104 | 1–72 | 73–93 | 94–103 | 104 |
 | 2 | the Island Cup | 105–208 | 105–176 | 177–197 | 198–207 | 208 |
@@ -299,7 +300,7 @@ Earned tokens are outside the catalogue's ids: they start at 1,000,001,
 above any id a catalogue can reach (64 series of at most 1,000 rows end at
 64,000), so a later series never meets them.
 
-The seven Legendaries, one a wave. The course has five cups; two
+The seven Legendaries, one a world. The course has five cups; two
 Legendaries belong to its set pieces instead. `kind` is the Legendary's
 number in its traits (section 10): 1 to 7 in the order they were designed
 (the Crystal Gnome first), not in the order of their ids:
@@ -375,12 +376,12 @@ either.)
 does; every owner check is on `cur.Previous().Address()`. A **treasury**,
 an address apart from the owner, receives every sale and the royalty: a
 cold wallet can hold the money while the owner's key does the daily
-settings. The owner can publish a series, open a wave, set the genesis's
-closing date (earlier only), set a tier's price for the waves to come
+settings. The owner can publish a series, open its sale, set the genesis's
+closing date (earlier only), set a tier's price for the sales to come
 within bounds, pause and resume every sale at once, set the site's URL,
 offer the treasury and the royalty to a new address, and sweep stray
 coins. The owner cannot mint a token for anyone, move or burn anyone's
-token, change a published series or wave, move the closing date later, or
+token, change a published series or opened sale, move the closing date later, or
 reserve anything: there is no airdrop and no team allocation.
 
 **The treasury** at deploy is a constant of the deploy, staged per chain by
@@ -399,7 +400,7 @@ bytes, the site's own at deploy. It is a setting, not part of a token: a
 moved site needs no new series.
 
 **After `Renounce`**, nobody can change a setting or publish a series,
-but nothing published is locked: the waves already opened stay on sale at
+but nothing published is locked: the sales already opened stay on sale at
 their prices until the closing date, which stays as it was set. A
 renounced realm sells what it has opened and nothing more. A treasury
 offer pending at the renounce can still be accepted; no new one can be
@@ -416,11 +417,11 @@ last id (`"720"` for the genesis), and `"1000001"` up for earned tokens. Lists t
 #### Writes, anyone
 
 ```go
-// Buy buys gnomes by id at their fixed price: 1 to 5 ids, each in a wave
+// Buy buys gnomes by id at their fixed price: 1 to 5 ids, each in a sale
 // that has started, none sold, before the genesis's closing date for a
 // genesis id; a Legendary among them like any other. A direct user call
-// (IsUserCall), with exactly the sum of their wave prices attached in
-// ugnot, forwarded to the treasury before it returns. In a wave's player
+// (IsUserCall), with exactly the sum of their sale prices attached in
+// ugnot, forwarded to the treasury before it returns. In a sale's player
 // window the caller must have a record in store, and the window's cap per
 // tier holds; the lifetime cap per tier (one Legendary a wallet) holds
 // always; both are checked for the whole batch. Returns the ids bought,
@@ -458,8 +459,9 @@ func Burn(cur realm, id grc721.TokenID)
 ```go
 func AddSeries(cur realm, name string, rows string)    // the next series, "id|tier|name|traits" a line, checked whole (section 9); the genesis first
 func SetCloseAt(cur realm, at int64)                   // the genesis's closing time (unix); unset at deploy, optional, set at launch or later; once set, only earlier, never later nor in the past
-func AddWave(cur realm, first, last, start, playerHours int64) // ids first to last on sale from start (unix), its first playerHours (0 to 168) for players, at the prices in force; no overlap; once a closing date is set, refused for a start at or after it
-func SetPrice(cur realm, tier string, ugnot int64)     // 1 to 10,000 GNOT; for the waves opened after it
+func OpenSale(cur realm, series string, start, playerHours int64) // every id of the series on sale from start (unix, a day back to a year ahead), its first playerHours (0 to 168) for players, at the prices in force, frozen into it; once a series; for the genesis, refused at or after its closing date
+func CancelSale(cur realm, series string)              // withdraws a sale before it starts, nothing of it sold; the series may open again
+func SetPrice(cur realm, tier string, ugnot int64)     // 1 to 10,000 GNOT; for the sales opened after it
 func SetMintOpen(cur realm, open bool)                 // pause or resume every sale at once; closed at deploy
 func SetSiteURL(cur realm, url string)                 // https://, at most 128 printable bytes; external_url and Render's links
 func SetTreasury(cur realm, to address)                // offers the treasury to a valid address, not the realm's; it takes it with AcceptTreasury
@@ -472,10 +474,11 @@ func Renounce(cur realm)
 ```
 
 `MintEarned` is open from deploy, and `SetMintOpen` and the closing date
-do not close it, because it sells nothing. A published series and an
-opened wave are never changed nor withdrawn: a wave keeps the prices it
-opened at, so `SetPrice` never lowers what is on sale. Each setter emits an
-event naming the new value (`SeriesAdded`, `CloseAtSet`, `WaveAdded`,
+do not close it, because it sells nothing. A published series is never
+changed, and a sale is never changed nor, once started or with a gnome
+sold, withdrawn: a sale keeps the prices it opened at, so `SetPrice` never
+lowers what is on sale. Each setter emits an
+event naming the new value (`SeriesAdded`, `CloseAtSet`, `SaleOpened`, `SaleCancelled`,
 `PriceSet`, `MintOpen`, `SiteURLSet`, `TreasuryOffered`, `TreasurySet`,
 `RoyaltySet`, `Swept`, and the owner's `OwnershipOffered`,
 `OwnershipTransfer`, `OwnershipRenounced`). The writes emit `GnomeBought`
@@ -505,7 +508,7 @@ The game's own:
 
 ```go
 // Gnome is one token of the catalogue or an earned one, minted or not;
-// its price is its wave's, or the price in force when no wave holds it yet:
+// its price is its sale's, or the price in force when its series is on no sale yet:
 // {"version":1,"id":"42","series":"genesis","name":"Pip Seedwell",
 //  "tier":"common","traits":"01…","owner":"g1…" or "","price":36000000,
 //  "sold":true}
@@ -544,27 +547,27 @@ func Proof(kind string, player address) string
 
 // Collection is the settings in one read: whether sales are open; the
 // genesis's closing date; per tier its price in force, its lifetime and
-// player-window caps, how many sold; the series (name, first, last id); the
-// waves (first, last, start, end of the player window, prices); the
+// player-window caps, how many sold; the series (name, first, last id), each
+// with its sale (start, end of the player window, prices; null before one); the
 // treasury and any pending offer, the royalty, the site's URL, the owner.
 func Collection() string
 
 func Render(path string) string
 ```
 
-`Render` gives gnoweb the collection (series, waves with their dates and
+`Render` gives gnoweb the collection (series, each sale with its dates and
 how many sold, prices, the closing date, a link to the site), a page per
 gnome with its portrait (gnoweb's markdown keeps `data:image/svg+xml`
 images: `gno.land/pkg/gnoweb/markdown/ext_imgvalidator.go`), and a player's
 page with their tokens and worn gnome.
 
-### 6. Payments, the waves and the close
+### 6. Payments, the sale and the close
 
 - **Buy** copies gnofly's guard in its order: `IsUserCall`, then the ids
-  (parsed strictly, distinct, each in a wave that has started, unsold, and,
+  (parsed strictly, distinct, each in a sale that has started, unsold, and,
   for a genesis id, before the closing date), then the player window and
   the caps, then `OriginSend()` equal to exactly one coin of `ugnot` for
-  the sum of the wave prices, then the state (caps, mints), then one
+  the sum of the sale prices, then the state (caps, mints), then one
   `OriginSend` banker send of that sum to the treasury. A refused call
   reverts its send with it: nobody pays for a refusal. Two buyers asking
   the same id in one block: the second panics on "sold" and keeps their
@@ -572,13 +575,13 @@ page with their tokens and worn gnome.
 - **Prices**, golf's own numbers: Common 36 GNOT (the par of nine holes),
   Rare 72 (the par of a course), Epic 336 (the dimples on a golf ball),
   Legendary 1,296 (18 holes × par 72). `SetPrice` changes a tier's price
-  within its bounds (1 to 10,000 GNOT) for the waves opened after it; a
-  wave keeps the prices it opened at until its last id is sold or the sale
+  within its bounds (1 to 10,000 GNOT) for the sales opened after it; a
+  sale keeps the prices it opened at until its last id is sold or the sale
   closes. So nothing on sale is ever made cheaper, and a buyer reads a
   price that cannot move under them. The owner re-prices, if GNOT moves a
-  lot, between waves only, and does not open a later wave cheaper than an
-  earlier one in GNOT terms without saying why.
-- **The Legendaries are sold like the rest**, one a wave, at the
+  lot, before a series' sale opens only, and does not open a later series
+  cheaper than an earlier one in GNOT terms without saying why.
+- **The Legendaries are sold like the rest**, all seven in the sale, at the
   Legendary price, by `Buy`, one a wallet over the whole sale. There is no
   auction. The first drafts auctioned them (48 hours, a reserve, each bid
   escrowed by the realm and the outbid refunded, a soft close); that was
@@ -587,24 +590,25 @@ page with their tokens and worn gnome.
   legal clarity (no bid that is an order, no auction rules, no coins kept
   for others). A Legendary unsold at the close is never minted, like any
   other id.
-- **Waves.** `AddWave` opens one world's range of ids from a start time.
+- **The sale.** `OpenSale` opens every id of a series from a start time
+  (ADR-013; the waves of the first drafts, a world at a time, are gone).
   For its first 48 hours (the genesis's setting; the call takes the hours)
   it sells only to a wallet with a record in store, a standing in either
   mode in golf's `totals` (v1's records were copied in), and at most 3
   Commons, 2 Rares, 1 Epic and 1 Legendary a wallet in that window. Then
   anyone, under the lifetime caps: Common 10, Rare 5, Epic 2, Legendary 1
-  a wallet over all waves. The owner opens the next wave by hand, when the
-  last one has mostly sold (the brief suggests about 70%); nothing opens on
-  its own. A cap spreads the sale over players, it is not a defence: anyone
+  a wallet over the whole sale. The window's caps are counted per series
+  and buyer, so a sale withdrawn and opened again hands no fresh window.
+  The owner opens the sale by hand; nothing opens on its own. A cap spreads the sale over players, it is not a defence: anyone
   can open more wallets. The caps are constants of the realm, kept with
   the supply in one config file.
 - **The close.** The genesis can have a hard closing date, `SetCloseAt`:
   unset at deploy and optional (decided 2026-10-07): the owner may set it at
-  launch or later, and waves and the sale run without one. Once set it can only move earlier (never later, and
+  launch or later, and the sale runs without one. Once set it can only move earlier (never later, and
   never into the past), so the date a buyer reads is the latest the sale
   can run. From it on, `Buy` refuses every genesis id ("sale closed"),
-  whatever wave holds it; an id unsold then is never minted, by anyone,
-  and no wave may start at or after it. A later series has its own sale,
+  whatever sale holds it; an id unsold then is never minted, by anyone,
+  and no sale may start at or after it. A later series has its own sale,
   not more of the genesis. The shop shows the date on every page once one is set.
 - **Royalty**: 5% by default, to the treasury, through royalty/v0's default
   royalty, readable as `RoyaltyInfo`. EIP-2981 is advisory: a plain
@@ -686,7 +690,7 @@ So a later format can refuse a mint, never prove a false one. A script
 compares the proof with golf/v2's `BestOf` on onyx's real rows before each
 deploy (section 16).
 
-**The player window's read.** A wave's player window asks less: whether a
+**The player window's read.** A sale's player window asks less: whether a
 wallet has a standing in either mode, `store.Has("totals", "assisted
 "+addr)` or `store.Has("totals", "pro "+addr)`, which golf/v2 writes from a
 player's first finished hole (v1's records were copied in). A copy counts
@@ -725,10 +729,10 @@ Approvals of an earned token are refused too, so no market lists one.
 | what | where | size |
 |---|---|---|
 | the catalogue | `catalogue`, a slice of series, each its rows as published: one string, `id|tier|name|traits` a line, read in place by bisection | the genesis about 720 × 64 bytes, paid by the owner when it is published |
-| the waves | `waves`, a slice: first and last id, start, end of the player window, prices per tier | a few dozen bytes a wave |
+| the sales | `sales`, a slice, one a series at most: the series, start, end of the player window, prices per tier | a few dozen bytes a sale |
 | the ledger | grc721's `PrivateLedger` (owners, balances, approvals), royalty's default | per token, below |
 | a wallet's tokens | `held`, bptree: `"<owner> <id on 9 digits>"` → `""`, so a wallet's rows sort by id | one row per token |
-| caps | `bought`, bptree: address → counts per tier; `inWindow`, bptree: `"<wave> <address>"` → counts per tier | one row per buyer, one per buyer and window |
+| caps | `bought`, bptree: address → counts per tier; `inWindow`, bptree: `"<series> <address>"` → counts per tier | one row per buyer, one per buyer and window |
 | earned | `earned`, bptree: `"<address> <kind>"` → id; `kinds`, bptree: id → kind | two rows per earned token |
 | equipped | `equipped`, bptree: address → id, the optional `Equip` choice (`Worn` derives the rest from `held`) | one row per player who equips |
 | settings | the price in force per tier, open or paused, the closing date, sold per tier; the site's URL; treasury and its pending offer, owner and its pending; the next earned id | at deploy |
@@ -741,7 +745,7 @@ token's id is its catalogue row's, and a published series never changes,
 so the row is the token's record.
 
 The bounds that keep every walk short: at most 64 series of at most 1,000
-rows each, 64 waves, a name of 48 bytes and traits of 256, 5 ids a `Buy`,
+rows each (so 64 sales, one a series), a name of 48 bytes and traits of 256, 5 ids a `Buy`,
 50 players a `WornMany`, 100 rows a `GnomesOf` page and a `Worn`'s look
 for the best.
 
@@ -757,7 +761,7 @@ typical one:
 
 | what | bytes | deposit, paid by |
 |---|---|---|
-| the genesis published, with one wave | 46,230 | 4.6 GNOT, the owner |
+| the genesis published, with one wave (measured before ADR-013; now its one sale) | 46,230 | 4.6 GNOT, the owner |
 | a buyer's first gnome | 3,535 | 0.35 GNOT, the buyer, on top of the price, returned on `Burn` |
 | a buy, on average over the first 11 buyers | about 5,300 | about 0.53 GNOT |
 
@@ -832,7 +836,7 @@ prices and sells by the row's tier, which the traits repeat: the script
 that writes the rows takes both from the same entry and checks they agree.
 
 **The catalogue's source** is `data/gnomes/`: `series.json` (each series'
-code, first id, supply per tier, waves in order, the generator's seed, the
+code, first id, supply per tier, its worlds in order, the generator's seed, the
 starting sale settings) and, per series, `archetypes.json` (the Commons'
 and Rares' archetypes and palettes), `epics.json` and `legendaries.json`
 (designed by hand). `scripts/gnomes.ts` makes `data/gnomes.json` from them,
@@ -939,8 +943,8 @@ ADR-003 holds: a static export, no server, nothing that needs one.
     on-chain." → the Viking's page;
   - a Legendary bought: "The Storm Gnome is mine, one of seven." → 720's
     page;
-  - a wave opened: "Wave 2 is open: the Island Cup's gnomes." → the
-    gallery, filtered to the wave;
+  - the sale opened: "The Genesis is on sale: 720 gnomes." → the
+    gallery;
   - showing one to everyone (`Equip`), from the picker: "My gnome for the
     boards: The Admiral." →
     its page.
@@ -960,9 +964,9 @@ How the project's owner earns, and only that:
   at the starting prices, the sum would be 504 × 36 + 144 × 72 + 65 × 336
   + 7 × 1,296 = 18,144 + 10,368 + 21,840 + 9,072 = 59,424 GNOT. That is
   the ceiling of the starting settings, not a forecast: nothing says how
-  many will sell (gnofly sold 162 planes in its first weeks), the owner
-  opens a wave only when the last has mostly sold, the prices of later
-  waves can change, and what is unsold at the closing date is never minted.
+  many will sell (gnofly sold 162 planes in its first weeks), the prices
+  of a later series' sale can differ, and what is unsold at the closing
+  date is never minted.
 - **Royalties** are a tip, not income: budget on the sale above only.
 - **Royalties**: 5% of a resale, to the treasury, only where a market pays
   `RoyaltyInfo`. With no market for these tokens today (Context), expect
@@ -981,12 +985,12 @@ How the project's owner earns, and only that:
 | Money held by the realm | none: a sale is forwarded in the same call, and there is no auction, so no escrow; `Sweep` sends coins sent by mistake to the treasury |
 | The treasury moved to a wrong or hostile address | two steps: `SetTreasury` only offers, and the sales keep going to the old treasury until the new address calls `AcceptTreasury`; the offer refuses the realm's own address and an invalid one |
 | GNOT restricted again by governance | every `Buy` reverts (the treasury send fails) and nobody's coins move; nothing is held, so nothing is stuck |
-| The closing date pushed back to sell more | `SetCloseAt` only moves it earlier; `AddWave` refuses a start at or after it; `Buy` refuses a genesis id from it on |
-| A stolen owner key | can publish a series, open waves before the close, change the prices of the waves to come, bring the close forward, pause the sale, set the site's URL (which the shop's links and `external_url` follow), offer the treasury (it moves only if the new address accepts), set the royalty and accept store's current rules for the earned gnomes' proof (`AcceptRules`, never another realm); cannot mint for anyone, move or burn a token, take a sale, push the close later, or change a published series or an opened wave. `Renounce` freezes the settings for good |
-| A price cut that undercuts earlier buyers | a wave keeps the prices it opened at; `SetPrice` moves only the waves opened after it |
+| The closing date pushed back to sell more | `SetCloseAt` only moves it earlier; `OpenSale` refuses a start at or after it; `Buy` refuses a genesis id from it on |
+| A stolen owner key | can publish a series, open its sale before the close (and withdraw it before it starts, nothing sold), change the prices of the sales to come, bring the close forward, pause the sale, set the site's URL (which the shop's links and `external_url` follow), offer the treasury (it moves only if the new address accepts), set the royalty and accept store's current rules for the earned gnomes' proof (`AcceptRules`, never another realm); cannot mint for anyone, move or burn a token, take a sale, push the close later, or change a published series or an opened sale. `Renounce` freezes the settings for good |
+| A price cut that undercuts earlier buyers | a sale keeps the prices it opened at; `SetPrice` moves only the sales opened after it |
 | A wallet taking several Legendaries | the lifetime cap of one Legendary a wallet; like every cap, it spreads the sale, it does not stop a buyer with many wallets |
-| The player window gamed by fresh wallets | a record costs a finished hole on chain, and the window has its own cap per wallet and wave; it spreads the first days over players, it does not claim to stop a determined buyer |
-| A catalogue or a query that grows without bound | at most 64 series of 1,000 rows, 64 waves, 5 ids a `Buy`, 50 players a `WornMany`, 100 rows a `GnomesOf` page or a `Worn`; a series is checked whole before it is kept |
+| The player window gamed by fresh wallets | a record costs a finished hole on chain, and the window has its own cap per wallet and series' sale (a sale withdrawn and opened again hands no fresh window); it spreads the first days over players, it does not claim to stop a determined buyer |
+| A catalogue or a query that grows without bound | at most 64 series of 1,000 rows (so 64 sales), 5 ids a `Buy`, 50 players a `WornMany`, 100 rows a `GnomesOf` page or a `Worn`; a series is checked whole before it is kept |
 | A forged realm value given to a helper | helpers take `cur` and check `IsCurrent`, as gnofly's `callerOf` does |
 | Malformed ids | strict decimal, no leading zero, in a known range; anything else is "unknown gnome" |
 | An earned token sold or listed | `OnTransfer` and `Approve` refuse it |
@@ -1016,11 +1020,11 @@ shop's words, are in `docs/superpowers/legal/`.
   staking, no buy-back, no airdrop or token promised to holders. The
   game's words never speak of floors, returns, flipping, "early is cheaper"
   or "will go up", and no timer or counter is fake: the shop counts each
-  wave up ("61 of 104 found a player"), never a whole collection down. The
+  sale up ("61 of 720 found a player"), never a whole collection down. The
   royalty goes to the project only. For the lawyer: MiCA's recital 11
   treats issuance "in a large series or collection" as a sign that
   crypto-assets are fungible, not unique; 720 fixed-price items in four
-  tiers, each with its own look and name, sold in waves, may or may not
+  tiers, each with its own look and name, sold in one sale, may or may not
   meet that test, and the answer decides whether the sale falls under
   MiCA. Ads aimed at the UK show the price and fees and say NFTs are
   unregulated (the ASA's rulings).
@@ -1099,19 +1103,21 @@ shop's words, are in `docs/superpowers/legal/`.
     time (`context_testing.gno`), dropping the realm and the `OriginSend`
     set before it: after every `SkipHeights`, the test sets `SetRealm` and
     `SetOriginSend` again.
-- Buy: paused, an id in no wave, an id of a wave not started, a sold id,
+- Buy: paused, an id in no sale, an id of a sale not started, a sold id,
   an id twice in one batch, six ids, an earned id; a Legendary bought at
   its price, a second Legendary for the same wallet refused (in one batch
-  and across waves); in a player
+  and across batches); in a player
   window a wallet with no record refused and one with a record in either
   mode taken, the window's cap reached in one batch and across batches; the
-  lifetime cap the same; a `SetPrice` after a wave opened leaves the wave's
-  prices as they were and prices the next wave; a price changed between
-  the read and the `Buy` of a wave not yet opened, refused by the exact
+  lifetime cap the same; a `SetPrice` after a sale opened leaves the sale's
+  prices as they were and prices the next sale; a price changed between
+  the read and the `Buy` of a sale not yet opened, refused by the exact
   check, coins kept.
-- Waves: `AddWave` refuses an overlap, a range past the catalogue, a
-  window over 168 hours, a 65th wave, and, once a closing date is set, a start at
-  or after it.
+- Sales: `OpenSale` refuses an unknown series, a second sale of a series,
+  a start more than a day back or a year ahead, a window over 168 hours,
+  and, once a closing date is set, a start at or after it; `CancelSale`
+  refuses a sale under way or with a gnome sold, and a sale opened again
+  hands no fresh player window.
 - The close, with `testing.SkipHeights` to move time (5 s a block):
   a sale with no closing date runs on; `SetCloseAt` later than the one
   set, or in the past, refused, earlier taken; a `Buy` of a genesis id one
@@ -1123,7 +1129,7 @@ shop's words, are in `docs/superpowers/legal/`.
   `AcceptTreasury` by anyone else refused; a deploy constant equal to the
   owner refused by `init`. `SetSiteURL` refuses a non-`https://` URL, 129
   bytes and a control byte; `TokenMetadata`'s `external_url` follows it.
-  After `Renounce`, every setter refused, the opened waves still on sale
+  After `Renounce`, every setter refused, the opened sales still on sale
   until the close. `Sweep` sends the realm's whole balance to the treasury.
 - Earned: a test cannot make course slots through golf/v2 (under `gno test`
   golf has no owner, `setUp` in `golf/v2/owner.gno`, and only the owner
@@ -1155,7 +1161,7 @@ shop's words, are in `docs/superpowers/legal/`.
 - The portrait: drawn from the traits for each tier; a name with markup
   escaped; a code past the realm's tables drawn plain.
 - Storage: filetests with `// Storage:` goldens for the genesis published
-  with a wave, a first buy, a second buy, a Legendary buy, an earned mint,
+  with its sale, a first buy, a second buy, a Legendary buy, an earned mint,
   a first equip.
 
 **Client** (`npm test`, `web/test/`): `gnomes.test.ts` for the codec
@@ -1181,7 +1187,7 @@ them, closed for CN, CU, IR, KP, SY, RU and BY.
 
 1. The realm and its tests, on a local gnodev.
 2. **Onyx**, deployed closed (`SetMintOpen` false). The owner publishes the
-   genesis (`AddSeries`), sets a closing date, opens a test wave, buys one
+   genesis (`AddSeries`), sets a closing date, opens a test sale, buys one
    of each tier (a Legendary included), moves the treasury in its two steps,
    brings the close forward and sees the sale end, mints an earned gnome from a played
    cup, and measures each storage deposit and the heaviest proof's gas; the
@@ -1197,7 +1203,7 @@ them, closed for CN, CU, IR, KP, SY, RU and BY.
    staged address apart from the owner, its site's URL the site's, and the
    genesis published. The shop's country rules go live with the site. The earned tier works from deploy (it sells nothing) but
    proves nothing until mainnet has slots, and the player window has no
-   players until it has records: a wave opens only once the course is
+   players until it has records: the sale opens only once the course is
    published there. Until then the shop says "earned gnomes open with the
    course" instead of offering the mint, and the gallery shows every gnome
    as "not yet on sale".
@@ -1206,11 +1212,9 @@ them, closed for CN, CU, IR, KP, SY, RU and BY.
    - At launch, or later, the owner may set the genesis's closing date
      (`SetCloseAt`), which the shop shows from then on; it can come earlier,
      never later. Without one the sale runs on.
-   - Wave 1 (the Garden, ids 1–104, its Legendary The Miller among them)
-     opens with `AddWave(1, 104, start, 48)` and `SetMintOpen(true)`.
-   - Wave 2 (the Island Cup, ids 105–208), then each next wave, about a
-     week apart, only when the last has mostly sold; otherwise the owner
-     waits. Unsold ids stay on sale at their wave's price until the close.
+   - The genesis's sale (ids 1–720, its seven Legendaries among them)
+     opens with `OpenSale("genesis", start, 48)` and `SetMintOpen(true)`.
+     Unsold ids stay on sale at the sale's price until the close.
    - At the closing date the sale ends; whatever is unsold, a Legendary
      included, is never minted.
 5. Docs: a `docs/gnomes.md` API page like `docs/golf.md`, the ADR from this
@@ -1235,7 +1239,8 @@ follows the code; done above), **code** (the code follows the spec), or
 
 **Built in the realm:** the catalogue as series (`AddSeries`, rows
 `id|tier|name|traits` read by bisection), waves with a player window
-(`AddWave`, `hasRecord` on store's `totals`), `SetPrice` per wave,
+(`AddWave`, `hasRecord` on store's `totals`), `SetPrice` per wave (later
+replaced: one sale a series, `OpenSale`/`CancelSale`, ADR-013),
 `SetMintOpen`, `Buy`, an auction (`StartAuction`, `Bid`, `Settle`,
 `CancelAuction`, to be removed), `Sweep`, `Equip`, `Equipped`, `EquippedMany`, the GRC721
 surface, `Collection`, `Gnome`, `Sold`, `GnomesOf`, a placeholder
@@ -1253,16 +1258,16 @@ throughout; the script that writes the realm's rows.
 
 | point | where | settle |
 |---|---|---|
-| Ids laid out by wave (each world's Commons, Rares, Epics, Legendary in one range), not by tier | `catalogue.ts` `planSeries`, `data/gnomes.json` | spec |
+| Ids laid out by world (each world's Commons, Rares, Epics, Legendary in one range), not by tier | `catalogue.ts` `planSeries`, `data/gnomes.json` | spec |
 | The catalogue published as series by `AddSeries`, not a table committed with the code; rows `id|tier|name|traits` | `catalogue.gno`, `rows.gno` | spec |
 | Traits: format 1 is 29 bytes (series, home, archetype, accent, prop added; a 32-bit accessory mask), not 18; palette 82 colours, not 64 | `codec.ts`, `vocab.ts` | spec |
 | An earned token's traits are tier and kind only; the client draws `GNOMES`' own | `skin.ts` `traitsOf`, `skinOf` | spec |
 | Legendary `kind` 1–7 in design order (Crystal 1), not by id | `legendaries.json` | spec |
 | Rares and Epics richer than the first draft (six patterns, six pieces, Epic props, eight Epic materials); `EARNED_ONLY` adds `mask` and `sash` outright | `vocab.ts`, `validate.ts`, `epics.json` | spec |
-| Waves replace `SetOpen` per tier; caps are constants (no `SetCap`); `SetMintOpen` pauses all | `waves.gno`, `config.gno`, `gnomes.gno` | spec |
+| Waves replace `SetOpen` per tier; caps are constants (no `SetCap`); `SetMintOpen` pauses all | `waves.gno`, `config.gno`, `gnomes.gno` | spec; later the waves became one sale a series (`sale.gno`, ADR-013) |
 | An auction for the Legendaries (`StartAuction`, `Bid`, `Settle`, `CancelAuction`, `Auction`, escrow in `Sweep`) | `auction.gno`, `gnomes.gno` | code: removed; the Legendaries are sold by `Buy` at 1,296 GNOT, one a wallet (decided) |
 | Prices 30/99/333 and a 777 reserve | `config.gno`, `data/gnomes/series.json` | code: 36/72/336/1,296 GNOT (decided) |
-| No closing date | `waves.gno`, `config.gno` | code: `SetCloseAt`, optional (none at deploy), earlier only once set (decided 2026-10-07) |
+| No closing date | `waves.gno` (now `sale.gno`, `close.gno`), `config.gno` | code: `SetCloseAt`, optional (none at deploy), earlier only once set (decided 2026-10-07) |
 | `Equipped`/`EquippedMany` answer only an `Equip` choice | `equip.gno` | code: `Worn`/`WornMany`, the best owned unless equipped (decided) |
 | No site URL setting; `external_url` a constant | `token.gno` | code: `SetSiteURL` (decided) |
 | `Sold` asks the ledger per id instead of a stored bitmap | `read.gno` | spec |
@@ -1279,9 +1284,9 @@ throughout; the script that writes the realm's rows.
 | `GnomesOf(owner)` returns the first 100 only, no `offset` or `next` | `read.gno` | code |
 | `RoyaltyInfo` returns `(address, int64)` and panics, not royalty/v0's `(address, int64, error)` | `token.gno` | code |
 | Token ids taken as `string` and `int64`, not `grc721.TokenID` | `token.gno` | spec (the same over a `MsgCall`); either is fine |
-| The realm's comments cite ADR-006; the file is `adr-007-gnomes.md`, and no ADR-006 exists | `catalogue.gno`, `waves.gno` | code: one number, whichever is free when it lands |
+| The realm's comments cite ADR-006; the file is `adr-007-gnomes.md`, and no ADR-006 exists | `catalogue.gno`, `waves.gno` (now `sale.gno`) | code: one number, whichever is free when it lands |
 | The designer's budget: 6,000 triangles for Commons and Rares (spec 5,000), 6,500 for Epics (6,000), draws counted in total, not added after `bake` | `validate.ts` `BUDGET` | **open**: measure on a phone before raising the spec's limits |
-| `series.json`'s note says the owner "never lowers a price"; the brief re-prices in GNOT if GNOT moves | `data/gnomes/series.json` | code (decided): prices are the owner's to set between waves, never lower on what is on sale; the note says that |
+| `series.json`'s note says the owner "never lowers a price"; the brief re-prices in GNOT if GNOT moves | `data/gnomes/series.json` | code (decided): prices are the owner's to set before a sale opens (between waves, before ADR-013), never lower on what is on sale; the note says that |
 | The genesis filetest puts the Legendaries first (ids 1–7) | `z_storage_genesis_filetest.gno` | code (cosmetic): lay it out as the plan does, so the golden matches the real catalogue's size |
 
 ## Verified facts
@@ -1345,7 +1350,7 @@ found there.
 
 None. Every point of the review is applied above. The one that concerned
 the auction (Legendaries frozen after `Renounce`) is moot since the
-auction was dropped: a Legendary is on sale with its wave, like any id,
+auction was dropped: a Legendary is on sale with its series, like any id,
 until the close.
 
 ## Out of scope
