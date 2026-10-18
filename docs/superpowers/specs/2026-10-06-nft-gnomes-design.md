@@ -33,9 +33,10 @@ the first draft's numbers and sale wherever they differ:
   of the first drafts (48 hours, a reserve, escrowed bids, a soft close)
   was dropped for simplicity (no coins held for anyone, a third less code
   and tests) and legal clarity (no bid as an order, no auction rules);
-- the genesis can have a **hard closing date** (`SetCloseAt`), set at launch or later:
-  it can move earlier, never later, and what is unsold then is never
-  minted;
+- the genesis has a **hard closing date** (`SetCloseAt`), set before its
+  sale opens (the realm refuses `OpenSale` and `SetMintOpen(true)` for it
+  until then): it can move earlier, never later, and what is unsold then is
+  never minted;
 - **wearing is free by default**: everyone shows their best gnome, derived
   from what they own on chain (`Worn`); any owned gnome can be played in
   one's own browser for free; `Equip` on chain is optional, to choose which
@@ -458,7 +459,7 @@ func Burn(cur realm, id grc721.TokenID)
 
 ```go
 func AddSeries(cur realm, name string, rows string)    // the next series, "id|tier|name|traits" a line, checked whole (section 9); the genesis first
-func SetCloseAt(cur realm, at int64)                   // the genesis's closing time (unix); unset at deploy, optional, set at launch or later; once set, only earlier, never later nor in the past
+func SetCloseAt(cur realm, at int64)                   // the genesis's closing time (unix); unset at deploy, set before the genesis sells (OpenSale and SetMintOpen(true) refuse it until then); once set, only earlier, never later nor in the past
 func OpenSale(cur realm, series string, start, playerHours int64) // every id of the series on sale from start (unix, a day back to a year ahead), its first playerHours (0 to 168) for players, at the prices in force, frozen into it; once a series; for the genesis, refused at or after its closing date
 func CancelSale(cur realm, series string)              // withdraws a sale before it starts, nothing of it sold; the series may open again
 func SetPrice(cur realm, tier string, ugnot int64)     // 1 to 10,000 GNOT; for the sales opened after it
@@ -602,14 +603,16 @@ page with their tokens and worn gnome.
   The owner opens the sale by hand; nothing opens on its own. A cap spreads the sale over players, it is not a defence: anyone
   can open more wallets. The caps are constants of the realm, kept with
   the supply in one config file.
-- **The close.** The genesis can have a hard closing date, `SetCloseAt`:
-  unset at deploy and optional (decided 2026-10-07): the owner may set it at
-  launch or later, and the sale runs without one. Once set it can only move earlier (never later, and
+- **The close.** The genesis has a hard closing date, `SetCloseAt`:
+  unset at deploy, and set before the genesis sells: until it is,
+  `OpenSale` of the genesis and `SetMintOpen(true)` are refused, so a buyer
+  always knows when the sale ends (ADR-007; the 2026-10-07 "optional" was
+  dropped). Once set it can only move earlier (never later, and
   never into the past), so the date a buyer reads is the latest the sale
   can run. From it on, `Buy` refuses every genesis id ("sale closed"),
   whatever sale holds it; an id unsold then is never minted, by anyone,
   and no sale may start at or after it. A later series has its own sale,
-  not more of the genesis. The shop shows the date on every page once one is set.
+  not more of the genesis. The shop shows the date on every page.
 - **Royalty**: 5% by default, to the treasury, through royalty/v0's default
   royalty, readable as `RoyaltyInfo`. EIP-2981 is advisory: a plain
   `TransferFrom` pays none.
@@ -1031,7 +1034,7 @@ shop's words, are in `docs/superpowers/legal/`.
 - **No auction.** Dropped for legal clarity as much as simplicity: no bid
   that is an order, no auction rules, no coins held for anyone, the same
   confirmation screen for every purchase.
-- **A hard closing date** once the owner sets one (optional), shown on every shop page and on the confirmation
+- **A hard closing date**, set before the genesis sells, shown on every shop page and on the confirmation
   screen (申込期間): it can only come earlier, and nothing unsold is minted
   after it, so "limited" means what it says for the genesis; the shop still
   says later series may be sold.
@@ -1115,11 +1118,11 @@ shop's words, are in `docs/superpowers/legal/`.
   check, coins kept.
 - Sales: `OpenSale` refuses an unknown series, a second sale of a series,
   a start more than a day back or a year ahead, a window over 168 hours,
-  and, once a closing date is set, a start at or after it; `CancelSale`
+  and, for the genesis, any before a closing date is set or at or after it; `CancelSale`
   refuses a sale under way or with a gnome sold, and a sale opened again
   hands no fresh player window.
 - The close, with `testing.SkipHeights` to move time (5 s a block):
-  a sale with no closing date runs on; `SetCloseAt` later than the one
+  no genesis sale nor `SetMintOpen(true)` before a date is set; `SetCloseAt` later than the one
   set, or in the past, refused, earlier taken; a `Buy` of a genesis id one
   block before the close taken and one at it refused, its coins kept; an
   unsold id stays unminted after it; `MintEarned` unaffected.
@@ -1209,9 +1212,9 @@ them, closed for CN, CU, IR, KP, SY, RU and BY.
    as "not yet on sale".
    - The two weeks before: one Legendary shown a day, with its lore; the
      gallery live, nothing for sale.
-   - At launch, or later, the owner may set the genesis's closing date
+   - Before the sale, the owner sets the genesis's closing date
      (`SetCloseAt`), which the shop shows from then on; it can come earlier,
-     never later. Without one the sale runs on.
+     never later. Without one the realm opens no genesis sale.
    - The genesis's sale (ids 1–720, its seven Legendaries among them)
      opens with `OpenSale("genesis", start, 48)` and `SetMintOpen(true)`.
      Unsold ids stay on sale at the sale's price until the close.
