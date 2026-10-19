@@ -165,10 +165,10 @@ void test("gnokeyPublish: adena's one gnokey call, signed by the author's addres
 
 void test("parLine: the par explained from the rounds that proved it", () => {
   const s = (...strokes: number[]) => strokes.map((n) => ({ strokes: n }));
-  assert.equal(parLine(s(2, 2, 2), 3), "Holed in 2 everywhere · par 3 leaves room");
-  assert.equal(parLine(s(2, 3, 2), 4), "Holed in 2 to 3 by weather · par 4 leaves room");
-  assert.equal(parLine(s(1, 1, 1), 2), "Holed in 1 everywhere · par 2 leaves room");
-  assert.equal(parLine(s(2, 2, 2), 5), "Holed in 2 everywhere · par 5 leaves room");
-  assert.equal(parLine(s(3, 3), 3), "Holed in 3 everywhere · par 3 leaves none: at least 4", "a par the rounds do not allow (Publish refuses it too)");
+  assert.equal(parLine(s(2, 2, 2), 3), "Holed in 2 everywhere: room to spare");
+  assert.equal(parLine(s(2, 3, 2), 4), "Holed in 2 to 3 by weather: room to spare");
+  assert.equal(parLine(s(1, 1, 1), 2), "Holed in 1 everywhere: room to spare");
+  assert.equal(parLine(s(2, 2, 2), 5), "Holed in 2 everywhere: room to spare");
+  assert.equal(parLine(s(3, 3), 3), "Holed in 3 everywhere: no room, make it at least 4", "a par the rounds do not allow (Publish refuses it too)");
   assert.equal(parLine([], 3), "");
 });

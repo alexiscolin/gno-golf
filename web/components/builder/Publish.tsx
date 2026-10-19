@@ -1,11 +1,11 @@
 "use client";
 
 // The publish step (the GUI spec's B4; the hole-builder design's "The
-// publish flow"): the hole as players will see it, and the form: its name
+// publish flow"): the hole as players will see it (the editor's board), and the form (its right column): its name
 // (edited in the header, the one place) and its note as the chain will keep
 // them (builder.wasm's check, PublishMine's own cleaning, its link check
 // live), its address, the permanence said before anything else, the total
-// on the button and the bill under "At most" before any signature, then
+// on the button and the bill under "What publishing costs" before any signature, then
 // Adena (or the gnokey command behind a tap), and the chain read until it
 // names the new version; published, the author's own score is the hole's
 // "Beat the builder" line (proof.ts builderScore). Before it opens, the chain is read (publishing open,
@@ -162,7 +162,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
           <Preview state={state} fresh capture={capture} />
           <div className="pub__card"><b>{lines[0]}</b><small>{lines[1]}</small></div>
         </section>
-        <section className="pub__doneform">
+        <section className="col pub__doneform">
           <h2>{name} is on gno.land!</h2>
           {strokes > 0 && <p className="pub__beat">{beatLine(strokes)}: your own round is the one to beat.</p>}
           <p>Play it for real: your best becomes the ghost your friends race.</p>
@@ -183,27 +183,31 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
     <main className="pub">
       <section className="pub__hole" aria-label="The hole as players will see it">
         <Preview state={state} fresh />
-        <div className="pub__card"><b>{name}</b><small>{worldName(draft.world)} · par {draft.par || "–"}</small></div>
       </section>
-      <section className="pub__form" aria-label="Publish">
+      <section className="col pub__form" aria-labelledby="pub-head">
+        <h2 className="col__head" id="pub-head">Publish on gno.land</h2>
         <div className="pub__scroll">
           <p className="pub__forever">Your hole, its name and its note are public and stay on the chain for good: nothing published can be deleted, by you or by anyone. The site&apos;s owner can hide a hole from the lists and from this site. <a href={ISSUES} target="_blank" rel="noreferrer">Report a hole</a></p>
-          {/* the name read here (the header edits it), the address it follows */}
-          <div className="pub__field"><span>Name</span><b aria-invalid={step.at === "name"}>{name || "–"}</b>{name !== draft.title && <small>Kept as: {name}</small>}</div>
+          {/* what is read, not typed, once each (the header edits the name, the one place): the name as the chain keeps it,
+              its world, the par explained by the rounds that proved it */}
+          <dl className="review pub__review">
+            <dt>Name</dt>
+            <dd><b aria-invalid={step.at === "name"}>{name || "–"}</b><small>{name !== draft.title ? "As the chain keeps your title" : "Rename it in the title above"}</small></dd>
+            <dt>World</dt><dd><b>{worldName(draft.world)}</b></dd>
+            <dt>Par</dt><dd><b>{draft.par || "–"}</b>{par && <small>{par}</small>}</dd>
+          </dl>
           {/* its address: the name's own until it is proved, set by hand here (another address, another weather: played again);
-              a version after the first says it is one */}
+              yours and its version the field's own ends; a version after the first says it is one */}
           <label className="pub__field">
-            <span>Address</span>
-            <span className="pub__addr"><code title={author}>{shortAddr(author)}/</code><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
-              disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><code>/v{id ? v : "…"}</code></span>
-            {v > 1 && <small>A new version of your hole at this address: change it for a hole of its own.</small>}
+            <span className="h-sub">Address</span>
+            <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
+              disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
+            <small>{v > 1 ? "A new version of your hole at this address: change it for a hole of its own." : "Your hole's link on gno.land: it can't change once published."}</small>
           </label>
-          {/* the par, explained by the rounds that proved it */}
-          {par && <div className="pub__field"><span>Par</span><code>{draft.par}</code><small>{par}{strokes ? ` · ${beatLine(strokes)}` : ""}</small></div>}
           <label className="pub__field">
-            <span>A line for players <em>{[...draft.note].length}/{MAX_NOTE}</em></span>
-            <textarea value={draft.note} rows={2} aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
-            {note !== draft.note && <small>Kept as: {note}</small>}
+            <span className="h-sub">A line for players</span>
+            <textarea value={draft.note} rows={2} placeholder="Bank it off the left wall." aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
+            <small className="pub__help"><span>{note !== draft.note ? `Kept as: ${note}` : "Shown under its name in the holes' lists."}</span><span>{[...draft.note].length}/{MAX_NOTE}</span></small>
           </label>
           {/* what went wrong, then its Try again */}
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
@@ -211,10 +215,11 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
           {step.at === "unread" && <Button onClick={() => setTries((n) => n + 1)}>Try again</Button>}
           {/* the total on the button; what it is made of a tap away, before any signature */}
           <details className="pub__bill">
-            <summary>At most {aboutGnot(b.most)} GNOT</summary>
+            <summary>What publishing costs</summary>
             <dl>
               <dt>Storage deposit</dt><dd>{aboutGnot(b.deposit)} GNOT</dd>
               <dt>Network fee</dt><dd>{aboutGnot(b.fee)} GNOT</dd>
+              <dt>At most, in all</dt><dd>{aboutGnot(b.most)} GNOT</dd>
             </dl>
             <p className="pub__small">The chain&apos;s price for keeping and checking the hole. Nothing goes to the game.</p>
           </details>

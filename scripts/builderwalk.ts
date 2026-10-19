@@ -205,21 +205,22 @@ async function publishAndCheck() {
   await click(onCard(/^Publish →$/), "Publish →");
   await until(`!!document.querySelector(".pub")`, "the Publish form");
   await sleep(3000);
-  const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub__field b")?.textContent || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
+  const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub__review b")?.textContent || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
   said(`on the Publish form: "${form.name}" · ${form.note || "ready"}${/could not be read/.test(form.note) ? " (chain unread: counts as reached, B6)" : ""}`);
-  // the publish layout on a short wide window: the hole's card in sight
-  const card = await c.js<{ b: number; h: number }>(`(() => { const r = document.querySelector(".pub__card")?.getBoundingClientRect(); return { b: r ? r.bottom : 1e9, h: innerHeight }; })()`);
-  if (card.b > card.h) throw new Error(`the hole's card is cut off the Publish form (${card.b} > ${card.h})`);
+  // the publish layout (the editor's frame): the action at the column's foot in sight, the 3D down to the same line
+  const card = await c.js<{ b: number; h: number; d: number }>(`(() => { const r = document.querySelector(".pub__foot")?.getBoundingClientRect(), p = document.querySelector(".pub__hole")?.getBoundingClientRect(), f = document.querySelector(".pub__form")?.getBoundingClientRect(); return { b: r ? r.bottom : 1e9, h: innerHeight, d: p && f ? Math.abs(p.bottom - f.bottom) : 1e9 }; })()`);
+  if (card.b > card.h) throw new Error(`the Publish button is cut off the form (${card.b} > ${card.h})`);
+  if (card.d > 2) throw new Error(`the 3D and the form end on different lines (${card.d}px)`);
 
   const ms = Date.now() - t0;
   console.log(JSON.stringify({ seconds: Math.round(ms / 1000), ...count }));
   if (ms > LIMIT_MS) throw new Error(`over 5 minutes: ${Math.round(ms / 1000)} s`);
   if (count.clicks > BUDGET.clicks || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
-  // past the path (not counted): a short wide window keeps the hole's card in sight; the Play step goes back to play (its summary at once)
+  // past the path (not counted): a short wide window keeps the Publish button in sight; the Play step goes back to play (its summary at once)
   await c.send("Emulation.setDeviceMetricsOverride", { width: 1366, height: 650, deviceScaleFactor: 1, mobile: false });
   await sleep(800);
-  const short = await c.js<{ b: number; h: number }>(`(() => { const r = document.querySelector(".pub__card").getBoundingClientRect(); return { b: r.bottom, h: innerHeight }; })()`);
-  if (short.b > short.h) throw new Error(`1366x650: the hole's card is cut off the Publish form (${short.b} > ${short.h})`);
+  const short = await c.js<{ b: number; h: number }>(`(() => { const r = document.querySelector(".pub__foot").getBoundingClientRect(); return { b: r.bottom, h: innerHeight }; })()`);
+  if (short.b > short.h) throw new Error(`1366x650: the Publish button is cut off the form (${short.b} > ${short.h})`);
   await c.js(`[...document.querySelectorAll(".step button")].find((b) => /Play/.test(b.textContent)).click()`);
   await until(`!!document.querySelector(".tmode .tmode__sum")`, "the Play step from Publish: play, every weather holed: its summary", 30_000);
   if (wallet) {

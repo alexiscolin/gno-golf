@@ -97,7 +97,7 @@
 .look:disabled { opacity: .45; cursor: not-allowed; }
 .palette__more { display: grid; gap: var(--sp-3); }
 /* what opens in place (More pieces, Details, Open a file, gnokey): a dashed link, the game's (.linkish) at the panel's size */
-:is(.palette__more, .bholes__more, .insp__details, .pub__gnokey) > summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+:is(.palette__more, .bholes__more, .insp__details, .pub__bill, .pub__gnokey) > summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
 .palette__more[open] > summary { margin-bottom: var(--sp-3); }
 /* "From other worlds" under the world's own, a rule between them */
 .palette__more + .palette__more { padding-top: var(--sp-4); border-top: var(--rule); }
@@ -390,44 +390,53 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 @media (prefers-reduced-motion: reduce) { .tmode__strip { transition: none; } }
 
 /* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */
-.pbench { position: fixed; inset: 0; display: grid; grid-template-rows: 44px minmax(0, 1fr); gap: var(--sp-5); padding: var(--sp-4); overflow: hidden; font-family: var(--font); color: var(--ink); background: var(--paper); }
-.pub { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); grid-template-rows: minmax(0, auto); align-content: start; gap: var(--sp-5); } /* (one row, the form's height: the hole beside it ends where it ends) */
+.pbench { --col-w: 292px; position: fixed; inset: 0; display: grid; grid-template-rows: 44px minmax(0, 1fr); gap: var(--sp-5); padding: var(--sp-4) max(var(--sp-4), env(safe-area-inset-right)) var(--sp-4) max(var(--sp-4), env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: none; font-family: var(--font); color: var(--ink); background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0, var(--paper)); }
+@media (min-width: 1400px) { .pbench { --col-w: 332px; } }
+/* the editor's frame: the hole where the board is, down to the column's foot; the form the editor's right column */
+.pub { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--col-w); grid-template-rows: minmax(0, 1fr); gap: var(--sp-4); }
 .pub__doneform { display: grid; align-content: center; justify-items: center; gap: var(--sp-3); padding: var(--sp-4); text-align: center; }
 .pub__doneform h2 { margin: 0; font-size: 28px; }
 .pub__doneform p { margin: 0; font-size: 15px; }
 .pub__doneform .btn { margin: 0; }
-.pub__hole { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--sp-4); min-width: 0; min-height: 0; }
-/* the 3D as tall as the form beside it leaves over the card (its own 16:10 no more) */
-.pub__hole .preview { width: 100%; height: 100%; min-height: 240px; aspect-ratio: auto; }
-.pub--done .pub__hole .preview { height: auto; aspect-ratio: 16 / 10; } /* (published: no form beside it, its own shape) */
-.pub__card { display: grid; gap: 2px; padding: var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); }
+.pub__hole { position: relative; display: grid; min-width: 0; min-height: 0; }
+/* the 3D the board's frame and height (its own 16:10 no more) */
+.pub__hole .preview { width: 100%; height: 100%; min-height: 240px; aspect-ratio: auto; border: var(--edge-bold); border-radius: var(--r-card); }
+/* published: the hole's card on the 3D, at its foot (a label, as its "3D · in sync" at its top) */
+.pub__card { position: absolute; left: var(--sp-3); bottom: var(--sp-3); z-index: 1; display: grid; gap: 2px; max-width: calc(100% - 2 * var(--sp-3)); padding: var(--sp-2) var(--sp-3); border: var(--info-edge); border-radius: 12px; background: rgba(var(--paper-rgb), .95); pointer-events: none; }
 .pub__card b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub__card small { color: var(--ink-soft); font-weight: 600; }
-.pub__form { min-height: 0; max-height: 100%; display: grid; grid-template-rows: minmax(0, auto) auto; border: var(--edge); border-radius: var(--r-card); background: var(--white); overflow: hidden; }
-.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-5); padding: var(--sp-5); }
-.pub__foot { padding: var(--sp-4) var(--sp-5); border-top: var(--rule); background: var(--paper); }
+/* a .col that holds still: its head, the form scrolling under it, the action at its foot */
+.pub__form { grid-template-rows: auto minmax(0, 1fr) auto; gap: 0; padding: 0; overflow: hidden; }
+.pub__form > .col__head { margin: 0; }
+.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-5); padding: var(--sp-4); }
+.pub__foot { padding: var(--sp-3) var(--sp-4); border-top: var(--rule); background: var(--paper); }
 .pub__foot .btn { margin: 0; width: 100%; }
 .pub__foot > .linkish { display: block; width: 100%; font-size: 14px; text-align: center; } /* (no Adena: the way to gnokey, above) */
 .pub__foot .pub__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (the footer one line, holding the action) */
 .pub__forever a { color: var(--green); font-weight: 700; }
 .pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
-.pub__field { display: grid; gap: var(--sp-2); font-size: 13px; font-weight: 700; }
-.pub__field span { display: flex; justify-content: space-between; }
-.pub__field em { font-style: normal; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.pub__field input, .pub__field textarea { min-height: 44px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; resize: none; }
-.pub__field [aria-invalid="true"] { border-color: var(--hat-ink); }
-.pub__field code { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
-/* the address: yours, then its own part typed in place, then its version */
-.pub__field .pub__addr { justify-content: flex-start; align-items: center; gap: var(--sp-1); }
-.pub__addr input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 14px; }
-.pub__field small, .pub__small { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+/* what is read, not typed: the shop's review rows at the column's width, each value its helper under it */
+.pub__review { grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.pub__review dd { display: grid; gap: 2px; }
+.pub__review b { font-size: 15px; }
+.pub__review b[aria-invalid="true"] { color: var(--hat-ink); }
+/* a field: its label (.h-sub), its box (the game's 48, its ring its own frame: globals.css), one line why under it */
+.pub__field { display: grid; gap: var(--sp-2); }
+.pub__field textarea { min-height: 48px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); resize: none; }
+.pub__field textarea::placeholder { color: var(--ink-soft); }
+.pub__field [aria-invalid="true"], .pub__addr:has(input[aria-invalid="true"]) { border-color: var(--hat-ink); }
+/* the address, one box (nameform's): yours, its own part typed in place, its version; mono for the address alone */
+.pub__addr { background: var(--white); font-size: 14px; }
+.pub__addr > span { white-space: nowrap; }
+.pub__addr > span:last-child { padding: 0 12px 0 2px; color: var(--ink-soft); }
+.pub__help { display: flex; justify-content: space-between; gap: var(--sp-3); }
+.pub__help > span:last-child { flex: none; font-variant-numeric: tabular-nums; }
+.pub__field small, .pub__review small, .pub__small { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink-soft); }
 .pub__bad { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; color: var(--hat-ink); font-weight: 700; }
-.pub__note { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: 12px; background: var(--paper); font-weight: 700; }
-.pub__bill summary { cursor: pointer; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pub__note { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: 12px; background: var(--white); font-weight: 700; }
 .pub__bill dl { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-1) var(--sp-3); margin: var(--sp-2) 0; font-size: 15px; font-variant-numeric: tabular-nums; }
 .pub__bill dd { margin: 0; text-align: right; }
 .pub__beat { font-weight: 800; color: var(--green); }
-.pub__field b { font-size: 17px; overflow-wrap: anywhere; }
 .pub__gnokey pre { max-height: 160px; overflow: auto; overscroll-behavior: contain; padding: var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
 .pub__row { display: flex; gap: var(--sp-2); }
 .pub__row .btn { margin: 0; }

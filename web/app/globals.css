@@ -1939,7 +1939,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: var(--chip-room); } /* the
 /* a text field: the friend to add, the gnokey key's name */
 .friends__add input, .gnokey__key, .feedback__text { min-width: 0; min-height: 48px; padding: 0 12px; border-radius: 12px; border: var(--edge); font: inherit; font-size: 14px; background: var(--white); color: var(--ink); }
 /* the ring drawn as the field's own border: an outline beside the ink border reads as two frames */
-.friends__add input:focus-visible, .gnokey__key:focus-visible, .feedback__text:focus-visible, .nameform__field:focus-within, .gsearch:focus-within,
+.friends__add input:focus-visible, .gnokey__key:focus-visible, .feedback__text:focus-visible, .nameform__field:focus-within, .pub__addr:focus-within, .gsearch:focus-within,
 :is(.bhead__name, .bholes__hole, .tmode__addr, .pub__field) :is(input, textarea):focus-visible { outline: none; border-color: var(--ink); box-shadow: var(--ring-shadow); }
 .friends__add input { flex: 1; }
 .feedback__text { padding: 10px 12px; resize: vertical; }
@@ -2117,17 +2117,21 @@ body:has(.netbanner) .screen.worlds { padding-bottom: var(--chip-room); } /* the
 .lb .unnamed li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
 .lb .unnamed li:nth-child(odd) { background: rgba(var(--ink-rgb), .04); }
 .lb .unnamed li.me { background: rgba(var(--ink-rgb), .12); color: var(--ink); font-weight: 700; }
+/* read-only rows, term by term: label left, its value right (a gnome's order, gnomes.css; a hole about to be published, builder.css .pub__review) */
+.review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-3) var(--sp-4); margin: 0; padding: var(--sp-4) var(--sp-5); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; }
+.review dt { font-weight: 700; color: var(--ink-soft); }
+.review dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
 .unnamed a { color: inherit; }
 /* taking a name in the game: a card, its title, the fixed nym- prefix, the rule said live */
 .nameform { display: grid; gap: 8px; margin: 12px 0; padding: 14px 16px; text-align: left; border: var(--edge); border-radius: 16px; background: var(--white); }
 .nameform__title { font-size: 17px; color: var(--ink); }
 .nameform__why { font-size: 13px; color: var(--ink-soft); }
 .nameform__row { display: flex; gap: 10px; align-items: stretch; }
-.nameform__field { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 48px; border: var(--edge); border-radius: 12px; background: var(--paper); font-family: var(--mono); font-size: 16px; }
-.nameform__field > span { padding: 0 2px 0 12px; color: var(--ink-soft); }
-.nameform__field input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; }
+.nameform__field, .pub__addr { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 48px; border: var(--edge); border-radius: 12px; background: var(--paper); font-family: var(--mono); font-size: 16px; }
+.nameform__field > span, .pub__addr > span:first-child { padding: 0 2px 0 12px; color: var(--ink-soft); }
+.nameform__field input, .pub__addr input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; }
 .nameform__field--bad, .nameform__field--bad:focus-within { border-color: var(--hat-ink); box-shadow: 0 0 0 3px rgba(var(--hat-rgb), .25); } /* a name the chain won't take */
-.nameform__field input:focus-visible { outline: none; box-shadow: none; } /* (its frame shows it) */
+.nameform__field input:focus-visible, .pub__addr input:focus-visible { outline: none; box-shadow: none; } /* (its frame shows it) */
 .nameform small { font-size: 12px; color: var(--ink-soft); }
 .nameform .nameform__ok { color: var(--green); font-weight: 700; }
 .nameform .nameform__err { color: var(--hat-ink); font-weight: 700; }

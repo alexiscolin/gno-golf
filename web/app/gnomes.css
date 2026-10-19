@@ -290,9 +290,7 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 /* a short screen (a small phone): the footer in the flow after the terms, never a sticky block over most of them */
 @media (max-height: 700px) { .gsheet__foot--order { position: static; } }
 /* the order, term by term: label left, term right; one column on a phone */
-.review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-3) var(--sp-4); margin: 0; padding: var(--sp-4) var(--sp-5); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; }
-.review dt { font-weight: 700; color: var(--ink-soft); }
-.review dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+/* (.review itself: globals.css, the Builder's Publish reads its hole in it too) */
 @media (max-width: 600px) { .review { grid-template-columns: 1fr; gap: 0; font-size: 15px; } .review dd { margin-bottom: var(--sp-2); } .review__group--terms .review { font-size: 13px; gap: 0; } .gsheet .review__total { padding-inline: var(--sp-4); } .review__total b { font-size: 19px; } }
 /* a consent: its own box, never pre-ticked; the order waits for both */
 .box { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; padding: var(--sp-4); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.4; cursor: pointer; }
