@@ -80,8 +80,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
   // its address, kept as its rounds were played under (another one: another weather, all played again), changed only on purpose
   // (the address it was at as the change began: kept again at a press, its rounds standing again)
-  const [moving, setMoving] = useState<string | null>(null);
-  const fixed = !!proved && moving === null;
+  // the address its rounds were played at: kept as it is here (another would have weathers not played yet)
+  const fixed = !!proved;
   const mine = proved ? draft.proofs.filter((p) => p.key === key && p.id === proved) : [];
   const par = proved ? parLine(mine, draft.par) : "", strokes = builderScore(mine);
 
@@ -206,15 +206,11 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
               <dt>Par</dt><dd><b>{draft.par || "–"}</b>{par && <small>{par}</small>}</dd>
             </dl>
           </div>
-          {/* its address: the name's own until it is proved, set by hand here (another address, another weather: played again);
-              yours and its version the field's own ends; a version after the first says it is one */}
+          {/* its address: the one its rounds were played at, read only (another would have weathers not played: never a
+              Publish locked by a change here); yours and its version the field's own ends; a version after the first says it is one */}
           <label className="pub__field">
             <span className="h-sub">Address</span>
-            <small>
-              {moving !== null ? "A new address gives it new weather: you'll play it again there." : v > 1 ? "A new version of your hole at this address." : "Your hole's link on gno.land: it can't change once published."}
-              {fixed && !sent && <> <button type="button" className="linkish" onClick={() => setMoving(draft.slug)}>Change address</button></>}
-              {moving !== null && !sent && <> <button type="button" className="linkish" onClick={() => (onDraft({ ...draft, slug: moving }), setMoving(null))}>Keep {moving}</button></>}
-            </small>
+            <small>{v > 1 ? "A new version of your hole at this address." : fixed ? "Your hole's link on gno.land, the one you played it at: it can't change once published." : "Your hole's link on gno.land: it can't change once published."}</small>
             <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
               readOnly={fixed} disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
           </label>
