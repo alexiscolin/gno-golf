@@ -61,7 +61,7 @@ const BITS = confetti(28);
 const NONE: readonly string[] = [];
 /** Said when a try holed before the address does not hole again under it (its calm period): the line promised it would count. */
 /** The start card's line, no address known as Play opens. */
-const START_LINE = "Connect Adena first: your address names the hole and sets its weather. Nothing is signed until you publish.";
+const START_LINE = "Your address names the hole and sets its weather. Nothing is signed until you publish.";
 const NOT_CARRIED = `Your try did not hold under your address: sink it in ${weatherName("")} again.`;
 /** How far back a weather is looked for (FIND_BACK periods), in days, for a sentence. */
 const FIND_DAYS = Math.round((FIND_BACK * RULES.periodMs) / 86_400_000);
@@ -379,8 +379,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   const par = proved ? suggestPar(mineProofs) : 0;
   const time = took ?? (now && tick ? Math.max(0, tick - since.current) : null);
   const rows = proved || provedNow ? summary(kinds.map(({ kind }) => ({ kind, strokes: mineProofs.find((p) => p.kind === kind)?.strokes ?? 0, ms: times[kind] })), par) : null;
-  // every weather holed as it opened: the summary at once (no round to play again)
-  const card = proved && !now ? { ...rows!, actions: rows!.actions.filter((a) => a.act !== "again") }
+  // every weather holed as it opened: the summary at once
+  const card = proved && !now ? rows
     : !holed || !now || checking || trying ? null
     : provedNow ? (first === undefined ? rows : null)
     : finished({ strokes: holed, kind: now.kind, why: why[now.kind] });
@@ -432,7 +432,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       {/* no address yet: asked once as Play opens, before round 1 (or just a try: asked again once it is holed) */}
       {now && !card && trying && !holed && !justTry && (
         <AddressLine start title={draft.title || "Your hole"} head={nowSaid("", atOf(""))} line={START_LINE} onAddress={sign}
-          note="A practice round: Clear only. Holed, add your address then and it counts; without one, nothing goes on to Publish.">
+          note="Practice first plays Clear only: add your address once it's holed and the round counts.">
           <Button onClick={() => (setJustTry(true), fresh(), setSaid(nowSaid("", atOf(""))))}>Practice first</Button>
         </AddressLine>
       )}

@@ -108,6 +108,6 @@ export function summary(rows: readonly { kind: string; strokes: number; ms?: num
     title: "Holed in every weather",
     line: par ? `Par ${par}, from your rounds.` : "",
     rows: rows.map((r) => ({ weather: weatherName(r.kind), strokes: String(r.strokes), time: r.ms != null ? clock(r.ms) : "–" })),
-    actions: [AGAIN, EDIT, { act: "publish", text: "Publish →", primary: true }],
+    actions: [EDIT, { act: "publish", text: "Publish →", primary: true }], // (a weather again: its chip)
   };
 }

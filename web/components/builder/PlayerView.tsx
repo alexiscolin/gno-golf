@@ -32,7 +32,7 @@ export default function PlayerView({ eye, large, onLarge }: { eye: Eye; large: b
       <button type="button" className="preview pview__pic" onClick={() => onLarge(true)} title="The hole from the tee, as a player sees it (P: large)" aria-label="The hole from the tee, as a player sees it: show it large (P)">
         <canvas ref={small} />
       </button>
-      <p className="pview__say">The hole from its tee, as a round opens on it. Click it or press <kbd>P</kbd> to see it large.</p>
+      <p className="pview__say">From the tee, as a round opens. Click it or press <kbd>P</kbd> to see it large.</p>
       {large && (
         <Sheet label="What the player sees" className="pview__big" onClose={() => onLarge(false)}>
           <h2>What the player sees</h2>

@@ -145,7 +145,9 @@
 .verdict--warn { color: #8a5a00; }
 .verdict--warn::before { content: "↺"; background: var(--gold); color: var(--ink); }
 /* a toast over the board's top: what an edit dropped, an undo away (calm, never in the way of the pointer) */
-.btoast { position: absolute; left: 50%; top: var(--sp-3); z-index: 2; transform: translateX(-50%); max-width: calc(100% - 2 * var(--sp-4)); margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); color: var(--ink); font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; animation: btoast-in .18s ease-out; }
+.btoast { position: absolute; left: 50%; top: var(--sp-3); z-index: 2; transform: translateX(-50%); max-width: calc(100% - 2 * var(--sp-4)); margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); color: var(--ink); font-size: 15px; font-weight: 700; white-space: nowrap; display: flex; align-items: center; gap: var(--sp-3); pointer-events: none; animation: btoast-in .18s ease-out; }
+/* its Undo the one thing in it a click reaches (the board under it otherwise) */
+.btoast button { pointer-events: auto; flex: none; }
 @keyframes btoast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
 @media (prefers-reduced-motion: reduce) { .btoast { animation: none; } }
 /* a file opened as it is, broken: said at the board's top left (clear of its own buttons) until it passes */

@@ -79,8 +79,9 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const nameWhy = checked.ok ? "" : explain(checked.why);
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
   // its address, kept as its rounds were played under (another one: another weather, all played again), changed only on purpose
-  const [moving, setMoving] = useState(false);
-  const fixed = !!proved && !moving;
+  // (the address it was at as the change began: kept again at a press, its rounds standing again)
+  const [moving, setMoving] = useState<string | null>(null);
+  const fixed = !!proved && moving === null;
   const mine = proved ? draft.proofs.filter((p) => p.key === key && p.id === proved) : [];
   const par = proved ? parLine(mine, draft.par) : "", strokes = builderScore(mine);
 
@@ -209,14 +210,15 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
             <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
               readOnly={fixed} disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
             <small>
-              {moving ? "A new address gives it new weather: you'll play it again there." : v > 1 ? "A new version of your hole at this address." : "Your hole's link on gno.land: it can't change once published."}
-              {fixed && !sent && <> <button type="button" className="linkish" onClick={() => setMoving(true)}>Change address</button></>}
+              {moving !== null ? "A new address gives it new weather: you'll play it again there." : v > 1 ? "A new version of your hole at this address." : "Your hole's link on gno.land: it can't change once published."}
+              {fixed && !sent && <> <button type="button" className="linkish" onClick={() => setMoving(draft.slug)}>Change address</button></>}
+              {moving !== null && !sent && <> <button type="button" className="linkish" onClick={() => (onDraft({ ...draft, slug: moving }), setMoving(null))}>Keep {moving}</button></>}
             </small>
           </label>
           <div className="pub__field">
             <span className="h-sub"><label htmlFor="pub-note">A line for players</label> <small>· optional</small> <InfoTip label="What is a line for players?" note="A tip or a dare from you, in a sentence: players read it under your hole's name in the community holes and on its card as they play it." /></span>
             <textarea id="pub-note" value={draft.note} rows={2} placeholder="Bank it off the left wall." aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
-            <small className="pub__help"><span>{note !== draft.note ? `Kept as: ${note}` : "Shown under its name in the holes' lists."}</span><span>{[...draft.note].length}/{MAX_NOTE}</span></small>
+            <small className="pub__help"><span>{note !== draft.note && `Kept as: ${note}`}</span><span>{[...draft.note].length}/{MAX_NOTE}</span></small>
           </div>
           {/* what went wrong, then its Try again */}
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>

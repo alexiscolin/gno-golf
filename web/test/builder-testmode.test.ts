@@ -141,7 +141,7 @@ void test("summary: Play's one card at the end, each weather proved with its str
     { weather: "Rain", strokes: "4", time: "–" }, // (proved before this visit: its time not known)
   ]);
   const acts = s.actions.map((a) => `${a.text}${a.key ? ` (${a.key})` : ""}${a.primary ? "*" : ""}`);
-  assert.deepEqual(acts, ["Try again (R)", "Back to Build (Esc)", "Publish →*"]);
+  assert.deepEqual(acts, ["Back to Build (Esc)", "Publish →*"], "no Try again: a weather's chip plays it again");
   assert.equal(summary([{ kind: "", strokes: 2 }], 0).line, "", "no par yet: nothing said");
 });
 

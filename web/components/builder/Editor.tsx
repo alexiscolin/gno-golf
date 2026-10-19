@@ -37,7 +37,7 @@ import type { Hole } from "@/lib/scene/data";
 import Board from "./Board";
 import Checks from "./Checks";
 import Header from "./Header";
-import Inspector, { MOD, useOnce } from "./Inspector";
+import Inspector, { useOnce } from "./Inspector";
 import Palette from "./Palette";
 import { refusalOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
@@ -119,8 +119,11 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   // came of it for the hole as it is now (its key), the key before it, and the toast of the proofs an edit dropped
   const [carrying, setCarrying] = useState<Draft | null>(null);
   const [rounds, setRounds] = useState<{ key: string; kept: string[]; broken: string[] } | null>(null);
-  const prevKey = useRef<string | null>(null);
-  const [toast, setToast] = useState("");
+  // (the last key looked at, and the last hole whose proofs were settled: carried, and those dropped said; an edit
+  // made before its carry came back leaves it, so a quick run of edits is said against the hole before them all)
+  const lastKey = useRef<string | null>(null), settled = useRef<{ key: string; draft: Draft } | null>(null);
+  // (back: the hole before the edit, its proofs standing; the toast gone once it is back, its Undo going back to it)
+  const [toast, setToast] = useState<{ text: string; back: Draft } | null>(null);
   // quick shots: the last few pulled (their specs, played again on the hole as it is now), the one being pulled, and the meter's line shown
   const [shots, setShots] = useState<QuickShot[]>([]);
   const [aim, setAim] = useState<QuickShot | null>(null);
@@ -219,15 +222,16 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   // thread; those that still hole in their strokes are its proofs (the step amended, never one of its own), the
   // others said; the weathers the edit dropped said once in a toast, an undo away from kept
   useEffect(() => {
-    const k = key?.of === shape ? key.key : null, prev = prevKey.current;
-    if (!k || k === prev) return;
-    prevKey.current = k;
+    const k = key?.of === shape ? key.key : null, before = settled.current;
+    if (!k || k === lastKey.current) return;
+    lastKey.current = k;
     const sayDropped = (proofs: Draft["proofs"]) => {
-      const gone = dropped(proofs, prev, k).map(weatherName);
-      if (!gone.length) return;
-      setToast(`This drops your ${listed(gone)} proof${gone.length > 1 ? "s" : ""} · ${MOD}Z keeps ${gone.length > 1 ? "them" : "it"}`);
+      settled.current = { key: k, draft: session.kept() };
+      const gone = before ? dropped(proofs, before.key, k).map(weatherName) : [];
+      if (!before || !gone.length) return;
+      setToast({ text: `Your ${listed(gone)} round${gone.length > 1 ? "s" : ""} no longer count: sink ${gone.length > 1 ? "them" : "it"} again, or undo.`, back: before.draft });
       clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToast(""), 5000);
+      toastTimer.current = setTimeout(() => setToast(null), 7000);
     };
     const hex = author && kept.slug && meter.current && toCarry(kept.proofs, k, author, kept.slug).length ? canonicalHex(kept, host) : null;
     if (!author || hex == null || !meter.current) return sayDropped(kept.proofs);
@@ -243,6 +247,13 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   }, [key, kept, shape, author, host, session]);
 
   const set = (d: Draft) => (session.set(frame(d)), refresh());
+  /** Undone back to a hole the history holds (the toast's: before the edits that dropped its proofs); not found, nothing undone. */
+  const undoTo = (back: Draft) => {
+    let n = 0;
+    while (session.canUndo() && !sameShape(session.kept(), back)) (session.undo(), n++);
+    if (!sameShape(session.kept(), back)) for (; n > 0; n--) session.redo();
+    refresh();
+  };
   const preview = (d: Draft) => (session.preview(d), refresh());
   const commit = () => (session.commit(), refresh());
   const cancel = () => (session.cancel(), refresh());
@@ -399,7 +410,12 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
         <>
           <Palette world={draft.world} palette={palette} armed={armed} off={off} bin={binShown} onArm={setArmed} chosen={looks} />
           <div className="centre">
-            {toast && <p className="btoast" role="status">{toast}</p>}
+            {/* the proofs an edit dropped, an undo away (the edit undone, they are the hole's again) */}
+            {toast && !sameShape(kept, toast.back) && (
+              <p className="btoast" role="status">{toast.text}
+                <Button size="s" type="button" onClick={() => (undoTo(toast.back), setToast(null))}>Undo</Button>
+              </p>
+            )}
             {opened && errors.length > 0 && <p className="bbroken" role="status">{opened}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !blinking, keep: blinking && piece?.clock.k === "substep", eye }}
