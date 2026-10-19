@@ -41,7 +41,7 @@ import { worldName } from "@/lib/builder/rules";
 /** How long the chain is read for the new version after a signature (it lands within a few blocks). */
 const LAND_MS = 90_000;
 
-export default function Publish({ host, draft, author, next, onDraft, onRetest, onBuild, onDone }: {
+export default function Publish({ host, draft, author, next, onDraft, onRetest, onReaddress, onBuild, onDone }: {
   host: BuilderHost;
   draft: Draft;
   author: string;
@@ -49,8 +49,10 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
   next: string;
   /** the name or the note changed: kept in the draft (neither moves a ball) */
   onDraft: (d: Draft) => void;
-  /** back to play it again (a newer version elsewhere, another address: new weather) */
+  /** back to play it again (a version published since: the next one has weather of its own; or its rounds no longer hold) */
   onRetest: () => void;
+  /** back to play it under another address, chosen on Play's start card first (this one taken down, or refused by the realm) */
+  onReaddress: () => void;
   /** back to Build only (the hole no longer holds: its errors to fix, nothing played unasked) */
   onBuild: () => void;
   onDone: (id: string) => void;
@@ -78,6 +80,8 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
   const checked = host.check(draft.slug, hex, note);
   const cost: Cost | null = checked.ok ? checked.cost : null;
   const nameWhy = checked.ok ? "" : explain(checked.why);
+  // (refused for its address alone: the same data and note under a plain one pass)
+  const slugBad = !checked.ok && host.check("hole", hex, note).ok;
   // proved under the id the editor read, as Play and the stepper go by (proof.ts provedAt); one published since, publishSteps says
   const proved = key && next ? provedAt(draft.proofs, draft.world, key, next) : null;
   const mine = proved ? draft.proofs.filter((p) => p.key === key && p.id === proved) : [];
@@ -93,16 +97,16 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
       chain.writer().catch(() => null),
       loadTakedown(chain).then((t) => takenDown(t, alias), () => null),
       chain.versions(alias).catch(() => null),
-    ]).then(([publishing, rules, writer, taken, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, writer, taken, versions })));
+      // (what the author's account holds: one that can't pay told before Adena; read again with the rest on "Check again")
+      chain.balance(author).catch(() => null),
+    ]).then(([publishing, rules, writer, taken, versions, funds]) => live.current && setReadings((r) => ({ ...r, publishing, rules, writer, taken, versions, funds })));
     void chain.gasPrice().then((gas) => live.current && setPrices((p) => ({ ...p, gas })), () => {});
-    // (what the author's account holds: one that can't pay told before Adena)
-    void chain.balance(author).then((funds) => live.current && setReadings((r) => ({ ...r, funds })), () => {});
     void chain.storagePrice().then((byte) => live.current && setPrices((p) => ({ ...p, byte })), () => {});
     void chain.chainId().then((c) => live.current && setChainId(c), () => {});
   }, [chain, alias, host, tries, author]);
   useEffect(() => void proofKey(draft, host).then((k) => live.current && setKey(k)), [draft, host]);
   useEffect(() => {
-    // (another address: its rounds were played under the one before, its weather another)
+    // (rounds under another address than this one, a draft kept by an older Builder: their weather another)
     const untested = draft.proofs.some((p) => p.key === key && slugOf(p.id) !== draft.slug)
       ? "The rounds that proved it were played under another address: play it again under this one."
       : "The rounds that proved it no longer play out the same on its final data: play it again.";
@@ -219,6 +223,7 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
             : step.why && <p className={step.at === "name" || step.at === "funds" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
           {step.at === "unread" && <Button onClick={() => setTries((n) => n + 1)}>Try again</Button>}
+          {step.at === "funds" && <Button onClick={() => setTries((n) => n + 1)}>Check again</Button>}
           {/* the total on the button; what it is made of a tap away, before any signature */}
           <details className="pub__bill">
             <summary>What publishing costs</summary>
@@ -245,7 +250,8 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
           {why && <p className="pub__bad" role="alert">{why}</p>}
         </div>
         <div className="pub__foot">
-          {step.at === "newer" || step.at === "hole" ? (step.at === "hole" && !/^The rounds/.test(step.why) ? <Button variant="gold" className="btn--wide" onClick={onBuild}>Back to Build</Button>
+          {step.at === "taken" || (step.at === "name" && slugBad) ? <Button variant="gold" className="btn--wide" onClick={onReaddress}>Play it under another address</Button>
+            : step.at === "newer" || step.at === "hole" ? (step.at === "hole" && !/^The rounds/.test(step.why) ? <Button variant="gold" className="btn--wide" onClick={onBuild}>Back to Build</Button>
             : <Button variant="gold" className="btn--wide" onClick={onRetest}>Play it again (free)</Button>)
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>

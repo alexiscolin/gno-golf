@@ -88,9 +88,16 @@
 /* the green's tools, over the pieces: their own small heading */
 .palette__tools { display: grid; gap: var(--sp-2); }
 .palette__tools h3 { margin: 0; }
-.palette__tools .ptiles { grid-template-columns: 1fr 1fr; gap: var(--sp-2); --pic: 30px; }
-.palette__tools .piece { grid-template: auto / var(--pic) minmax(0, 1fr); column-gap: var(--sp-2); padding: 4px var(--sp-2) 4px 4px; }
+/* (side by side, "Shrink" whole at the narrowest palette: a smaller icon and name there, the pieces kept unscrolled) */
+.palette__tools .ptiles { grid-template-columns: 1fr 1fr; gap: var(--sp-2); --pic: 24px; }
+.palette__tools .piece { grid-template: auto / var(--pic) minmax(0, 1fr); column-gap: 4px; padding: 3px 4px 3px 3px; }
 .palette__tools .piece__icon { grid-row: auto; padding: 2px; }
+.palette__tools .piece__name { align-self: center; font-size: 14px; } /* (one row: by its icon's middle) */
+@media (min-width: 1280px) {
+  .palette__tools .ptiles { --pic: 28px; }
+  .palette__tools .piece { column-gap: 6px; padding: 4px 6px 4px 4px; }
+  .palette__tools .piece__name { font-size: 15px; }
+}
 .piece img { grid-row: 1 / 3; width: var(--pic); height: var(--pic); border-radius: 10px; pointer-events: none; background: rgba(var(--ink-rgb), .06); }
 .piece__name { align-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 800; line-height: 1.2; }
 /* what it does: two lines when it needs them, never cut (the picture's height holds both) */
@@ -492,10 +499,10 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Play's at the board's top right, under the
    steps'; the palette's lower, by its tiles; the pointer through them all (gone at the first drag) */
 .bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
-.bhint--green { left: calc(var(--palette-w) + 24px); top: 130px; } /* (by the palette's Green, at its top) */
+.bhint--green { left: calc(var(--palette-w) + 24px); top: 150px; max-width: 180px; } /* (by the palette's Green, narrow: clear of Play's at 1024, of the tee) */
 .bhint--test { right: calc(var(--col-w) + 3 * var(--sp-4)); top: 160px; }
 .bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
-/* the "?": the game's sheet (ui.tsx Sheet: its dim, its X), wider: the three hints then the world's pieces (each tile's picture,
+/* the "?": the game's sheet (ui.tsx Sheet: its dim, its X), wider: the first run's hints then the world's pieces (each tile's picture,
    name and what it does) and every key on one screen; it scrolls in itself only in a short window */
 .bgloss { display: flex; flex-direction: column; gap: var(--sp-2); width: min(640px, 100%); max-width: none; max-height: 100%; overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); }
 .bgloss__hints { display: grid; gap: var(--sp-1); }
@@ -532,6 +539,8 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .board__side--ew { cursor: ew-resize; }
 .board__side--ns { cursor: ns-resize; }
 .board__side--locked { cursor: not-allowed; }
+.board__side:focus { outline: none; }
+.board__side:focus-visible > line:not(.board__hit) { stroke: var(--gold); opacity: 1; stroke-width: 5px; } /* (the keyboard's side: gold, thicker) */
 .board__wash path { fill: rgba(92, 214, 140, .45); }
 .board__wash line { stroke: #1c9a55; stroke-width: 3px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .board__wash--no path { fill: rgba(225, 75, 59, .35); }

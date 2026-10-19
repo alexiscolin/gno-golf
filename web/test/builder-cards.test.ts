@@ -41,12 +41,16 @@ void test("draftMap: a bar round its four corners; a pulse's piece drawn as a mo
 void test("draftState: the weathers ticked as holed for the hole as it is now, the best of its ids", () => {
   const all = required("garden");
   assert.deepEqual(all, ["", "wind", "rain"]);
-  assert.deepEqual(draftState({ world: "garden", proofs: [] }, "k"), { stage: "new", ticks: all.map((kind) => ({ kind, done: false })), word: "Clear · Wind · Rain" });
+  assert.deepEqual(draftState({ world: "garden", proofs: [] }, "k"), { stage: "new", ticks: all.map((kind) => ({ kind, done: false })), word: "Clear · Wind · Rain", again: "" });
   assert.equal(draftState({ world: "garden", proofs: [proof("")] }, "other").word, "Clear · Wind · Rain", "proofs of the hole before an edit: none holed now");
   assert.equal(draftState({ world: "garden", proofs: [proof("")] }, null).stage, "new");
-  assert.deepEqual(draftState({ world: "garden", proofs: [proof("")] }, "k"), { stage: "testing", ticks: [{ kind: "", done: true }, { kind: "wind", done: false }, { kind: "rain", done: false }], word: "Clear ✓ · Wind · Rain" });
+  assert.deepEqual(draftState({ world: "garden", proofs: [proof("")] }, "k"), { stage: "testing", ticks: [{ kind: "", done: true }, { kind: "wind", done: false }, { kind: "rain", done: false }], word: "Clear ✓ · Wind · Rain", again: "" });
   // the best of its ids: one id holed everywhere is ready, whatever another holds
   const ready = draftState({ world: "garden", proofs: [proof(all[0], "k", "g1me/hole/v2"), ...all.map((k) => proof(k))] }, "k");
   assert.equal(ready.stage, "ready");
   assert.equal(ready.word, "Clear ✓ · Wind ✓ · Rain ✓");
+  // under the id its Publish would go by: v1 proved and published, v2 not yet (the Editor's rule): played again for v2, never ready
+  const v1 = all.map((k) => proof(k, "k", "g1me/hole/v1")), after = draftState({ world: "garden", proofs: v1 }, "k", "g1me/hole/v2");
+  assert.deepEqual([after.stage, after.again], ["new", "v2"]);
+  assert.deepEqual([draftState({ world: "garden", proofs: v1 }, "k", "g1me/hole/v1").stage, draftState({ world: "garden", proofs: v1 }, "k", "g1me/hole/v1").again], ["ready", ""]);
 });

@@ -113,7 +113,7 @@ void test("publishSteps: open once every check holds; else the first that does n
   assert.equal(publishSteps({ ...ready, publishing: false, rules: false }, at).at, "closed", "closed first: nothing else matters then");
   // an account that cannot pay the bill: told before the wallet opens; a balance unread never waited on
   const pay = { ...at, pay: { gas: 1e8, price: 0.001, deposit: 600_000, most: 760_000 } };
-  assert.deepEqual(publishSteps({ ...ready, funds: 500_000 }, pay), { at: "funds", why: "g1aaaaaa…aaaa holds 0.50 GNOT here; publishing takes up to 0.76. Add GNOT to it, then publish." });
+  assert.deepEqual(publishSteps({ ...ready, funds: 500_000 }, pay), { at: "funds", why: "g1aaaaaa…aaaa holds 0.50 GNOT here; publishing takes up to 0.76. Add at least 0.25 GNOT to it, then check again." });
   assert.equal(publishSteps({ ...ready, funds: 2_000_000 }, pay).at, "ready");
   assert.equal(publishSteps({ ...ready, funds: null }, pay).at, "ready", "the node can't say: not held back");
   assert.equal(publishSteps({ ...ready, funds: 500_000, name: "The name or the note looks like a web address." }, pay).at, "name", "the form's own first");

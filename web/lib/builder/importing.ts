@@ -77,8 +77,9 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
   if (takenDown(taken, id)) return "This hole was taken down: it cannot be opened in the Builder.";
   const r = await asDraft(hex, host, census);
   if (typeof r === "string") return r;
-  const [author, slug] = id.split("/");
-  return { ...r.draft, slug: me && author === me && isSlug(slug) ? slug : "" };
+  const [author, slug] = id.split("/"), mine = !!me && author === me && isSlug(slug);
+  // (the author's own: its next version, the hole it is of kept: Play knows the address is its own)
+  return { ...r.draft, slug: mine ? slug : "", ...(mine && { from: id }) };
 }
 
 /**
@@ -88,7 +89,7 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
  */
 export function remixOf(d: Draft, id: string): Draft {
   const credit = `Remix of ${d.title || "a hole"} by ${shortAddr(authorOf(id) ?? "")}`;
-  return { ...d, slug: "", title: "", par: 0, proofs: [], note: [...credit].slice(0, MAX_NOTE).join("") };
+  return { ...d, slug: "", title: "", par: 0, proofs: [], from: undefined, note: [...credit].slice(0, MAX_NOTE).join("") };
 }
 
 /**

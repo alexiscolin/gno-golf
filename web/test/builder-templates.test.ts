@@ -8,7 +8,7 @@ import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
 import { owned } from "../lib/builder/surface.ts";
-import { firstRun, retitle, slugOf, startsIn, typedSlug } from "../lib/builder/templates.ts";
+import { firstRun, nextSlug, ownSlug, retitle, slugOf, startsIn, typedSlug } from "../lib/builder/templates.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
 import { unknownEntry } from "../lib/builder/edit.ts";
@@ -118,7 +118,30 @@ void test("slugOf: a name with no Latin letter in it (another script, emoji) get
   assert.equal(retitle({ ...startsIn("garden")[0].draft, slug: "" }, "日本の庭").slug, a);
 });
 
-void test("typedSlug: an address typed by hand (on Publish) kept to what the chain takes: lower case, a dash for anything else, at most 32", () => {
+void test("a new draft's address is its own: never another draft's (numbered past them), its name's own still followed; one of the chain's next versions keeps its alias's", () => {
+  const dog = startsIn("garden").find((s) => s.name === "dogleg")!.draft;
+  const proof = (id: string) => ({ key: "k", id, kind: "", period: 1, shots: [], commits: [], strokes: 2, maxWork: 1 });
+  // two holes from one starter: the second numbered, a third past both
+  const b = ownSlug(dog, [dog]), c = ownSlug(dog, [dog, b]);
+  assert.deepEqual([dog.slug, b.slug, c.slug], ["garden-dogleg", "garden-dogleg-2", "garden-dogleg-3"]);
+  assert.equal(ownSlug(dog, []), dog, "no other: as it is");
+  // a file's rounds under the old address dropped (they count only there)
+  const filed = ownSlug({ ...dog, proofs: [proof("g1me/garden-dogleg/v1")] }, [dog]);
+  assert.deepEqual([filed.slug, filed.proofs.length], ["garden-dogleg-2", 0]);
+  // the chain's next version of the author's hole: its alias kept, it is that hole's
+  const next = { ...dog, from: "g1me/garden-dogleg/v1" };
+  assert.equal(ownSlug(next, [dog]), next);
+  // renamed: the name's own address, numbered past the others; the numbered one still follows its name
+  assert.equal(retitle(b, "Mole Run", new Set(["garden-dogleg", "mole-run"])).slug, "mole-run-2");
+  assert.equal(retitle(b, "Mole Run").slug, "mole-run", "garden-dogleg-2 is its name's own: it follows");
+  assert.equal(retitle({ ...dog, slug: "" }, "Garden Dogleg", new Set(["garden-dogleg"])).slug, "garden-dogleg-2");
+  // Play's way off a taken address: the next number, never one taken
+  assert.equal(nextSlug("mole-run", new Set()), "mole-run-2");
+  assert.equal(nextSlug("mole-run-2", new Set(["mole-run-3"])), "mole-run-4");
+  assert.equal(nextSlug("x".repeat(32), new Set()), `${"x".repeat(30)}-2`, "within 32");
+});
+
+void test("typedSlug: an address typed by hand (on Play's start card) kept to what the chain takes: lower case, a dash for anything else, at most 32", () => {
   assert.equal(typedSlug("My Hole_2"), "my-hole-2");
   assert.equal(typedSlug("x".repeat(40)).length, 32);
   assert.equal(typedSlug("ok-1"), "ok-1");

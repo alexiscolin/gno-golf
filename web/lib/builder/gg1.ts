@@ -114,7 +114,8 @@ export function piecesBy(d: Draft, refs: Map<string, PieceRef[]>): Map<string, P
   return by;
 }
 
-const sub = (a: V, d: V): V => [a[0] + d[0], a[1] + d[1]];
+/** a moved by d, to a millionth (frame's shift is any amount, a post's rim: the painted green's lattice keys must still meet). */
+const sub = (a: V, d: V): V => [+(a[0] + d[0]).toFixed(6) + 0, +(a[1] + d[1]).toFixed(6) + 0];
 
 /**
  * The draft as GG1 (hex) on a 96 by 96 board, and its bars (fit's lines:
@@ -199,7 +200,7 @@ export function frame(d: Draft): Draft {
   }
   grow(d.tee), grow(d.pin);
   const s: V = [MARGIN - lx, MARGIN - ly];
-  if (s[0] === 0 && s[1] === 0) return d;
+  if (Math.abs(s[0]) < 1e-7 && Math.abs(s[1]) < 1e-7) return d; // (framed already: what is left is float noise, rounded away)
   const move = (g: Geometry): Geometry => {
     switch (g.t) {
       case "rail": return { ...g, a: sub(g.a, s), b: sub(g.b, s) };

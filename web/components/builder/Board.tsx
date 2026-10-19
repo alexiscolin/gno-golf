@@ -19,17 +19,20 @@
 // it once (a second, never with reduced motion). The keys most used are
 // said at its foot on a browser's first visit. The green is painted too
 // (surface.ts, gesture.ts; its tools the palette's, B): Grow, a drag paints
-// cells in under a two-cell brush, Shrink paints them out (Shift: along one
+// cells in under the brush (surface.ts BRUSH, three cells a side), Shrink paints them out (Shift: along one
 // axis), a side of its outline dragged moves the whole side, a side clicked
 // opens or shuts it; the stroke drawn at once as one ghost, judged once a
 // frame at most (green, or red with why), let go one step, judged by the
 // editor's gate (refused: said at the board's foot). A side hovered says
 // what it does, or why it stays as it is (locked). The tee and the cup are
 // dragged in either mode (pressed on, the end's; anywhere else, a stroke).
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
+// From the keyboard, Tab reaches the sides (one stop, the arrows' side
+// after), an arrow moves the focused one a cell, Enter or Space opens or
+// shuts it; painting itself takes the pointer.
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { boxIn, centreOn, FLAT, frameView, islandIn, gridLines, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
+import { boxIn, centreOn, FLAT, frameView, fromPlane, islandIn, gridLines, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
 import { BOARD, MARGIN } from "@/lib/builder/gg1";
 import { handlesOf, type HandleKey } from "@/lib/builder/handles";
 import { type PaletteEntry } from "@/lib/builder/palette";
@@ -49,7 +52,7 @@ import { entryName } from "@/lib/builder/names";
 import { KEY_LINE } from "@/lib/builder/keys";
 import { pt, xy } from "@/lib/builder/rules";
 import { pulled, type Played, type QuickShot } from "@/lib/builder/quickshot";
-import { railsOf, type Green, type PaintMode } from "@/lib/builder/surface";
+import { moveSide, railsOf, SIDE_HAND, SIDE_LOCKED, toggleSide, type Green, type PaintMode } from "@/lib/builder/surface";
 import type { Shown } from "@/lib/builder/difficulty";
 
 export interface BoardProps {
@@ -164,6 +167,9 @@ export default function Board(props: BoardProps) {
   const [wash, setWash] = useState<Moved["wash"]>(null);
   const [hover, setHover] = useState<{ of: Draft; i: number; why: string } | null>(null);
   const [endHover, setEndHover] = useState<"tee" | "pin" | null>(null); // (the tee or the cup under the pointer: it says it drags)
+  // the side the keyboard is on (its one Tab stop), and the one to take the focus once a move it made is drawn (its way out, where it went)
+  const [roving, setRoving] = useState(0);
+  const refocus = useRef<{ out: V; at: V } | null>(null);
   const judging = useRef(0);
   const washPath = useMemo(() => wash && { cells: cellsPath(wash.cells), rails: railsOf(wash.cells, [...wash.open, ...(green?.hand ?? [])]) }, [wash?.cells, wash?.open]); // eslint-disable-line react-hooks/exhaustive-deps -- (its why, the green: no reason to draw again)
   const greenPath = useMemo(() => (green ? cellsPath(green.cells) : ""), [green]);
@@ -229,6 +235,19 @@ export default function Board(props: BoardProps) {
   useEffect(() => void (!armed && setGhost(null)), [armed]);
   // the paint put down (Esc, a piece armed) mid-stroke: the stroke dropped, its ghost with it
   useEffect(() => void (!mode && (gesture.painting() && gesture.cancel(), setWash(null), setHover(null))), [mode, gesture]);
+  // a side moved from the keyboard: the focus on it where it went (the nearest side facing its way), as it is drawn again
+  useEffect(() => {
+    const r = refocus.current;
+    if (!r || !green) return;
+    refocus.current = null;
+    const dist = (i: number) => {
+      const s = green.sides[i];
+      return s.out[0] === r.out[0] && s.out[1] === r.out[1] ? Math.hypot((s.a[0] + s.b[0]) / 2 - r.at[0], (s.a[1] + s.b[1]) / 2 - r.at[1]) : Infinity;
+    };
+    const i = green.sides.reduce((best, _, k) => (dist(k) < dist(best) ? k : best), 0);
+    setRoving(i);
+    requestAnimationFrame(() => box.current?.querySelector<SVGGElement>(`[data-side="${i}"]`)?.focus());
+  }, [green]);
 
   // the container's size, and the view framing the hole at first
   useLayoutEffect(() => {
@@ -307,10 +326,25 @@ export default function Board(props: BoardProps) {
   };
   const env: Env = { draft, quick, full, armed, selected, step, paint: mode && green ? { mode, green } : null };
 
+  /** A side from the keyboard: an arrow moves it a cell (along its way out, the arrow as it points on the screen), Enter or Space opens or shuts it; the author's wall on it: neither, why said. */
+  function onSideKey(e: RKeyboardEvent<SVGGElement>, i: number) {
+    const g = green, s = g?.sides[i], arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (!g || !s || !props.paint || (!arrows[e.key] && e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    e.stopPropagation(); // (the editor's arrows move a piece selected: not this one)
+    if (s.hand) return refuse(SIDE_HAND);
+    if (e.key === "Enter" || e.key === " ") return props.paint.onPaint({ cells: g.cells, open: toggleSide(g.open, s) }, s.open ? undefined : SIDE_LOCKED);
+    const d = fromPlane(arrows[e.key], { turns: look.turns, tilt: 0 }), by = Math.round(d[0] * s.out[0] + d[1] * s.out[1]);
+    if (!by) return; // (along it: it has no way to go)
+    refocus.current = { out: s.out, at: [(s.a[0] + s.b[0]) / 2 + s.out[0] * by, (s.a[1] + s.b[1]) / 2 + s.out[1] * by] };
+    props.paint.onPaint(moveSide(g, s, by));
+  }
+
   function onDown(e: RPointerEvent<SVGSVGElement>) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
     setFlash(null); // (a refusal said is the last gesture's: a new one starts clean)
+    refocus.current = null; // (a key's move refused: the pointer's edit is no reason to move the focus)
     if (pointers.current.size > 1) {
       // a pinch: a drag under way is dropped, its unchecked preview with it (never kept by the next edit), a stroke's ghost too
       if (gesture.grabbing()) (gesture.cancel(), setLive(null), setWash(null), props.onCarry?.(false));
@@ -329,7 +363,10 @@ export default function Board(props: BoardProps) {
       const side = (e.target as Element).closest<HTMLElement>("[data-side]")?.dataset.side;
       gesture.down(env, at, side !== undefined ? { t: "side", i: Number(side) } : { t: "brush" });
       drag.current = { t: "paint", press: [e.clientX, e.clientY], side: side !== undefined };
-      return washed(gesture.move(env, at, { line: e.shiftKey })?.wash);
+      // (its first place the step's: a place left over from the last stroke never hides this one's first ghost)
+      const first = gesture.move(env, at, { line: e.shiftKey });
+      cell.current = first?.cell ?? "";
+      return washed(first?.wash);
     }
     const target: Target = hit?.dataset.handle ? { t: "handle", key: hit.dataset.handle as HandleKey } : hit?.dataset.end ? { t: "end", which: hit.dataset.end as "tee" | "pin" }
       : hit?.dataset.piece ? { t: "piece", id: hit.dataset.piece } : null;
@@ -423,7 +460,7 @@ export default function Board(props: BoardProps) {
   // the tee's and the cup's badges: where they are, upright and at the board's scale whatever the look
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
-    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why || wash?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}${mode ? " board--paint" : ""}`} ref={box} tabIndex={-1} aria-label={mode ? `The board, painting the green: a drag ${mode === "grow" ? "grows" : "shrinks"} it, a side dragged moves it, Space and a drag pans, the wheel zooms` : "The board: the wheel or a pinch zooms, a drag on empty space pans"}>
+    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why || wash?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}${mode ? " board--paint" : ""}`} ref={box} tabIndex={-1} aria-label={mode ? `The board, painting the green: a drag ${mode === "grow" ? "grows" : "shrinks"} it, a side dragged moves it (or Tab to a side: the arrows move it, Enter opens it), Space and a drag pans, the wheel zooms` : "The board: the wheel or a pinch zooms, a drag on empty space pans"}>
       {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} eye={props.scene.eye} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), setWash(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
@@ -456,6 +493,9 @@ export default function Board(props: BoardProps) {
               const across = !!sd.out[0] !== (look.turns % 2 === 1) ? " board__side--ew" : " board__side--ns";
               return (
                 <g key={`${sd.a.join()} ${sd.b.join()}`} data-side={i} className={`board__side${sd.open ? " board__side--open" : ""}${why ? " board__side--locked" : ""}${across}`}
+                  role="button" tabIndex={i === Math.min(roving, green.sides.length - 1) ? 0 : -1} onKeyDown={(e) => onSideKey(e, i)}
+                  aria-label={`A side of the green, ${sd.open ? "open" : "walled"}: ${why || `the arrows move it, Enter ${sd.open ? "shuts" : "opens"} it`}`}
+                  onFocus={() => (setRoving(i), setHover({ of: draft, i, why: gesture.sideWhy(env, i) }))} onBlur={() => setHover(null)}
                   onPointerEnter={() => !drag.current && setHover({ of: draft, i, why: gesture.sideWhy(env, i) })} onPointerLeave={() => setHover(null)}>
                   <line x1={sd.a[0]} y1={sd.a[1]} x2={sd.b[0]} y2={sd.b[1]} />
                   <line className="board__hit" x1={sd.a[0]} y1={sd.a[1]} x2={sd.b[0]} y2={sd.b[1]} stroke="transparent" strokeWidth={Math.max(0.6, 14 / view.k)} />

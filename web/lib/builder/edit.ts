@@ -308,7 +308,6 @@ export function newErrors(before: readonly Issue[], after: Draft, o: ValidateOpt
   return errorsOf(after, o).filter((i) => !had.has(keyOf(i)));
 }
 
-export { nextId };
 
 /** The draft without the piece (its proofs kept: their key says whether they still hold, an undo brings them back). */
 export const removePiece = (d: Draft, id: string): Draft => without(d, id);

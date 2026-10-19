@@ -54,8 +54,8 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   onArm: (e: PaletteEntry | null) => void;
   /** each piece's look as chosen (its first until then), the editor's (its keys arm it too) */
   chosen: Readonly<Record<string, string>>;
-  /** the green's paint: the way on (null: off), and a tool pressed (the one on: off) */
-  paint?: { mode: PaintMode | null; onMode: (m: PaintMode | null) => void };
+  /** the green's paint: the way on (null: off), why it cannot be taken up ("" it can: a hole walled by hand has none to paint), and a tool pressed (the one on: off) */
+  paint?: { mode: PaintMode | null; off?: string; onMode: (m: PaintMode | null) => void };
 }) {
   const name = worldName(world), { first, more, others } = tilesOf(palette);
   // picked up: the game's wooden tick (put back: nothing)
@@ -75,8 +75,8 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
           <div className="ptiles">
             {TOOLS.map((t) => (
               <div key={t.mode} className="ptile">
-                <button type="button" className={`piece piece--tool${paint.mode === t.mode ? " piece--on" : ""}`} data-tool={t.mode} aria-pressed={paint.mode === t.mode}
-                  title={`${t.name} the green (B): ${t.does}, its walls following; drag a side to move it, click one to open it`} onClick={() => paint.onMode(paint.mode === t.mode ? null : t.mode)}>
+                <button type="button" className={`piece piece--tool${paint.mode === t.mode ? " piece--on" : ""}`} data-tool={t.mode} aria-pressed={paint.mode === t.mode} disabled={!!paint.off}
+                  title={paint.off || `${t.name} the green (B): ${t.does}, its walls following; drag a side to move it, click one to open it`} onClick={() => paint.onMode(paint.mode === t.mode ? null : t.mode)}>
                   <ToolIcon sign={t.sign} />
                   <span className="piece__name">{t.name}</span>
                 </button>

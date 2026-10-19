@@ -49,8 +49,8 @@ export interface Green {
   sides: Side[];
 }
 
-/** To a millionth (a lattice's float noise kept out of the draft). */
-const r6 = (x: number) => +x.toFixed(6) + 0;
+/** To a millionth (a lattice's float noise kept out of the draft: every lattice point is made through it, add too). */
+export const r6 = (x: number) => +x.toFixed(6) + 0;
 const key = (v: V) => `${v[0]} ${v[1]}`;
 const add = (a: V, b: V, k = 1): V => [r6(a[0] + b[0] * k), r6(a[1] + b[1] * k)];
 const STEPS: readonly V[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -58,6 +58,8 @@ const sameRail = (p: Piece, a: V, b: V) => {
   const g = p.geometry;
   return g.t === "rail" && ((key(g.a) === key(a) && key(g.b) === key(b)) || (key(g.a) === key(b) && key(g.b) === key(a)));
 };
+/** A green's own rail: plain, fixed, from a to b (the one piece the green is walled with: a starter's, from scratch's, a stroke's). */
+export const railPiece = (id: string, a: V, b: V): Piece => ({ id, entry: SURFACE_RAIL, geometry: { t: "rail", a, b }, params: {}, clock: { k: "fixed" } });
 /** A rail the green may own: plain, fixed (a run of its outline exactly, as it puts them). */
 export const isPlainRail = (p: Piece) => p.entry === SURFACE_RAIL && p.geometry.t === "rail" && p.clock.k === "fixed";
 /** Points once each (the first of each place). */
@@ -86,10 +88,10 @@ export function outline(cells: readonly V[], open: readonly V[] = [], hand: read
   };
   for (const c of cells) {
     const [x, y] = c;
-    if (!has.has(key([x, y - 1]))) edge([x, y], [1, 0]);
-    if (!has.has(key([x + 1, y]))) edge(add(c, [1, 0]), [0, 1]);
-    if (!has.has(key([x, y + 1]))) edge(add(c, [1, 1]), [-1, 0]);
-    if (!has.has(key([x - 1, y]))) edge(add(c, [0, 1]), [0, -1]);
+    if (!has.has(key(add(c, [0, -1])))) edge([x, y], [1, 0]);
+    if (!has.has(key(add(c, [1, 0])))) edge(add(c, [1, 0]), [0, 1]);
+    if (!has.has(key(add(c, [0, 1])))) edge(add(c, [1, 1]), [-1, 0]);
+    if (!has.has(key(add(c, [-1, 0])))) edge(add(c, [0, 1]), [0, -1]);
   }
   all.sort((p, q) => p.from[1] - q.from[1] || p.from[0] - q.from[0]);
   const used = new Set<Edge>(), sides: Side[] = [];
@@ -186,7 +188,7 @@ export function applySurface(d: Draft, next: { cells: readonly V[]; open: readon
   want.forEach((r, i) => {
     if (kept[i]) return void rails.push(kept[i]);
     if (rest.some((p) => isPlainRail(p) && sameRail(p, r.a, r.b))) return;
-    rails.push({ id: free.shift() ?? nextId({ pieces: [...d.pieces, ...rails] }), entry: SURFACE_RAIL, geometry: { t: "rail", a: r.a, b: r.b }, params: {}, clock: { k: "fixed" } });
+    rails.push(railPiece(free.shift() ?? nextId({ pieces: [...d.pieces, ...rails] }), r.a, r.b));
   });
   const cells = uniq(next.cells).sort((p, q) => p[1] - q[1] || p[0] - q[0]);
   return frame({ ...d, pieces: [...rails, ...rest], surface: { cells, open } });
@@ -202,11 +204,12 @@ export function surfaceOf(d: Draft): Surface | null {
   if (!segs.length || segs.some((g) => g.a[0] !== g.b[0] && g.a[1] !== g.b[1])) return null;
   const ends = segs.flatMap((g) => [g.a, g.b]), o = originOf(ends);
   if (ends.some((v) => mod1(v[0]) !== o[0] || mod1(v[1]) !== o[1])) return null;
-  const xs = ends.map((v) => v[0]), ys = ends.map((v) => v[1]), cells: V[] = [];
-  for (let y = Math.min(...ys); y < Math.max(...ys); y++) {
-    for (let x = Math.min(...xs); x < Math.max(...xs); x++) {
+  const xs = ends.map((v) => v[0]), ys = ends.map((v) => v[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), cells: V[] = [];
+  // (each cell from the low corner by whole steps, to a millionth: no float drift across the lattice)
+  for (let j = 0; j < Math.round(Math.max(...ys) - y0); j++) {
+    for (let i = 0; i < Math.round(Math.max(...xs) - x0); i++) {
       // inside: an odd number of upright rails crossed from the cell's middle out to +x
-      const cx = x + 0.5, cy = y + 0.5;
+      const x = r6(x0 + i), y = r6(y0 + j), cx = x + 0.5, cy = y + 0.5;
       const n = segs.filter((g) => g.a[0] === g.b[0] && g.a[0] > cx && Math.min(g.a[1], g.b[1]) < cy && Math.max(g.a[1], g.b[1]) > cy).length;
       if (n % 2) cells.push([x, y]);
     }
@@ -267,19 +270,21 @@ function partsOf(cells: readonly V[]): { of: Map<string, number>; n: number } {
 }
 /**
  * How narrow cells are: the cells no MIN_WIDE square of them covers (a way,
- * a nook narrower than that), and the squares' parts beyond one in a part of
- * the green (two rooms a way that narrow joins, or none). 0: never narrower.
+ * a nook narrower than that), the squares' parts beyond one in a part of
+ * the green (two rooms a way that narrow joins, or none), and the green's
+ * parts (one cut in two: an island apart). 0: never narrower.
  */
-export function narrowness(cells: readonly V[]): { bare: number; split: number } {
+export function narrowness(cells: readonly V[]): { bare: number; split: number; parts: number } {
   const has = new Set(cells.map(key)), W = MIN_WIDE, within = (c: V) => Array.from({ length: W * W }, (_, i) => add(c, [i % W, Math.floor(i / W)]));
   const squares = cells.filter((c) => within(c).every((v) => has.has(key(v)))), covered = new Set(squares.flatMap(within).map(key));
   const green = partsOf(cells), rooms = partsOf(squares);
-  return { bare: cells.filter((c) => !covered.has(key(c))).length, split: rooms.n - new Set(squares.map((c) => green.of.get(key(c)))).size };
+  return { bare: cells.filter((c) => !covered.has(key(c))).length, split: rooms.n - new Set(squares.map((c) => green.of.get(key(c)))).size, parts: green.n };
 }
-/** Why a green may not become now from was (the gate's): none left, or narrower somewhere than it was (MIN_WIDE). */
+/** Why a green may not become now from was (the gate's): none left, cut in more parts than it was (an island no ball reaches), or narrower somewhere than it was (MIN_WIDE). */
 export function narrowed(was: Surface | null, now: Surface): Issue[] {
   const issue = (text: string): Issue[] => [{ rule: "E14", severity: "error", text }];
   if (!now.cells.length) return issue("The hole needs some green");
-  const a = was ? narrowness(was.cells) : { bare: 0, split: 0 }, b = narrowness(now.cells);
+  const a = was ? narrowness(was.cells) : { bare: 0, split: 0, parts: 1 }, b = narrowness(now.cells);
+  if (b.parts > a.parts) return issue("This cuts the green in two: keep it in one piece");
   return b.bare > a.bare || b.split > a.split ? issue(`This leaves the green too narrow to play: keep it at least ${MIN_WIDE} wide`) : [];
 }

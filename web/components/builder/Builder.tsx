@@ -25,15 +25,15 @@ import Header from "./Header";
 import Publish from "./Publish";
 import Start from "./Start";
 import { current } from "@/lib/adena";
-import { firstRun, HINTS_KEY } from "@/lib/builder/templates";
+import { firstRun, HINTS_KEY, ownSlug } from "@/lib/builder/templates";
 
 export default function Builder() {
   const [host, setHost] = useState<BuilderHost | null>(null);
   const [failed, setFailed] = useState("");
   const [drafts, setDrafts] = useState<Kept[]>([]);
   // the draft open (its key), how many times opened (a fresh editor each), the step, whether Play opens at once (back from
-  // Publish), and the id the editor found it proved under (Publish's)
-  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "publish"; play?: boolean; next?: string } | null>(null);
+  // Publish; its address to change first, readdress), and the id the editor found it proved under (Publish's)
+  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "publish"; play?: boolean; readdress?: boolean; next?: string } | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
   const [hints, setHints] = useState(false);
@@ -47,9 +47,11 @@ export default function Builder() {
     setElsewhere(false);
     setOpen({ at, n: 0, step: "edit" });
   }, []);
-  // a draft added (a new hole, a file, a remix) under a key of its own, and opened
-  const add = useCallback((draft: Draft) => {
-    const key = newKey();
+  // a draft added (a new hole, a file, a remix) under a key of its own, an address no other draft has (templates.ts ownSlug), and opened
+  const among = useRef<readonly Kept[]>([]);
+  among.current = drafts;
+  const add = useCallback((d: Draft, others: readonly Kept[] = among.current) => {
+    const key = newKey(), draft = ownSlug(d, others.map((k) => k.draft));
     setUnkept(!saveDraft(key, draft));
     setDrafts((list) => [...list, { key, draft }]);
     openAt(key);
@@ -59,12 +61,12 @@ export default function Builder() {
     // a remix asked for (taken from the address at once: a reload does not make another)
     const remix = remixId(window.location.search), url = new URL(window.location.href);
     if (remix) url.searchParams.delete("remix"), window.history.replaceState(window.history.state, "", url);
-    // a new player: straight onto the Garden's dogleg, with the three hints (templates.ts firstRun); not on a remix
+    // a new player: straight onto the Garden's dogleg, with the first run's hints (templates.ts firstRun); not on a remix
     let hinted = true;
     try { hinted = !!localStorage.getItem(HINTS_KEY); } catch {}
     const first = remix ? null : firstRun(list.map((k) => k.draft), hinted);
     setDrafts(list);
-    if (first) add(first), setHints(true);
+    if (first) add(first, list), setHints(true);
     // the address kept, else Adena's account if it already shares one with the site (no popup), kept as a typed one is
     // (unless one was given meanwhile); a game under way keeps the author it opened with (Editor: from its next Play)
     const kept = knownAuthor();
@@ -129,7 +131,7 @@ export default function Builder() {
     </>
   );
   if (open && d) {
-    const edit = (play = false) => setOpen({ ...open, n: open.n + 1, step: "edit", play });
+    const edit = (play = false, readdress = false) => setOpen({ ...open, n: open.n + 1, step: "edit", play, readdress });
     if (open.step === "publish" && author) {
       return (
         <div className={`pbench tint--${d.world}`}>
@@ -137,7 +139,7 @@ export default function Builder() {
             steps={{ edit: { locked: "", done: true }, play: { locked: "", done: true }, publish: { locked: "", done: false } }}
             action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))}
             onStep={(s) => s !== "publish" && edit(s === "play")} onBack={() => edit()} />
-          <Publish host={host} draft={d} author={author} next={open.next ?? ""} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onBuild={() => edit()} onDone={() => {}} />
+          <Publish host={host} draft={d} author={author} next={open.next ?? ""} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onReaddress={() => edit(true, true)} onBuild={() => edit()} onDone={(id) => update((x) => ({ ...x, from: id }))} />
           {unkeptNote}
         </div>
       );
@@ -145,7 +147,8 @@ export default function Builder() {
     return (
       <>
         <Editor key={`${open.at}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null), unkept || setDrafts(loadDrafts()))}
-          onPublish={(next) => setOpen({ ...open, step: "publish", next })} onAuthor={setAuthor} play={open.play} opened={opened}
+          onPublish={(next) => setOpen({ ...open, step: "publish", next })} onAuthor={setAuthor} play={open.play} readdress={open.readdress} opened={opened}
+          taken={drafts.filter((k) => k.key !== open.at).map((k) => k.draft.slug)}
           hints={hints} onHinted={onHinted} />
         {unkeptNote}
       </>

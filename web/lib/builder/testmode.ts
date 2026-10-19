@@ -26,8 +26,25 @@ export function holeId(author: string, slug: string, versions: Versions | null):
 
 /** The id a hole of author's at slug is played and published under: the alias's next version as the chain says (read:
  *  false, unread: v1, as a new hole). The one rule Play, the stepper and Publish go by (read once, by the editor). */
-export const nextId = (chain: Pick<Chain, "versions">, author: string, slug: string): Promise<{ id: string; read: boolean }> =>
+export const nextHoleId = (chain: Pick<Chain, "versions">, author: string, slug: string): Promise<{ id: string; read: boolean }> =>
   chain.versions(`${author}/${slug}`).then((v) => ({ id: holeId(author, slug, v), read: true }), () => ({ id: holeId(author, slug, null), read: false }));
+
+/** A hole id's version (author/slug/vN: N; 0 for none). */
+const versionOf = (id: string) => Number(/\/v(\d+)$/.exec(id)?.[1] ?? 0);
+
+/**
+ * Whether the draft, played under next (its alias's next version), would be
+ * a new version of the hole published there, not another hole over it: none
+ * is published there yet, or the draft is of it (from: opened from it, or
+ * published from it; a draft kept before that was known, a round played
+ * under one of its versions).
+ */
+export function cameFrom(d: Pick<Draft, "from" | "proofs">, next: string): boolean {
+  const n = versionOf(next), alias = next.slice(0, next.lastIndexOf("/v"));
+  if (n <= 1) return true;
+  const of = (id: string) => id === alias || (id.startsWith(alias + "/v") && versionOf(id) < n);
+  return (!!d.from && of(d.from)) || d.proofs.some((p) => of(p.id));
+}
 
 /** The weathers to beat in order (required), each with the period it is played in (periodFor). */
 export function plan(host: BuilderHost, id: string, world: string, now: number): { kind: string; period: number }[] {

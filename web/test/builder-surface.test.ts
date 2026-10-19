@@ -9,14 +9,15 @@ import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft, type Draft, type V } from "../lib/builder/draft.ts";
-import { writeDraft } from "../lib/builder/gg1.ts";
+import { frame, writeDraft } from "../lib/builder/gg1.ts";
 import { FIELD } from "../lib/builder/rules.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { errorsOf, gate, removePiece, type Dropped } from "../lib/builder/edit.ts";
 import { BUILDER_LIMITS } from "../lib/builder/limits.ts";
-import { applySurface, brushAt, moveSide, narrowed, narrowness, outline, owned, painted, railsOf, strokeCells, surfaceOf, toggleSide, type Surface } from "../lib/builder/surface.ts";
+import { applySurface, brushAt, isPlainRail, moveSide, narrowed, narrowness, outline, owned, painted, railsOf, strokeCells, surfaceOf, toggleSide, type Surface } from "../lib/builder/surface.ts";
 import type { ValidateOptions } from "../lib/builder/pipeline.ts";
-import { startsIn } from "../lib/builder/templates.ts";
+import { scratch, startsIn } from "../lib/builder/templates.ts";
+import { makeGesture } from "../lib/builder/gesture.ts";
 
 const { census } = await import("../lib/builder/drawn.ts");
 const opts = async (world: string) => ({ host, palette: await loadPalette(world), census });
@@ -155,9 +156,9 @@ void test("moveSide: a side moved keeps its open edges with it", () => {
 
 void test("the gate: a green narrower than three refused (E14's words), wide enough let through; a green narrow already, kept so", async () => {
   const o = await opts("garden"), d = painted0(STARTERS.garden.straight), cells = d.surface!.cells;
-  assert.deepEqual(narrowness(cells), { bare: 0, split: 0 });
+  assert.deepEqual(narrowness(cells), { bare: 0, split: 0, parts: 1 });
   // a nook two wide off the bottom: refused; three wide: let through
-  const nook = (w: number) => painted(cells, Array.from({ length: 3 * w }, (_, i): V => [10.5 + (i % w), 14.5 + Math.floor(i / w)]), true);
+  const nook = (w: number) => painted(cells, Array.from({ length: 3 * w }, (_, i): V => [10.5 + (i % w), 13.5 + Math.floor(i / w)]), true);
   const two = paintEdit(d, { cells: nook(2), open: [] }, o);
   assert.ok("why" in two && /too narrow to play: keep it at least 3 wide/.test(two.why), "why" in two ? two.why : "let through");
   ok(paintEdit(d, { cells: nook(3), open: [] }, o));
@@ -182,4 +183,42 @@ void test("a hole walled plainly by hand (no green kept) is painted all the same
   const grown = ok(paintEdit(bare, { cells: painted(g.cells, strokeCells([10, 14], [20, 14], g.cells), true), open: [] }, o));
   assert.ok(grown.surface && grown.surface.cells.length > g.cells.length, "painted, kept from then on");
   assert.equal(owned({ ...bare, pieces: bare.pieces.map((p) => (p.id === "r2" ? { ...p, entry: "island/rail/rampart" } : p)) }), null, "a wall not plain: no green to paint");
+});
+
+void test("narrowed: a cut that leaves the green in two parts (an island beyond the cup, each part wide enough) is refused", async () => {
+  const o = await opts("garden"), d = painted0(STARTERS.garden.straight), cells = d.surface!.cells;
+  const far = Math.max(...cells.map((c) => c[0])), rows = cells.filter((c) => c[0] === far).map((c) => c[1]);
+  const block = (x0: number, n: number) => rows.flatMap((y) => Array.from({ length: n }, (_, i): V => [far + x0 + i, y]));
+  const grown = painted(cells, block(1, 8), true), cut = painted(grown, block(1, 3), false);
+  assert.ok(narrowness(cut).bare === 0 && narrowness(cut).parts === 2, "each part wide enough, two of them");
+  assert.match(narrowed({ cells: grown, open: [] }, { cells: cut, open: [] })[0]?.text ?? "", /cuts the green in two/);
+  const r = gate({ ...d, surface: { cells: grown, open: [] } }, applySurface({ ...d, surface: { cells: grown, open: [] } }, { cells: cut, open: [] }), o);
+  assert.ok("why" in r && /cuts the green in two/.test(r.why), "why" in r ? r.why : "let through");
+});
+
+void test("a green framed off the quarters (a post's rim) keeps its lattice: neighbours met to a millionth, its four sides, its rails its own", () => {
+  const sc = scratch("garden"), post: Draft["pieces"][number] = { id: "q1", entry: "*/post/scarecrow", geometry: { t: "post", c: [1.04, 1.19], r: 0.37 }, params: {}, clock: { k: "fixed" } };
+  const d = frame({ ...sc, pieces: [...sc.pieces, post] }), g = owned(d)!;
+  assert.notEqual(d.surface!.cells[0][0] % 1, 0, "off the whole units");
+  assert.equal(g.sides.length, 4, "a plain rectangle: four sides");
+  assert.equal(g.ids.length, 4, "its four rails its own");
+  assert.deepEqual([g.open, g.hand], [[], []]);
+  assert.ok(surfaceOf({ ...d, surface: undefined }), "read from its rails too");
+  assert.equal(applySurface(d, g).pieces.filter(isPlainRail).length, 4, "painted again: the same four");
+});
+
+void test("a stroke that changes no cell (Grow inside the green, Shrink off it) is no edit: nothing let go to the gate, no step", async () => {
+  const o = await opts("garden"), d = painted0(STARTERS.garden.straight), green = owned(d)!;
+  let sent = 0;
+  const noop = () => {};
+  const g = makeGesture({ onPreview: noop, onCommit: noop, onCancel: noop, onSet: noop, onSelect: noop, onDisarm: noop, onBin: noop, onPaint: () => void sent++ });
+  const xs = green.cells.map((c) => c[0]), ys = green.cells.map((c) => c[1]);
+  const mid: V = [(Math.min(...xs) + Math.max(...xs) + 1) / 2, (Math.min(...ys) + Math.max(...ys) + 1) / 2];
+  const env = (mode: "grow" | "shrink") => ({ draft: d, quick: o, full: o, armed: null, selected: null, step: 0.5, paint: { mode, green } });
+  const stroke = (mode: "grow" | "shrink", at: V) => (g.down(env(mode), at, { t: "brush" }), g.move(env(mode), at), g.up(env(mode), at));
+  assert.equal(stroke("grow", mid), null, "grown inside: nothing");
+  assert.equal(stroke("shrink", [mid[0], Math.max(...ys) + 20]), null, "shrunk where no green is: nothing");
+  assert.equal(sent, 0);
+  assert.deepEqual(stroke("grow", [mid[0], Math.max(...ys) + 1.5]), { painted: true }, "grown at its edge: let go to the gate");
+  assert.equal(sent, 1);
 });

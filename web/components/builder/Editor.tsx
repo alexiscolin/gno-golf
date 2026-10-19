@@ -31,7 +31,7 @@ import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/b
 import { canonicalHex, parAllowed, proofKey, unproven, type Proof } from "@/lib/builder/proof";
 import { dropped, toCarry, withCarried } from "@/lib/builder/carry";
 import { FIELD, listed, required, weatherName } from "@/lib/builder/rules";
-import { nextId, publishTip } from "@/lib/builder/testmode";
+import { nextHoleId, publishTip, slugOf } from "@/lib/builder/testmode";
 import { endpoints } from "@/lib/builder/holes";
 import { makeChain } from "@/lib/chain";
 import { makeSession } from "@/lib/builder/session";
@@ -40,7 +40,7 @@ import type { Draft, V } from "@/lib/builder/draft";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import type { Hole } from "@/lib/scene/data";
 import Board from "./Board";
-import { applySurface, owned, PAINT_OFF, type PaintMode } from "@/lib/builder/surface";
+import { applySurface, owned, PAINT_OFF, surfaceIn, type PaintMode } from "@/lib/builder/surface";
 import Checks from "./Checks";
 import { refusalOf } from "@/lib/builder/explain";
 import Header from "./Header";
@@ -68,7 +68,7 @@ const WORLDS = Object.keys(FIELD);
 /** Quick shots kept on the board: the latest and three faded. */
 const SHOTS_KEPT = 4;
 
-export default function Editor({ host, first, author, onSave, onBack, onPublish, onAuthor, play: playFirst = false, hints = false, onHinted = () => {}, opened = "" }: {
+export default function Editor({ host, first, author, onSave, onBack, onPublish, onAuthor, play: playFirst = false, readdress = false, taken = [], hints = false, onHinted = () => {}, opened = "" }: {
   host: BuilderHost;
   first: Draft;
   author: string | null;
@@ -81,7 +81,11 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   onAuthor: (a: string) => void;
   /** Play as soon as the hole is checked (back from Publish to play it again) */
   play?: boolean;
-  /** the first run's three hints shown (Hints), gone at the first drag */
+  /** with it, its address changed first (Play's start card: one taken down, or one the realm refuses) */
+  readdress?: boolean;
+  /** the other drafts' addresses: a name's own never one of them (templates.ts retitle) */
+  taken?: readonly string[];
+  /** the first run's hints shown (Hints), gone at the first drag */
   hints?: boolean;
   onHinted?: () => void;
   /** a file opened as it is: why it is broken, said until it passes ("" none) */
@@ -89,6 +93,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
 }) {
   // one session (its undo history) while the editor is open: a step saved and handed back is not a new draft (its key opens a new one)
   const [session] = useState(() => makeSession(first));
+  const others = useMemo(() => new Set(taken), [taken.join(" ")]); // eslint-disable-line react-hooks/exhaustive-deps -- (a list each render: its addresses)
   const [, bump] = useState(0);
   const [again, setAgain] = useState(false); // the hints asked for again (the header's "?")
   const draft = session.now(), kept = session.kept();
@@ -302,12 +307,15 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   };
   const fix = (i: Issue) => quick && tryEdit(fixOf(i, draft, quick), "No free place near it: move it by hand.");
   // the green as it stands, while the paint is on (surface.ts owned); a stroke let go: the green and its walls, one step through the gate
-  const green = useMemo(() => (paint ? owned(draft) : null), [paint, draft]);
+  // (what owned reads: an end dragged, the green stays as it was, its path and its checks with it)
+  const green = useMemo(() => (paint ? owned(draft) : null), [paint, draft.surface, draft.pieces]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the hole with no green to paint (walled by hand): the tools off up front, why on them (as a piece at a limit)
+  const paintOff = useMemo(() => (surfaceIn(kept) ? "" : PAINT_OFF), [kept.surface, kept.pieces]); // eslint-disable-line react-hooks/exhaustive-deps
   const paintTo = (g: { cells: V[]; open: V[] }, refused?: string) => tryEdit(applySurface(draft, g, green), "", refused);
   /** The paint taken up (its way, or the last one), or put down (null); a hole with no green to paint: why, as a next step. */
   const toPaint = (m: PaintMode | null) => {
     if (!m) return setTool((t) => (t?.t === "paint" ? null : t));
-    if (!owned(draft)) return say(PAINT_OFF);
+    if (paintOff) return say(paintOff);
     lastMode.current = m;
     setTool({ t: "paint", mode: m });
   };
@@ -403,7 +411,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     const now = playWhenAsked(want, playOff);
     if (now !== "wait") (setWant(false), now === "play" && play());
   }, [want, playOff]); // eslint-disable-line react-hooks/exhaustive-deps -- (play: the render's own)
-  // the id Play and Publish go by (testmode.ts nextId: the alias's next version; one published since asks for its own
+  // the id Play and Publish go by (testmode.ts nextHoleId: the alias's next version; one published since asks for its own
   // rounds), read once an alias is known and the hole checked (not a read for each key typed in its name), again if unread
   const [next, setNext] = useState<{ of: string; id: string; read: boolean } | null>(null);
   const alias = author && kept.slug ? `${author}/${kept.slug}` : "", ask = !!alias && !playOff;
@@ -411,7 +419,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   useEffect(() => {
     if (!ask || (next?.of === alias && next.read)) return;
     let stale = false;
-    void nextId(chain, author!, kept.slug).then((n) => !stale && setNext({ of: alias, ...n }));
+    void nextHoleId(chain, author!, kept.slug).then((n) => !stale && setNext({ of: alias, ...n }));
     return () => void (stale = true);
   }, [alias, ask]); // eslint-disable-line react-hooks/exhaustive-deps -- (next: read, not a reason to read again)
   const nextNow = next?.of === alias ? next.id : null;
@@ -424,6 +432,10 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const shut = proved ? "" : publishTip(kept.world, left);
   // a round of play's proof, kept in the draft as kept (the step amended: an undo before it drops it with the edit)
   const amend = (f: (k: Draft) => Draft) => (session.amend(f(session.kept())), refresh());
+  // the address changed before round 1 (Play's start card): one step, the rounds under another dropped (they count only there)
+  // (asked from Publish: once, until it is changed)
+  const [askSlug, setAskSlug] = useState(readdress);
+  const toSlug = (slug: string) => (setAskSlug(false), session.edit((k) => ({ ...k, slug, proofs: k.proofs.filter((p) => slugOf(p.id) === slug) })), refresh());
   const prove = (p: Proof) => amend((k) => ({ ...k, proofs: [...k.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }));
   const setPar = (par: number) => playing && amend((k) => (parAllowed(k.proofs.filter((q) => q.key === playing.key), k.par) ? k : { ...k, par }));
   // the first run's hints: gone at the first drag (a piece taken from the palette, one carried on the board, the paint taken up)
@@ -435,11 +447,11 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
         action={proved ? { text: "Publish", onClick: publish } : { text: "Play", key: "T", off: playOff, onClick: play }}
         meter={meterFace(clean, est, shape)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
-        onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onWorld={world} onStep={(s) => (s === "play" ? play() : s === "publish" && proved && publish())} onBack={onBack} onHelp={() => setAgain(true)}
-        onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, dice)))), setDice((n) => n + 1), refresh())} />
+        onTitle={(t) => (session.edit((k) => frame(retitle(k, t, others))), refresh())} onWorld={world} onStep={(s) => (s === "play" ? play() : s === "publish" && proved && publish())} onBack={onBack} onHelp={() => setAgain(true)}
+        onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, dice), others))), setDice((n) => n + 1), refresh())} />
       {palette && quick && full ? (
         <>
-          <Palette world={draft.world} palette={palette} armed={armed} off={off} bin={binShown} onArm={arm} chosen={looks} paint={{ mode: paint, onMode: toPaint }} />
+          <Palette world={draft.world} palette={palette} armed={armed} off={off} bin={binShown} onArm={arm} chosen={looks} paint={{ mode: paint, off: paintOff, onMode: toPaint }} />
           <div className="centre">
             {/* the proofs an edit dropped, an undo away (the edit undone, they are the hole's again) */}
             {toast && !sameShape(kept, toast.back) && (
@@ -485,7 +497,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
           <TestMode key={playing.author ?? ""} host={host} draft={kept} hex={playing.hex} proofKey={playing.key} author={playing.author} guess={guess?.par ?? 0}
             onAuthor={(a) => (setPlaying((p) => p && { ...p, author: a }), onAuthor(a))}
             next={playing.author && next?.of === `${playing.author}/${kept.slug}` ? next : null}
-            onProof={prove} onPar={setPar} tried={tried} onTried={() => setTried(null)}
+            onProof={prove} onPar={setPar} tried={tried} onTried={() => setTried(null)} readdress={askSlug} taken={others} onSlug={toSlug}
             onRound={(r) => (setTried(r), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), publish())} />
         </div>
       )}

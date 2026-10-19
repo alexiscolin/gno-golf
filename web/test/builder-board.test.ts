@@ -6,14 +6,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
-import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, errorsOf, newErrors, nextId, pieceLabel, placeNear, placePiece, removePiece, toWorld } from "../lib/builder/edit.ts";
+import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, errorsOf, newErrors, pieceLabel, placeNear, placePiece, removePiece, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, notTurned, setHandle, snap, turnPiece } from "../lib/builder/handles.ts";
 import { frame } from "../lib/builder/gg1.ts";
 import { makeSession, settle } from "../lib/builder/session.ts";
 import { centreOn, gridLines, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
-import type { Draft, Piece, V } from "../lib/builder/draft.ts";
+import { nextId, type Draft, type Piece, type V } from "../lib/builder/draft.ts";
 
 const garden = await loadPalette("garden");
 const { census } = await import("../lib/builder/drawn.ts");

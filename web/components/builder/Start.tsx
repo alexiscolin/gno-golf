@@ -127,7 +127,8 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
       {any ? (
         <ul className="bholes__list">
           {drafts.map((d, i) => {
-            const st = draftState(d, keys[i] ?? null), h = rowOf(d);
+            // (under the id its Publish would go by: the version after the one on the chain, else its first; the author unknown, the best of its ids)
+            const h = rowOf(d), st = draftState(d, keys[i] ?? null, author && d.slug ? (h ? afterOf(h.id) : `${author}/${d.slug}/v1`) : null);
             return (
               <li key={i} className="bholes__draft bholes__draft--open">
                 <span className="bholes__map bholes__map--s"><HoleMap hole={draftMap(d)} className="bholes__svg" /></span>
@@ -135,9 +136,10 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                   {/* the whole card opens it (this button's area covers it: its other links over it) */}
                   <button type="button" className="bholes__pick" title={d.title || undefined} onClick={() => onOpen(i)}><b>{d.title || "A hole with no name yet"}</b></button>
                   <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
-                  {/* its weathers, ticked as holed (published and none holed here since: its line on the chain says it all) */}
-                  {!(h && st.stage === "new") && (
-                    <span className={`bholes__state bholes__state--${st.stage}`} aria-label={`Weathers holed: ${st.word}`} title={st.stage === "ready" ? "Sunk in every weather: ready to publish" : "Each weather marked ○ is still to sink before it can be published"}>
+                  {/* its weathers, ticked as holed (published and none holed here since: its line on the chain says it all, unless its
+                      rounds were of the version before: played again for the next) */}
+                  {!(h && st.stage === "new" && !st.again) && (
+                    <span className={`bholes__state bholes__state--${st.stage}`} aria-label={`Weathers holed: ${st.word}`} title={st.stage === "ready" ? "Sunk in every weather: ready to publish" : st.again ? `Play it again for ${st.again}: each version has weather of its own` : "Each weather marked ○ is still to sink before it can be published"}>
                       {st.ticks.map((t, k) => <span key={t.kind} className={t.done ? "on" : undefined}>{k ? " · " : ""}{weatherName(t.kind)}{t.done ? " ✓" : " ○"}</span>)}
                     </span>
                   )}
@@ -211,6 +213,9 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     </div>
   );
 }
+
+/** The version after a hole's (author/slug/vN: vN+1). */
+const afterOf = (id: string) => id.replace(/\/v(\d+)$/, (_, n: string) => `/v${Number(n) + 1}`);
 
 /** A published hole's line on its card: on the chain, a dot for what is new since the last look, its players and plays, its best against the author's. */
 function Live({ s, fresh }: { s: HoleStats; fresh: boolean }) {

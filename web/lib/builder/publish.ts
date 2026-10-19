@@ -131,7 +131,8 @@ export function publishSteps(r: Readings, { author, slug, proved, sha, realm, pa
   if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };
   if (r.hole) return { at: "hole", why: r.hole };
   if (r.name) return { at: "name", why: r.name };
-  if (pay && r.funds != null && shortOf(pay.gas, pay.price, pay.deposit, r.funds)) return { at: "funds", why: `${shortAddr(author)} holds ${aboutGnot(r.funds)} GNOT here; publishing takes up to ${aboutGnot(pay.most)}. Add GNOT to it, then publish.` };
+  const short = pay ? shortOf(pay.gas, pay.price, pay.deposit, r.funds) : null;
+  if (pay && r.funds != null && short) return { at: "funds", why: `${shortAddr(author)} holds ${aboutGnot(r.funds)} GNOT here; publishing takes up to ${aboutGnot(pay.most)}. Add at least ${aboutGnot(short * 1e6)} GNOT to it, then check again.` };
   return { at: "ready", why: "" };
 }
 

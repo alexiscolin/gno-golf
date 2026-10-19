@@ -4,8 +4,9 @@
 // in every sentence the checks say ("the wall", "the wet sand", "the lagoon",
 // "the blinking hand"). A look is named by its skin ("lagoon": the Lagoon); a
 // plain form, or a skin two kinds share or that says too little, by NAMED.
-// The palette's tiles (what a piece does: Wall, Water, Barrier) are named
-// here too. Plain data on the bindings (no scene), so the checks, the worker
+// The palette's tiles (what a piece does: Bank, Water, Barrier; the rail's
+// tile is Bank, an inner bank, while its plain entry is still named Wall in
+// NAMED) are named here too. Plain data on the bindings (no scene), so the checks, the worker
 // and the palette (tiles.ts) name alike.
 import { BINDINGS, KIND, type Binding } from "./bindings";
 import { entryParts } from "./gg1";

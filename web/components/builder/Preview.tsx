@@ -27,6 +27,18 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
   const orbit = useRef({ ...FRAMED }), redraw = useRef<() => void>(() => {}), frame = useRef(0), drag = useRef<{ x: number; y: number } | null>(null);
   const turned = () => void (frame.current ||= requestAnimationFrame(() => ((frame.current = 0), redraw.current())));
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  // the wheel zooms the view, never the page under it (a native listener: React's own wheel is passive, as Board's)
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      orbit.current.zoom = Math.max(0.35, Math.min(1.8, orbit.current.zoom * Math.exp(e.deltaY * 0.0015)));
+      turned();
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [failed]); // (turned: refs only)
 
   // a canvas of its own each mount (React mounts twice in development, on the same element): its WebGL
   // context freed when it goes, not when the canvas is collected (a browser holds about sixteen)
@@ -95,7 +107,6 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
         turned();
       }}
       onPointerUp={() => void (drag.current = null)} onPointerCancel={() => void (drag.current = null)}
-      onWheel={(e) => ((orbit.current.zoom = Math.max(0.35, Math.min(1.8, orbit.current.zoom * Math.exp(e.deltaY * 0.0015)))), turned())}
       onDoubleClick={() => ((orbit.current = { ...FRAMED }), turned())}>
       <span className="pill">{state ? (fresh ? "3D · in sync" : "3D · catching up") : "3D · waiting for the checks"}</span>
     </div>

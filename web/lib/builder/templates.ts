@@ -5,9 +5,9 @@
 // to draw the hole on (scratch). Each passes every
 // check in every world (test/builder-templates.test.ts): a new hole is never
 // one the Builder refuses, and every edit after it keeps it so.
-import { emptyDraft, type Draft, type Piece, type V } from "./draft";
+import { emptyDraft, type Draft } from "./draft";
 import { entryParts, frame } from "./gg1";
-import { MIN_WIDE, SURFACE_RAIL, surfaceOf } from "./surface";
+import { MIN_WIDE, railPiece as rail, surfaceOf } from "./surface";
 import { STARTERS } from "./starters";
 import { cap, worldName } from "./rules";
 
@@ -21,7 +21,6 @@ export interface Start {
 
 /** From scratch: the smallest plain green the checks take (MIN_WIDE across, the tee and the cup a ball's room from its ends). */
 const W = 2 * MIN_WIDE, H = MIN_WIDE;
-const rail = (id: string, a: V, b: V): Piece => ({ id, entry: SURFACE_RAIL, geometry: { t: "rail", a, b }, params: {}, clock: { k: "fixed" } });
 
 /** A plain green in a world, walled by itself, the tee and the cup at its ends, framed; par the lowest its world's starters have. */
 export function scratch(world: string): Draft {
@@ -78,15 +77,46 @@ function hashOf(text: string): string {
   for (const c of text) h = Math.imul(h ^ c.codePointAt(0)!, 0x01000193) >>> 0;
   return h.toString(36).padStart(6, "0").slice(-6);
 }
-/** An address typed by hand (Publish's): what the chain takes, a dash for anything else, at most 32. */
+/** An address typed by hand (Play's, before round 1): what the chain takes, a dash for anything else, at most 32. */
 export const typedSlug = (typed: string) => typed.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 32);
+
+/** An address numbered (n from 2: "garden-dogleg-2"), within 32. */
+const numbered = (base: string, n: number) => (n < 2 ? base : `${base.slice(0, 31 - String(n).length).replace(/-+$/, "")}-${n}`);
+/** Whether slug is base or base numbered. */
+const isOf = (slug: string, base: string) => slug === base || numbered(base, Number(/-(\d+)$/.exec(slug)?.[1] ?? 0)) === slug;
+/** base, else the first of it numbered from n that taken has not. */
+const freeFrom = (base: string, taken: ReadonlySet<string>, n = 2) => {
+  if (!taken.has(base) && n <= 2) return base;
+  while (taken.has(numbered(base, n))) n++;
+  return numbered(base, n);
+};
+/** The next address after slug that taken has not: its number up one ("garden-dogleg-2" → "-3"), or -2 (Play's way off an address another hole has). */
+export function nextSlug(slug: string, taken: ReadonlySet<string>): string {
+  const m = /^(.+)-(\d+)$/.exec(slug), base = m && numbered(m[1], +m[2]) === slug ? m[1] : slug;
+  return freeFrom(base, new Set([...taken, slug]), base === slug ? 2 : +m![2] + 1);
+}
 
 /**
  * The hole renamed: its address follows its name (slugOf) while it is the
- * name's own or none, until the hole is first proved (the proofs are bound
- * to its address); an address set by hand stays.
+ * name's own (numbered or not) or none, until the hole is first proved (the
+ * proofs are bound to its address), one no other draft has (taken: their
+ * addresses, numbered past them: two drafts of one address, the second's
+ * publish would be a new version of the first); an address set by hand stays.
  */
-export function retitle(d: Draft, title: string): Draft {
-  const follows = !d.proofs.length && (!d.slug || d.slug === slugOf(d.title));
-  return { ...d, title, slug: follows ? slugOf(title) : d.slug };
+export function retitle(d: Draft, title: string, taken: ReadonlySet<string> = new Set()): Draft {
+  const follows = !d.proofs.length && (!d.slug || isOf(d.slug, slugOf(d.title)));
+  return { ...d, title, slug: follows ? freeFrom(slugOf(title), taken) : d.slug };
+}
+
+/**
+ * A new draft (a starter, from scratch, a file, a remix) given an address no
+ * other draft here has (others), numbered past theirs; its rounds under the
+ * old one dropped (they count only there). One opened from the chain as its
+ * next version keeps its own: it is that hole's.
+ */
+export function ownSlug(d: Draft, others: readonly Draft[]): Draft {
+  const taken = new Set(others.map((o) => o.slug));
+  if (!d.slug || !taken.has(d.slug) || (d.from && d.from.split("/")[1] === d.slug)) return d;
+  const slug = nextSlug(d.slug, taken);
+  return { ...d, slug, proofs: d.proofs.filter((p) => p.id.split("/").at(-2) === slug) };
 }

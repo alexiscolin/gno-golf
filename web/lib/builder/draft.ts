@@ -4,7 +4,7 @@
 // that will be published. A draft read from a file or from the browser is
 // untrusted: parseDraft takes it only whole, on the grid and within its
 // limits. Its history (undo, redo) and its keeping in the browser are here.
-import { isObj, isSlug } from "../chain";
+import { isObj, isHoleId, isSlug } from "../chain";
 import { FIELD, gameWorld, MAX_PAR, notABuilderWorld } from "./rules";
 
 export type V = [number, number];
@@ -83,6 +83,8 @@ export interface Draft {
   proofs: Proof[];
   /** the green as painted; none: read from its rails, if they make one (surface.ts surfaceIn) */
   surface?: Surface;
+  /** the published version it is of (its id: opened from the chain, or published from it): its next version a new one of that hole (testmode.ts cameFrom) */
+  from?: string;
 }
 
 /** A draft's limits, beside GG1's own (gg1.ts LIMITS): what the editor holds at once. */
@@ -198,6 +200,7 @@ export function parseDraft(text: string): Draft | string {
   }
   if (!Array.isArray(d.proofs) || !d.proofs.every(isProof)) return "The draft's proofs are not rounds the Builder made.";
   if (d.surface !== undefined && !isSurface(d.surface, d.tee)) return "The draft's green is not one the Builder painted.";
+  if (d.from !== undefined && !isHoleId(d.from)) return "The draft's published hole is not a hole's address.";
   return rebuild(d as unknown as Draft);
 }
 
@@ -230,6 +233,7 @@ function rebuild(d: Draft): Draft {
     pulses: d.pulses.map((q) => ({ every: q.every, on: q.on, phase: q.phase })),
     proofs: d.proofs.map((p) => ({ key: p.key, id: p.id, kind: p.kind, period: p.period, shots: [...p.shots], commits: p.commits.map(([a, b]): [number, number] => [a, b]), strokes: p.strokes, maxWork: p.maxWork })),
     ...(d.surface && { surface: { cells: d.surface.cells.map(v), open: d.surface.open.map(v) } }),
+    ...(d.from && { from: d.from }),
   };
 }
 

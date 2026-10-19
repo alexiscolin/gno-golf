@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { askSaid, clock, finished, heldSaid, holeId, holeRow, nextId, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
+import { askSaid, cameFrom, clock, finished, heldSaid, holeId, holeRow, nextHoleId, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
 import { holdsIn, holdsToo } from "../lib/builder/carry.ts";
 import { provedAt, replay, type Proof } from "../lib/builder/proof.ts";
 import fs from "node:fs";
@@ -98,12 +98,12 @@ void test("publishTip, askSaid, heldSaid: the weathers named, never \"every weat
   assert.equal(heldSaid(null, ["", "wind"]), "Your practice round holds in Clear and Wind ✓");
 });
 
-void test("provedAt, nextId: proved under the alias's next version only; that id as the chain says, v1 unread", async () => {
+void test("provedAt, nextHoleId: proved under the alias's next version only; that id as the chain says, v1 unread", async () => {
   const mk = (id: string, kind: string, maxWork = 1): Proof => ({ key: "k", id, kind, period: 1, shots: [], commits: [], strokes: 2, maxWork });
   const v1 = `${A}/mole-run/v1`, v2 = `${A}/mole-run/v2`;
   const versions = { version: 1, slot: `${A}/mole-run`, versions: [{ id: v1, v: 1, height: 1, by: A, sha: "", note: "", next: "" }] };
-  assert.deepEqual(await nextId({ versions: () => Promise.resolve(versions) }, A, "mole-run"), { id: v2, read: true });
-  assert.deepEqual(await nextId({ versions: () => Promise.reject(new Error("down")) }, A, "mole-run"), { id: v1, read: false });
+  assert.deepEqual(await nextHoleId({ versions: () => Promise.resolve(versions) }, A, "mole-run"), { id: v2, read: true });
+  assert.deepEqual(await nextHoleId({ versions: () => Promise.reject(new Error("down")) }, A, "mole-run"), { id: v1, read: false });
   // the one rule the stepper, Play and Publish go by: every weather under the alias's next version
   const all = (id: string) => ["", "wind", "rain"].map((k) => mk(id, k));
   assert.equal(provedAt(all(v1), "garden", "k", v1), v1);
@@ -159,4 +159,15 @@ void test("the address, asked once on the game's card: as Play opens (round 1 na
   assert.ok(src.includes(">Use my Adena address<") && src.includes(">Paste an address<") && src.includes("ADENA_URL") && src.includes("askSaid(draft.world)"));
   assert.ok(src.includes(">Practice first<") && src.includes("Nothing is signed until you publish."), "the start card: a try kept, nothing signed");
   assert.match(src, /function AddressLine/);
+});
+
+void test("cameFrom: played under its alias's next version, a draft is a new version of the hole there only if it is of it (opened or published from it, or played under one of its versions); nothing there yet, any is", () => {
+  const A = "g1me", proof = (id: string) => ({ key: "k", id, kind: "", period: 1, shots: [], commits: [], strokes: 2, maxWork: 1 });
+  assert.equal(cameFrom({ proofs: [] }, `${A}/mole-run/v1`), true, "nothing published there");
+  assert.equal(cameFrom({ proofs: [] }, `${A}/mole-run/v2`), false, "another hole holds it: not this draft's");
+  assert.equal(cameFrom({ proofs: [proof(`${A}/mole-run/v2`)] }, `${A}/mole-run/v2`), false, "rounds under the next one prove nothing of where it came from");
+  assert.equal(cameFrom({ from: `${A}/mole-run/v1`, proofs: [] }, `${A}/mole-run/v2`), true, "opened from v1 (or published as it)");
+  assert.equal(cameFrom({ from: `${A}/mole-run`, proofs: [] }, `${A}/mole-run/v3`), true, "opened by its alias");
+  assert.equal(cameFrom({ proofs: [proof(`${A}/mole-run/v1`)] }, `${A}/mole-run/v2`), true, "a draft kept before: played under v1");
+  assert.equal(cameFrom({ from: `${A}/other/v1`, proofs: [proof(`${A}/other/v1`)] }, `${A}/mole-run/v2`), false, "of another hole");
 });

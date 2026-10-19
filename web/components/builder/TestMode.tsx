@@ -25,21 +25,27 @@
 // (Golf.tsx): the strokes card with the par and the time in play, the
 // weather card, the weathers to hole beside them. In play R or Backspace
 // plays again from the tee, V swaps the overview camera, Escape goes back
-// to Build.
+// to Build. With it, the hole's address is checked before round 1: one
+// another hole of the author's holds already (one this draft did not come
+// from: testmode.ts cameFrom), or one Publish could not use (taken down,
+// refused), is changed on the start card first (the next free one a click
+// away), its rounds under the old one said not to count; a real new version
+// is said so.
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button, Dialog } from "@/components/ui";
 import { useFlash } from "@/components/common";
 import { CamButton } from "@/components/CamButton";
 import Weather, { SkyIcon } from "@/components/Weather";
 import { connect, hasAdena } from "@/lib/adena";
-import { isAddress, makeChain, RULES } from "@/lib/chain";
+import { isAddress, isSlug, makeChain, RULES, shortAddr } from "@/lib/chain";
 import { createGame } from "@/lib/engine";
 import { camlog } from "@/lib/testhooks";
 import { endpoints, keepAuthor } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
 import { holdsIn, holdsToo } from "@/lib/builder/carry";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
-import { askSaid, clock, finished, heldSaid, toGo, holeRow, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
+import { askSaid, cameFrom, clock, finished, heldSaid, toGo, holeRow, nowSaid, parSaid, plan, slugOf, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
+import { nextSlug, typedSlug } from "@/lib/builder/templates";
 import { playKey } from "@/lib/builder/keys";
 import { NO_GL } from "@/lib/builder/editor";
 import { hold, onStage, stageCanvas, stageRenderer, stageUp } from "@/lib/builder/stage";
@@ -145,7 +151,32 @@ function AddressLine({ start, title, head, line, note, onAddress, children }: { 
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, next, guess = 0, tried = null, onAuthor, onProof, onPar, onRound, onTried, onPublish, onLeave }: {
+/** The address chosen before round 1 (the author's known): one another hole of theirs holds (clash: the next free one a click
+ *  away, or one typed), or one Publish could not use; the rounds played under it said not to count under another. */
+function AddressCard({ title, author, slug, clash, rounds, taken, onSlug, onLeave }: { title: string; author: string; slug: string; clash: boolean; rounds: boolean; taken: ReadonlySet<string>; onSlug: (s: string) => void; onLeave: () => void }) {
+  const offer = nextSlug(slug, taken);
+  const [typed, setTyped] = useState<string | null>(clash ? null : offer);
+  const ok = typed !== null && isSlug(typed) && typed !== slug && !taken.has(typed);
+  return (
+    <WonCard title={title} head={clash ? "This address holds another hole" : "A new address"} kicker="Before you tee off" label="Its address first" className="tmode__sign tmode__sign--start">
+      <p>{clash ? `${shortAddr(author)}/${slug} holds a hole of yours this draft didn't come from: published there, this one would replace it for players.` : `Publish can't use ${shortAddr(author)}/${slug}: give it another address.`}
+        {rounds && ` Rounds played under ${slug} don't count under a new one: you sink it again in each weather.`}</p>
+      {typed !== null && (
+        <span className="tmode__addr">
+          <input value={typed} aria-label="Its address" spellCheck={false} autoCapitalize="off" autoFocus aria-invalid={!ok} onChange={(e) => setTyped(typedSlug(e.target.value))} />
+          <Button variant="primary" disabled={!ok} onClick={() => onSlug(typed)}>Use this address</Button>
+        </span>
+      )}
+      <div className="banner__row">
+        <Button keycap="Esc" onClick={onLeave}>Back to Build</Button>
+        {typed === null && <Button onClick={() => setTyped(offer)}>Another address</Button>}
+        {typed === null && <Button variant="primary" onClick={() => onSlug(offer)}>Use {offer}</Button>}
+      </div>
+    </WonCard>
+  );
+}
+
+export default function TestMode({ host, draft, hex, proofKey, author, next, guess = 0, tried = null, readdress = false, taken = new Set(), onAuthor, onProof, onPar, onRound, onTried, onSlug, onPublish, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -162,6 +193,12 @@ export default function TestMode({ host, draft, hex, proofKey, author, next, gue
   tried?: readonly string[] | null;
   /** that try replayed (counted where it held): not replayed again */
   onTried: () => void;
+  /** its address to change before round 1 (Publish could not use it) */
+  readdress?: boolean;
+  /** the other drafts' addresses (none of them offered) */
+  taken?: ReadonlySet<string>;
+  /** the address changed on the start card (the editor's step: the rounds under the old one dropped) */
+  onSlug: (slug: string) => void;
   /** the address given (a try holed first): kept in this browser, and play goes on as the author's */
   onAuthor: (a: string) => void;
   onProof: (p: Proof) => void;
@@ -213,8 +250,15 @@ export default function TestMode({ host, draft, hex, proofKey, author, next, gue
 
   // the hole's id: the author's alias's next version, as the editor read it (v1 if it cannot be read), the one the stepper
   // and Publish go by; a try's its own
-  const id = !author ? TRY_HOLE : next?.id ?? null, unread = !!author && next?.read === false;
-  useEffect(() => void (unread && setAside("The chain could not be read: played as a new hole (v1). If it has versions already, play it again once it can be.")), [unread]);
+  // (its address first, before any round: another hole of the author's there, or one asked to change; none plays meanwhile)
+  const [asked, setAsked] = useState(readdress);
+  const clash = !!author && !!next?.read && !cameFrom(draft, next.id), choosing = !!author && !!next && (asked || clash);
+  const id = !author ? TRY_HOLE : choosing ? null : next?.id ?? null, unread = !!author && next?.read === false;
+  const v = Number(/\/v(\d+)$/.exec(next?.id ?? "")?.[1] ?? 0);
+  useEffect(() => {
+    if (unread) setAside("The chain could not be read: played as a new hole (v1). If it has versions already, play it again once it can be.");
+    else if (id && !trying && v > 1) setAside(`A new version of ${draft.title || "your hole"}: v${v}, with weather of its own.`);
+  }, [unread, id]); // eslint-disable-line react-hooks/exhaustive-deps -- (said as the id is known)
 
   // the round holed in the weather played (its strokes; 0 not yet), until a play again or the next weather
   const [holed, setHoled] = useState(0);
@@ -427,6 +471,11 @@ export default function TestMode({ host, draft, hex, proofKey, author, next, gue
           {/* the game's view button: classic, third person, far (V swaps to the overview) */}
           {snap && <CamButton cam={snap.cam} onCam={(next) => game.current?.setCam(next)} />}
         </footer>
+      )}
+      {/* the address first: another hole of the author's there, or one Publish could not use */}
+      {choosing && (
+        <AddressCard title={draft.title || "Your hole"} author={author ?? ""} slug={draft.slug} clash={clash} rounds={draft.proofs.some((p) => slugOf(p.id) === draft.slug)} taken={taken}
+          onSlug={(s) => (setAsked(false), onSlug(s))} onLeave={onLeave} />
       )}
       {/* no address yet: asked once as Play opens, before round 1 (or just a try: asked again once it is holed) */}
       {now && !card && trying && !holed && !justTry && (
