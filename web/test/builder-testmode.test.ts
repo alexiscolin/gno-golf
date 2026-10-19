@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
 import { askSaid, clock, finished, heldSaid, holeId, holeRow, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
-import { holdsToo } from "../lib/builder/carry.ts";
+import { holdsIn, holdsToo } from "../lib/builder/carry.ts";
 import { leftAs, replay, type Proof } from "../lib/builder/proof.ts";
 import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
@@ -95,6 +95,7 @@ void test("publishTip, askSaid, heldSaid: the weathers named, never \"every weat
   assert.equal(askSaid("garden"), "Clear ✓ — next: Wind and Rain. Your address names the hole and sets its weather, so we need it once to go on. Nothing is signed.");
   assert.equal(heldSaid("", ["rain"]), "Your Clear round holds in Rain too ✓");
   assert.equal(heldSaid("", ["wind", "rain"]), "Your Clear round holds in Wind and Rain too ✓");
+  assert.equal(heldSaid(null, ["", "wind"]), "Your practice round holds in Clear and Wind ✓");
 });
 
 void test("leftAs: the weathers still to sink under the author's best id; all with no author or none proved", () => {
@@ -129,6 +130,10 @@ void test("holdsToo: a proved round's shots replayed in the weathers left, each 
     assert.ok(typeof again !== "string", `${q.kind}: holds when replayed`);
   }
   assert.deepEqual(await holdsToo(host, d, hex, proof, [{ kind: "wind", period: -1 }]), [], "a weather with no period is never counted");
+  // a practice round's shots (no weather of its own), under the author's id: each weather it holes in proved, calm too
+  const practice = await holdsIn(host, d, hex, { key, id, shots: proof.shots }, p);
+  assert.ok(practice.some((q) => q.kind === "") && practice.some((q) => q.kind === "rain"), "a practice putt counts in calm and in the rain");
+  for (const q of practice) assert.equal(q.period, p.find((x) => x.kind === q.kind)!.period);
 });
 
 void test("summary: Play's one card at the end, each weather proved with its strokes and time, Publish the way on", () => {

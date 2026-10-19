@@ -99,8 +99,10 @@ export function publishTip(world: string, left: readonly string[]): string {
 export const askSaid = (world: string) =>
   `${weatherName("")} ✓ — next: ${weathersSaid(required(world).filter((k) => k))}. Your address names the hole and sets its weather, so we need it once to go on. Nothing is signed.`;
 
-/** Said when a round's shots, replayed in other weathers, hole there too (those weathers proved without a round of their own). */
-export const heldSaid = (from: string, kinds: readonly string[]) => `Your ${weatherName(from)} round holds in ${weathersSaid(kinds)} too ✓`;
+/** Said when a round's shots, replayed in other weathers, hole there too (those weathers proved without a round of their own);
+ *  from null: a practice round's, replayed once the address is given ("Your practice round holds in Clear and Wind ✓"). */
+export const heldSaid = (from: string | null, kinds: readonly string[]) =>
+  from === null ? `Your practice round holds in ${weathersSaid(kinds)} ✓` : `Your ${weatherName(from)} round holds in ${weathersSaid(kinds)} too ✓`;
 
 /** Play's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
 export function summary(rows: readonly { kind: string; strokes: number; ms?: number }[], par: number): Finished {

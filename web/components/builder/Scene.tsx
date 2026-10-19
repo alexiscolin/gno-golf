@@ -12,7 +12,8 @@
 // checked hole changes (a drop, an undo), never as the pointer moves.
 // The same scene gives the player's view (PlayerView.tsx): the hole from the
 // tee through the game's lens, drawn in a corner of the board's canvas and
-// copied out, once a build (the edit settled) or when asked, never a frame.
+// copied out, once a build (the edit settled), when asked, or when the canvas
+// comes back to it (from Play, or its context lost and back), never a frame.
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { applyRig, makeScene, setLighting, teeRig } from "@/lib/scene/camera";
@@ -118,7 +119,8 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
     return () => void (eye.paint = () => {});
   }, [eye]); // eslint-disable-line react-hooks/exhaustive-deps -- (paint reads refs only)
 
-  // the scene, on the Builder's canvas, while the board is up; given back after Play, it draws again
+  // the scene, on the Builder's canvas, while the board is up; given back (after Play, or its context back after a loss),
+  // it draws again, the player's view with it (a build while the canvas was away or lost painted nothing)
   useEffect(() => {
     const r = stageRenderer();
     if (!r) return;
@@ -128,7 +130,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
       const c = r.domElement;
       c.removeAttribute("id"), c.removeAttribute("style"); // (the game's sizing and its #stage, gone with it)
       r.resetState();
-      draw();
+      if (!paint()) draw();
       if (latest.current.keep) waker.current?.(); // (a timed piece kept moving: its loop, stopped while lent, again)
     });
     return () => {

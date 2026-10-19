@@ -4,7 +4,8 @@
 // the hole's name in place (the one place it is edited: its address follows
 // it, shown on Publish), the three steps (Build, Play, Publish), and on the
 // right the difficulty chip (a click shows the meter's line on the board),
-// the history and the mode's one action (Play, in Build). A step done or
+// the history and the mode's one action, the way on (Play, in Build; once
+// every weather is sunk, Publish: Play then its step, T still). A step done or
 // open is a link back to it; a locked one says why; Publish, once open, is
 // lit: the way on. The world a hole is in changes from its menu, a button saying it.
 import { useRef } from "react";
@@ -126,7 +127,9 @@ export default function Header({ title, world, worlds = [], step, steps, action,
               {st.locked && !now ? (
                 <InfoTip label={`${names[s]}, locked: why`} note={st.locked} className=""><i>🔒</i><span>{names[s]}</span></InfoTip>
               ) : (
-                <button type="button" title={names[s]} aria-label={names[s]} aria-current={now ? "step" : undefined} onClick={() => onStep(s)}>
+                // (Play from Build: its key too, the big button Publish once every weather is sunk)
+                <button type="button" title={s === "play" && step === "edit" ? "Play (T)" : names[s]} aria-label={names[s]} aria-keyshortcuts={s === "play" && step === "edit" ? "T" : undefined}
+                  aria-current={now ? "step" : undefined} onClick={() => onStep(s)}>
                   <i>{st.done && !now ? "✓" : i + 1}</i><span>{names[s]}</span>
                 </button>
               )}

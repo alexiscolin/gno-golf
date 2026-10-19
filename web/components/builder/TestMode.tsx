@@ -19,9 +19,9 @@
 // count gets that card with why (finished). Without an address, it is asked
 // once on the start card as Play opens (Adena's, or one pasted), or put by
 // for a try: a round in calm weather under an id of its own (TRY_HOLE), the
-// address asked once it is holed, then replayed under the author's id in its
-// calm period, the calm proof if it holes
-// there too (tried). Its HUD is the game's own
+// address asked once it is holed, then replayed under the author's id in each
+// weather (carry.ts holdsIn), proved in each it holes in (tried): practice
+// counts. Its HUD is the game's own
 // (Golf.tsx): the strokes card with the par and the time in play, the
 // weather card, the weathers to hole beside them. In play R or Backspace
 // plays again from the tee, V swaps the overview camera, Escape goes back
@@ -37,7 +37,7 @@ import { createGame } from "@/lib/engine";
 import { camlog } from "@/lib/testhooks";
 import { endpoints, keepAuthor } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
-import { holdsToo } from "@/lib/builder/carry";
+import { holdsIn, holdsToo } from "@/lib/builder/carry";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
 import { askSaid, clock, finished, heldSaid, toGo, holeId, holeRow, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
@@ -59,10 +59,10 @@ const CALM: WeatherNow = { wind: null, rain: false, fog: false, storm: false, sn
 const BITS = confetti(28);
 /** No chip stamped. */
 const NONE: readonly string[] = [];
-/** Said when a try holed before the address does not hole again under it (its calm period): the line promised it would count. */
 /** The start card's line, no address known as Play opens. */
 const START_LINE = "Your address names the hole and sets its weather. Nothing is signed until you publish.";
-const NOT_CARRIED = `Your try did not hold under your address: sink it in ${weatherName("")} again.`;
+/** Said when a try holed before the address holes in no weather under it: the line promised it would count. */
+const NOT_CARRIED = "Your practice round did not hold under your address: sink it in each weather.";
 /** How far back a weather is looked for (FIND_BACK periods), in days, for a sentence. */
 const FIND_DAYS = Math.round((FIND_BACK * RULES.periodMs) / 86_400_000);
 
@@ -145,7 +145,7 @@ function AddressLine({ start, title, head, line, note, onAddress, children }: { 
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, tried = null, onAuthor, onProof, onPar, onRound, onPublish, onLeave }: {
+export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, tried = null, onAuthor, onProof, onPar, onRound, onTried, onPublish, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -155,8 +155,10 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   author: string | null;
   /** the difficulty meter's par (0: none): shown, as a guess, until the rounds set it */
   guess?: number;
-  /** a try holed before the address was given, its shots: replayed first as the author's calm round */
+  /** a try holed before the address was given, its shots: replayed first in each weather, the author's rounds where it holds */
   tried?: readonly string[] | null;
+  /** that try replayed (counted where it held): not replayed again */
+  onTried: () => void;
   /** the address given (a try holed first): kept in this browser, and play goes on as the author's */
   onAuthor: (a: string) => void;
   onProof: (p: Proof) => void;
@@ -248,20 +250,21 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const of = required(draft.world).length;
     return trying ? { n: 1, of } : leftNow.current.includes(kind) ? { n: of - leftNow.current.length + 1, of } : undefined;
   };
-  // a try holed before the address: replayed under the author's id in its calm period, the calm proof if it holes there
-  // too (the replay is the proof, as for any round); the first weather waits for it, said by its title card then
+  // a try holed before the address: replayed under the author's id in each weather left, at its period, proved in each it
+  // holes in (the replay is the proof, as for any round) and said ("Your practice round holds in Clear and Wind ✓"); the
+  // first weather waits for it, said by its title card then
   const [carry, setCarry] = useState<"" | "waiting" | "done">(tried && !trying ? "waiting" : "");
   useEffect(() => {
     if (carry !== "waiting" || !id || !kinds.length) return;
-    const calm = kinds.find((k) => k.kind === "");
-    if (!calm || calm.period < 0 || !left.includes("") || !tried) return setCarry("");
-    void replay(makeLocalChain(host, holeRow(id, draft), hex, calm.period), { key: proofKey, id, kind: "", period: calm.period, shots: [...tried] }).then(async (p) => {
-      if (typeof p === "string") return (setAside(NOT_CARRIED), setCarry("")); // (said plainly: the round the line promised did not count)
-      onProof(p);
+    const ways = kinds.filter((k) => left.includes(k.kind));
+    if (!ways.length || !tried) return setCarry("");
+    void holdsIn(host, draft, hex, { key: proofKey, id, shots: tried }, ways).then((more) => {
+      onTried();
+      if (!more.length) return (setAside(NOT_CARRIED), setCarry("")); // (said plainly: the round the line promised did not count)
+      more.forEach(onProof);
       sound("cup");
-      await chain(p);
-      setStamp(["", ...alsoHeld.current]);
-      alsoHeld.current = [];
+      setStamp(more.map((p) => p.kind));
+      setHeld(heldSaid(null, more.map((p) => p.kind)));
       setCarry("done");
     });
   }, [carry, id, kinds]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -432,7 +435,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       {/* no address yet: asked once as Play opens, before round 1 (or just a try: asked again once it is holed) */}
       {now && !card && trying && !holed && !justTry && (
         <AddressLine start title={draft.title || "Your hole"} head={nowSaid("", atOf(""))} line={START_LINE} onAddress={sign}
-          note="Practice first plays Clear only: add your address once it's holed and the round counts.">
+          note="Practice first plays Clear only: add your address once it's holed and it counts in each weather it holds in.">
           <Button onClick={() => (setJustTry(true), fresh(), setSaid(nowSaid("", atOf(""))))}>Practice first</Button>
         </AddressLine>
       )}

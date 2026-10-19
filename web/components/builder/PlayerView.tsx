@@ -13,15 +13,18 @@ import { Sheet } from "@/components/ui";
 export default function PlayerView({ eye, large, onLarge }: { eye: Eye; large: boolean; onLarge: (on: boolean) => void }) {
   const small = useRef<HTMLCanvasElement>(null), big = useRef<HTMLCanvasElement>(null);
 
-  // the canvas painted: the large one while it is open, else the small one; painted as it comes and when resized
+  // the canvas painted: the large one while it is open, else the small one; painted as it comes, when resized, and
+  // when its own context comes back blank (a GPU reset)
   useEffect(() => {
     const el = (large ? big : small).current;
     if (!el) return;
     eye.canvas = el;
-    const ro = new ResizeObserver(() => eye.paint());
+    const again = () => eye.paint(), ro = new ResizeObserver(again);
     ro.observe(el);
+    el.addEventListener("contextrestored", again);
     return () => {
       ro.disconnect();
+      el.removeEventListener("contextrestored", again);
       if (eye.canvas === el) eye.canvas = null;
     };
   }, [eye, large]);

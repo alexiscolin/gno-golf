@@ -142,8 +142,9 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   // Play (T): the hole as kept, its canonical bytes and proof key, played over the editor (kept open: the same zoom, selection and history after)
   // (the author it opened with: one Adena shares late never swaps a game under way; the address given in play does)
   const [playing, setPlaying] = useState<{ hex: string; key: string; author: string | null } | null>(null), [want, setWant] = useState(playFirst);
-  // the last try's round that holed (no address yet), left on the board as a dotted trail (played again as the hole changes)
-  const [trail, setTrail] = useState<QuickShot[]>([]), [tried, setTried] = useState<readonly string[] | null>(null);
+  // the last try's round that holed (no address yet), left on the board as a dotted trail (played again as the hole changes);
+  // its shots kept with the hole they holed (its proof key) until the address is given, then replayed in each weather
+  const [trail, setTrail] = useState<QuickShot[]>([]), [tried, setTried] = useState<{ shots: readonly string[]; key: string } | null>(null);
   // the player's view (PlayerView.tsx), painted by the board's 3D scene
   const [eye] = useState<Eye>(() => ({ canvas: null, paint: () => {} }));
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -373,7 +374,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const playOff = testGate(shape, checked, gl) || (carrying === kept || key?.of !== shape || !key.key ? CHECKING : "");
   function play() {
     const hex = !playOff && key?.key ? canonicalHex(kept, host) : null;
-    if (hex != null) (setArmed(null), setAim(null), setTried(null), setPlaying({ hex, key: key!.key!, author }), onHinted());
+    if (hex != null) (setArmed(null), setAim(null), setPlaying({ hex, key: key!.key!, author }), onHinted());
   }
   // back from Publish to play it again: as soon as the hole is checked; dropped if it cannot start (never opened later, unasked)
   useEffect(() => {
@@ -401,7 +402,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} world={draft.world} worlds={WORLDS} step="edit"
         steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: shut, done: false } }}
-        action={{ text: "Play", key: "T", off: playOff, onClick: play }}
+        action={proved ? { text: "Publish", onClick: publish } : { text: "Play", key: "T", off: playOff, onClick: play }}
         meter={meterFace(clean, est, shape)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onWorld={world} onStep={(s) => (s === "play" ? play() : s === "publish" && proved && publish())} onBack={onBack} onHelp={() => setAgain(true)}
@@ -451,7 +452,8 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
           {/* (a new game once the address is given: its rounds the author's from then on) */}
           <TestMode key={playing.author ?? ""} host={host} draft={kept} hex={playing.hex} proofKey={playing.key} author={playing.author} guess={guess?.par ?? 0}
             onAuthor={(a) => (setPlaying((p) => p && { ...p, author: a }), onAuthor(a))}
-            onProof={prove} onPar={setPar} tried={tried} onRound={(r) => (setTried(r), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), onPublish(session.kept()))} />
+            onProof={prove} onPar={setPar} tried={tried?.key === playing.key ? tried.shots : null} onTried={() => setTried(null)}
+            onRound={(r) => (setTried({ shots: r, key: playing.key }), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), onPublish(session.kept()))} />
         </div>
       )}
       {(hints || again) && <Hints world={draft.world} glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}

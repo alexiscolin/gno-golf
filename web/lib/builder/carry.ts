@@ -60,12 +60,21 @@ export async function carry(host: BuilderHost, d: Draft, hex: string, key: strin
  * holes in too, by the realm's own code as any round's. None is counted
  * unreplayed; the others stay to play.
  */
-export async function holdsToo(host: BuilderHost, d: Draft, hex: string, p: Proof, left: readonly { kind: string; period: number }[]): Promise<Proof[]> {
+export const holdsToo = (host: BuilderHost, d: Draft, hex: string, p: Proof, left: readonly { kind: string; period: number }[]): Promise<Proof[]> =>
+  holdsIn(host, d, hex, p, left.filter((w) => w.kind !== p.kind));
+
+/**
+ * A round's shots (a practice round's, played before the address: no
+ * weather of its own) replayed under the author's id (key, id) in each
+ * weather given, at its period: the proofs of those it holes in, as any
+ * round's; a weather with no period is left to play.
+ */
+export async function holdsIn(host: BuilderHost, d: Draft, hex: string, r: { key: string; id: string; shots: readonly string[] }, left: readonly { kind: string; period: number }[]): Promise<Proof[]> {
   const out: Proof[] = [];
   for (const { kind, period } of left) {
-    if (kind === p.kind || period < 0) continue;
-    const r = await replay(makeLocalChain(host, holeRow(p.id, d), hex, period), { key: p.key, id: p.id, kind, period, shots: [...p.shots] });
-    if (typeof r !== "string") out.push(r);
+    if (period < 0) continue;
+    const p = await replay(makeLocalChain(host, holeRow(r.id, d), hex, period), { key: r.key, id: r.id, kind, period, shots: [...r.shots] });
+    if (typeof p !== "string") out.push(p);
   }
   return out;
 }
