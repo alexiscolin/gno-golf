@@ -205,7 +205,7 @@ async function publishAndCheck() {
   await click(onCard(/^Publish →$/), "Publish →");
   await until(`!!document.querySelector(".pub")`, "the Publish form");
   await sleep(3000);
-  const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub__review b")?.textContent || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
+  const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub__field > input")?.value || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
   said(`on the Publish form: "${form.name}" · ${form.note || "ready"}${/could not be read/.test(form.note) ? " (chain unread: counts as reached, B6)" : ""}`);
   // the publish layout (the editor's frame): the action at the column's foot in sight, the 3D down to the same line
   const card = await c.js<{ b: number; h: number; d: number }>(`(() => { const r = document.querySelector(".pub__foot")?.getBoundingClientRect(), p = document.querySelector(".pub__hole")?.getBoundingClientRect(), f = document.querySelector(".pub__form")?.getBoundingClientRect(); return { b: r ? r.bottom : 1e9, h: innerHeight, d: p && f ? Math.abs(p.bottom - f.bottom) : 1e9 }; })()`);

@@ -15,7 +15,7 @@
 // holeHolds, publishSteps).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { shortAddr, useCopied } from "@/components/common";
-import { Button } from "@/components/ui";
+import { Button, InfoTip } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
 import { aboutGnot, connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
@@ -78,6 +78,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const cost: Cost | null = checked.ok ? checked.cost : null;
   const nameWhy = checked.ok ? "" : explain(checked.why);
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
+  // the address its rounds were played under (another one typed since: back to it, nothing to play again)
+  const playedAt = key ? draft.proofs.find((p) => p.key === key && p.id.startsWith(`${author}/`))?.id.split("/").at(-2) : undefined;
   const mine = proved ? draft.proofs.filter((p) => p.key === key && p.id === proved) : [];
   const par = proved ? parLine(mine, draft.par) : "", strokes = builderScore(mine);
 
@@ -188,11 +190,14 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
         <h2 className="col__head" id="pub-head">Publish on gno.land</h2>
         <div className="pub__scroll">
           <p className="pub__forever">Your hole, its name and its note are public and stay on the chain for good: nothing published can be deleted, by you or by anyone. The site&apos;s owner can hide a hole from the lists and from this site. <a href={ISSUES} target="_blank" rel="noreferrer">Report a hole</a></p>
-          {/* what is read, not typed, once each (the header edits the name, the one place): the name as the chain keeps it,
-              its world, the par explained by the rounds that proved it */}
+          {/* its name, typed here as in the header (one title, both places), as the chain will keep it said under it */}
+          <label className="pub__field">
+            <span className="h-sub">Name</span>
+            <input value={draft.title} maxLength={40} placeholder="Name your hole" aria-invalid={step.at === "name"} disabled={!!sent} onChange={(e) => onDraft({ ...draft, title: e.target.value })} />
+            <small>{name !== draft.title ? `Kept as: ${name || "–"}` : "Shown on the course and in the holes' lists."}</small>
+          </label>
+          {/* what is read, not typed: its world, the par explained by the rounds that proved it */}
           <dl className="review pub__review">
-            <dt>Name</dt>
-            <dd><b aria-invalid={step.at === "name"}>{name || "–"}</b><small>{name !== draft.title ? "As the chain keeps your title" : "Rename it in the title above"}</small></dd>
             <dt>World</dt><dd><b>{worldName(draft.world)}</b></dd>
             <dt>Par</dt><dd><b>{draft.par || "–"}</b>{par && <small>{par}</small>}</dd>
           </dl>
@@ -204,11 +209,11 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
               disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
             <small>{v > 1 ? "A new version of your hole at this address: change it for a hole of its own." : "Your hole's link on gno.land: it can't change once published."}</small>
           </label>
-          <label className="pub__field">
-            <span className="h-sub">A line for players</span>
-            <textarea value={draft.note} rows={2} placeholder="Bank it off the left wall." aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
+          <div className="pub__field">
+            <span className="h-sub"><label htmlFor="pub-note">A line for players</label> <small>· optional</small> <InfoTip label="What is a line for players?" note="A tip or a dare from you, in a sentence: players read it under your hole's name in the community holes and on its card as they play it." /></span>
+            <textarea id="pub-note" value={draft.note} rows={2} placeholder="Bank it off the left wall." aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
             <small className="pub__help"><span>{note !== draft.note ? `Kept as: ${note}` : "Shown under its name in the holes' lists."}</span><span>{[...draft.note].length}/{MAX_NOTE}</span></small>
-          </label>
+          </div>
           {/* what went wrong, then its Try again */}
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
             : step.why && <p className={step.at === "name" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
@@ -240,7 +245,12 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
         </div>
         <div className="pub__foot">
           {step.at === "newer" || step.at === "hole" ? (step.at === "hole" && !/^The rounds/.test(step.why) ? <Button variant="gold" className="btn--wide" onClick={onBuild}>Back to Build</Button>
-            : <Button variant="gold" className="btn--wide" onClick={onRetest}>Play it again (free)</Button>)
+            : playedAt && playedAt !== draft.slug ? (
+              <div className="pub__act">
+                <Button className="btn--wide" onClick={onRetest}>Play it again here</Button>
+                <Button variant="gold" className="btn--wide" onClick={() => onDraft({ ...draft, slug: playedAt })}>Back to {playedAt}</Button>
+              </div>
+            ) : <Button variant="gold" className="btn--wide" onClick={onRetest}>Play it again (free)</Button>)
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
                 : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${aboutGnot(b.most)} GNOT`}</Button>

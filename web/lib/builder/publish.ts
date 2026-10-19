@@ -123,7 +123,7 @@ export function publishSteps(r: Readings, { author, slug, proved, sha, realm }: 
   if (r.publishing === null || r.rules === null || r.writer === null || r.taken === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
   if (r.publishing === undefined || r.rules === undefined || r.writer === undefined || r.taken === undefined || r.versions === undefined || r.hole === undefined) return { at: "reading", why: "" };
   const id = holeId(author, slug, r.versions);
-  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: play it again.` };
+  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: play it again.` }; // (another address typed: the form offers the one its rounds were played at)
   if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };
   if (r.hole) return { at: "hole", why: r.hole };
   if (r.name) return { at: "name", why: r.name };
