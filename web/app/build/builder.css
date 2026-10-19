@@ -425,6 +425,7 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__review b { font-size: 15px; }
 /* a field: its label (.h-sub), its box (the game's 48, its ring its own frame: globals.css), one line why under it */
 .pub__field { display: grid; gap: var(--sp-2); }
+.pub__field > .h-sub + small { margin-top: calc(-1 * var(--sp-1)); } /* its why under its title, read before typing */
 .pub__field > input, .pub__field textarea { min-height: 48px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); resize: none; }
 .pub__field > input::placeholder, .pub__field textarea::placeholder { color: var(--ink-soft); }
 .pub__field [aria-invalid="true"], .pub__addr:has(input[aria-invalid="true"]) { border-color: var(--hat-ink); }

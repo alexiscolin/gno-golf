@@ -863,11 +863,16 @@ function decor(s: Hole, bank: Height = () => 0): THREE.Group {
   const wingColors = [C.sun, C.petal, 0xffffff];
   if (time !== "night") for (let i = 0; i < 3; i++) g.add(butterfly(rand, X0 + (X1 - X0) * (0.2 + i * 0.3), H + 2.5 - i * 5, wingColors[i]));
 
-  const sign = signpost(String(s.hole).replace(/[^0-9]/g, "") || "1");
-  sign.scale.setScalar(1.35);
-  sign.position.set(-3.6, GRASS + bank(-3.6, H + 1.2), H + 1.2);
-  sign.rotation.y = -0.5; // readable from the front and from the tee end
-  g.add(sign);
+  // a course hole's number ("garden/7", an old realm's "…/gnogolf/hole11", a version after it); a built hole (an
+  // author's g1… address, the Builder's draft) has none, nor a sign
+  const place = /^g1/.test(String(s.hole)) ? undefined : /(?:^|\/)[a-z]+\/?(\d+)$/.exec(String(s.hole).replace(/\/v\d+$/, ""))?.[1];
+  if (place) {
+    const sign = signpost(place);
+    sign.scale.setScalar(1.35);
+    sign.position.set(-3.6, GRASS + bank(-3.6, H + 1.2), H + 1.2);
+    sign.rotation.y = -0.5; // readable from the front and from the tee end
+    g.add(sign);
+  }
 
   weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : "clear"));
   return g;

@@ -195,8 +195,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
           {/* its name, typed here as in the header (one title, both places), as the chain will keep it said under it */}
           <label className="pub__field">
             <span className="h-sub">Name</span>
-            <input value={draft.title} maxLength={40} placeholder="Name your hole" aria-invalid={step.at === "name"} disabled={!!sent} onChange={(e) => onDraft({ ...draft, title: e.target.value })} />
             <small>{name !== draft.title ? `Kept as: ${name || "–"}` : "Shown on the course and in the holes' lists."}</small>
+            <input value={draft.title} maxLength={40} placeholder="Name your hole" aria-invalid={step.at === "name"} disabled={!!sent} onChange={(e) => onDraft({ ...draft, title: e.target.value })} />
           </label>
           {/* what is read, not typed: its world, the par explained by the rounds that proved it */}
           <div className="pub__field">
@@ -210,13 +210,13 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
               yours and its version the field's own ends; a version after the first says it is one */}
           <label className="pub__field">
             <span className="h-sub">Address</span>
-            <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
-              readOnly={fixed} disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
             <small>
               {moving !== null ? "A new address gives it new weather: you'll play it again there." : v > 1 ? "A new version of your hole at this address." : "Your hole's link on gno.land: it can't change once published."}
               {fixed && !sent && <> <button type="button" className="linkish" onClick={() => setMoving(draft.slug)}>Change address</button></>}
               {moving !== null && !sent && <> <button type="button" className="linkish" onClick={() => (onDraft({ ...draft, slug: moving }), setMoving(null))}>Keep {moving}</button></>}
             </small>
+            <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
+              readOnly={fixed} disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
           </label>
           <div className="pub__field">
             <span className="h-sub"><label htmlFor="pub-note">A line for players</label> <small>· optional</small> <InfoTip label="What is a line for players?" note="A tip or a dare from you, in a sentence: players read it under your hole's name in the community holes and on its card as they play it." /></span>
