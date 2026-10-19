@@ -240,7 +240,7 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 @media (min-width: 601px) {
   .gsheet__head:not(.gsheet__head--small, .gsheet__hop) { grid-template-columns: 180px minmax(0, 1fr); align-items: center; justify-items: stretch; gap: var(--sp-4); margin-top: var(--sp-3); text-align: left; }
   .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gtile { width: 180px; }
-  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gsheet__id { justify-items: start; text-align: left; padding-right: 32px; }
+  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gsheet__id { justify-items: start; text-align: left; padding-right: 56px; } /* (the X: 48, and a gap) */
   .gsheet__head:not(.gsheet__head--small, .gsheet__hop) :is(h2, .gsheet__line) { padding-inline: 0; text-align: left; }
 }
 /* Share beside the one action: a third of its width, its height */
