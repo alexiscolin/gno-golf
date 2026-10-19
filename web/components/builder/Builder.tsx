@@ -144,7 +144,7 @@ export default function Builder() {
     return (
       <>
         <Editor key={`${open.at}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null), unkept || setDrafts(loadDrafts()))}
-          onPublish={() => setOpen({ ...open, step: "publish" })} onAuthor={setAuthor} play={open.play} opened={opened}
+          onPublish={(x) => (update(() => x), setOpen({ ...open, step: "publish" }))} onAuthor={setAuthor} play={open.play} opened={opened}
           hints={hints} onHinted={onHinted} />
         {unkeptNote}
       </>

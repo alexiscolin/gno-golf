@@ -39,7 +39,7 @@ import { endpoints, keepAuthor } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
 import { holdsIn, holdsToo } from "@/lib/builder/carry";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
-import { askSaid, clock, finished, heldSaid, toGo, holeId, holeRow, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
+import { askSaid, clock, finished, heldSaid, toGo, holeRow, nextId, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
 import { NO_GL } from "@/lib/builder/editor";
 import { hold, onStage, stageCanvas, stageRenderer, stageUp } from "@/lib/builder/stage";
@@ -209,15 +209,15 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     return () => removeEventListener("keydown", key, true);
   });
 
-  // the hole's id: the author's alias's next version, as the chain says (v1 if it cannot be read)
+  // the hole's id: the author's alias's next version, as the chain says (v1 if it cannot be read): holes.ts nextId, as the
+  // stepper and Publish read it
   useEffect(() => {
     if (!author) return setId(TRY_HOLE);
     if (!draft.slug) return;
-    const { rpc, web } = endpoints(window.location.search), alias = `${author}/${draft.slug}`;
-    makeChain({ rpc, web }).versions(alias).then(
-      (v) => setId(holeId(author, draft.slug, v)),
-      () => (setId(holeId(author, draft.slug, null)), setAside("The chain could not be read: played as a new hole (v1). If it has versions already, play it again once it can be.")),
-    );
+    void nextId(author, draft.slug).then(({ id: next, read }) => {
+      setId(next);
+      if (!read) setAside("The chain could not be read: played as a new hole (v1). If it has versions already, play it again once it can be.");
+    });
   }, [author, draft.slug]);
 
   // the round holed in the weather played (its strokes; 0 not yet), until a play again or the next weather

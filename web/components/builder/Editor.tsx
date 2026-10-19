@@ -25,10 +25,10 @@ import { frame } from "@/lib/builder/gg1";
 import { notTurned, QUARTER, snap, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
-import { canonicalHex, leftAs, parAllowed, proofKey, provedAnyAs, provedAs, type Proof } from "@/lib/builder/proof";
+import { canonicalHex, parAllowed, proofKey, provedAnyAs, provedAs, provedAt, unproven, type Proof } from "@/lib/builder/proof";
 import { dropped, toCarry, withCarried } from "@/lib/builder/carry";
 import { FIELD, listed, required, weatherName } from "@/lib/builder/rules";
-import { publishTip, slugOf } from "@/lib/builder/testmode";
+import { nextId, publishTip, slugOf } from "@/lib/builder/testmode";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
@@ -381,17 +381,30 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     const now = playWhenAsked(want, playOff);
     if (now !== "wait") (setWant(false), now === "play" && play());
   }, [want, playOff]); // eslint-disable-line react-hooks/exhaustive-deps -- (play: the render's own)
-  // proved as it is now: Publish open and lit (proofs keep while the hole is the same: an undo brings them back)
+  // proved as it is now: Publish open and lit (proofs keep while the hole is the same: an undo brings them back), under
+  // the id Play and Publish go by (holes.ts nextId: the alias's next version; one published since asks for its own rounds)
   // (under another address typed since too: Publish opens on the one its rounds were played at, the slug put back)
-  const provedId = !playOff && author ? provedAs(kept.proofs, kept.world, key!.key!, author, kept.slug) ?? provedAnyAs(kept.proofs, kept.world, key!.key!, author) : null;
+  const pk = !playOff && author && key?.key ? key.key : null;
+  const slugAt = pk && author && !provedAs(kept.proofs, kept.world, pk, author, kept.slug) ? slugOf(provedAnyAs(kept.proofs, kept.world, pk, author) ?? "") || kept.slug : kept.slug;
+  const [next, setNext] = useState<{ of: string; id: string } | null>(null);
+  const alias = author ? `${author}/${slugAt}` : "";
+  useEffect(() => {
+    if (!author || !slugAt) return;
+    let stale = false;
+    void nextId(author, slugAt).then(({ id }) => !stale && setNext({ of: `${author}/${slugAt}`, id }));
+    return () => void (stale = true);
+  }, [author, slugAt]);
+  const nextNow = next?.of === alias ? next.id : null;
+  const provedId = pk && nextNow ? provedAt(kept.proofs, kept.world, pk, nextNow) : null;
   const proved = !!provedId;
+  // (the slug put back handed to Publish as it opens: the edit's own save comes after the editor is gone)
   const publish = () => {
-    const at = provedId && slugOf(provedId);
-    if (at && at !== kept.slug) (session.edit((k) => ({ ...k, slug: at })), refresh());
-    onPublish(kept);
+    const at = provedId && slugOf(provedId), d = at && at !== kept.slug ? { ...kept, slug: at } : kept;
+    if (d !== kept) (session.edit(() => d), refresh());
+    onPublish(d);
   };
-  // Publish shut: the weathers named, or the ones still to sink
-  const shut = proved ? "" : publishTip(kept.world, key?.key ? leftAs(kept.proofs, kept.world, key.key, author, kept.slug) : required(kept.world));
+  // Publish shut: the weathers named, or the ones still to sink under that id
+  const shut = proved ? "" : publishTip(kept.world, key?.key && nextNow ? unproven(kept.proofs, kept.world, key.key, nextNow) : required(kept.world));
   // a round of play's proof, kept in the draft as kept (the step amended: an undo before it drops it with the edit)
   const amend = (f: (k: Draft) => Draft) => (session.amend(f(session.kept())), refresh());
   const prove = (p: Proof) => amend((k) => ({ ...k, proofs: [...k.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }));
@@ -453,7 +466,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
           <TestMode key={playing.author ?? ""} host={host} draft={kept} hex={playing.hex} proofKey={playing.key} author={playing.author} guess={guess?.par ?? 0}
             onAuthor={(a) => (setPlaying((p) => p && { ...p, author: a }), onAuthor(a))}
             onProof={prove} onPar={setPar} tried={tried?.key === playing.key ? tried.shots : null} onTried={() => setTried(null)}
-            onRound={(r) => (setTried({ shots: r, key: playing.key }), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), onPublish(session.kept()))} />
+            onRound={(r) => (setTried({ shots: r, key: playing.key }), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), publish())} />
         </div>
       )}
       {(hints || again) && <Hints world={draft.world} glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}

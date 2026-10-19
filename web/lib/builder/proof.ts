@@ -109,6 +109,11 @@ export function unproven(proofs: readonly Proof[], world: string, key: string, i
   return required(world).filter((k) => !held.has(k));
 }
 
+/** The id the hole as it is now (key) is proved under, for the stepper, Play and Publish alike: next (the alias's next
+ *  version, as the chain says: testmode.ts holeId) if every weather is proved there; else null. A round under an earlier
+ *  version (published since) proves nothing: the next one has weather of its own. */
+export const provedAt = (proofs: readonly Proof[], world: string, key: string, next: string): string | null => (unproven(proofs, world, key, next).length === 0 ? next : null);
+
 /** The ids under prefix that hold a proof of the hole as it is now (key). */
 const idsUnder = (proofs: readonly Proof[], key: string, prefix: string) => new Set(proofs.filter((p) => p.key === key && p.id.startsWith(prefix)).map((p) => p.id));
 /** The latest id under prefix proving the hole as it is now (key) in every weather; null if none. */

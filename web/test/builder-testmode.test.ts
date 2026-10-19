@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
 import { askSaid, clock, finished, heldSaid, holeId, holeRow, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
 import { holdsIn, holdsToo } from "../lib/builder/carry.ts";
-import { leftAs, replay, type Proof } from "../lib/builder/proof.ts";
+import { leftAs, provedAt, replay, type Proof } from "../lib/builder/proof.ts";
 import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { makeChain } from "../lib/chain.ts";
@@ -105,6 +105,11 @@ void test("leftAs: the weathers still to sink under the author's best id; all wi
   assert.deepEqual(leftAs([mk(v1, "")], "garden", "k", null, "mole-run"), ["", "wind", "rain"]);
   assert.deepEqual(leftAs([mk(v1, ""), mk(v2, ""), mk(v2, "rain")], "garden", "k", A, "mole-run"), ["wind"]);
   assert.deepEqual(leftAs([mk(v1, "", 9e9)], "garden", "k", A, "mole-run"), ["", "wind", "rain"], "a proof past minShotWork is none");
+  // the one rule the stepper, Play and Publish go by: every weather under the alias's next version
+  const all = (id: string) => ["", "wind", "rain"].map((k) => mk(id, k));
+  assert.equal(provedAt(all(v1), "garden", "k", v1), v1);
+  assert.equal(provedAt(all(v1), "garden", "k", v2), null, "v1 published since: its rounds prove nothing for v2");
+  assert.equal(provedAt([...all(v1), mk(v2, "")], "garden", "k", v2), null);
 });
 
 void test("holdsToo: a proved round's shots replayed in the weathers left, each it holes in proved by that replay alone", async () => {

@@ -25,7 +25,7 @@ import { endpoints, playLink } from "@/lib/builder/holes";
 import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
 import { census } from "@/lib/builder/drawn";
 import { loadPalette } from "@/lib/builder/palette";
-import { builderScore, proofKey, provedAs, shaOf } from "@/lib/builder/proof";
+import { builderScore, proofKey, provedAt, shaOf } from "@/lib/builder/proof";
 import { holeId, holeRow, slugOf } from "@/lib/builder/testmode";
 import { ISSUES } from "@/lib/site";
 import { loadTakedown, takenDown } from "@/lib/takedown";
@@ -77,7 +77,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const checked = host.check(draft.slug, hex, note);
   const cost: Cost | null = checked.ok ? checked.cost : null;
   const nameWhy = checked.ok ? "" : explain(checked.why);
-  const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
+  // proved under the id it would be published under (the alias's next version, as Play and the stepper go by: proof.ts provedAt)
+  const proved = key && readings.versions ? provedAt(draft.proofs, draft.world, key, holeId(author, draft.slug, readings.versions)) : null;
   // its address, kept as its rounds were played under (another one: another weather, all played again), changed only on purpose
   // (the address it was at as the change began: kept again at a press, its rounds standing again)
   // the address its rounds were played at: kept as it is here (another would have weathers not played yet)
@@ -106,7 +107,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
     const untested = draft.proofs.some((p) => p.key === key && slugOf(p.id) !== draft.slug)
       ? "The rounds that proved it were played under another address: play it again under this one."
       : "The rounds that proved it no longer play out the same on its final data: play it again.";
-    if (!hex || !key || !proved) return setReadings((r) => ({ ...r, hole: key && !proved ? untested : undefined }));
+    // (not proved there: publishSteps says why, a version published since first; the chain unread, its own step)
+    if (!hex || !key || !proved) return setReadings((r) => ({ ...r, hole: key && readings.versions !== undefined && !proved ? untested : undefined }));
     setReadings((r) => ({ ...r, hole: undefined }));
     const judged = loadPalette(draft.world).then((palette) => holeHolds({ ...draft, title: name }, hex, key, proved, { host, palette, census }));
     void Promise.all([judged, shaOf(hex)]).then(([hole, s]) => {
@@ -114,7 +116,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
       setReadings((r) => ({ ...r, hole }));
       setSha(s);
     }, (e: unknown) => live.current && setReadings((r) => ({ ...r, hole: e instanceof Error ? e.message : String(e) })));
-  }, [hex, key, proved, draft, host, name]);
+  }, [hex, key, proved, draft, host, name, readings.versions]);
 
   const step = publishSteps({ ...readings, name: nameWhy }, { author, slug: draft.slug, proved: proved ?? "", sha, realm: chain.realm });
   const id = readings.versions ? holeId(author, draft.slug, readings.versions) : "";

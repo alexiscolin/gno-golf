@@ -6,7 +6,8 @@
 // without). With the author's address known, every round played is a try at
 // the next weather not holed; without it, a round in calm weather (a try,
 // under an id of its own: TRY_HOLE), the address asked once one is holed.
-import type { Chain } from "../chain";
+import { makeChain, type Chain } from "../chain";
+import { endpoints } from "./holes";
 import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
@@ -22,6 +23,13 @@ export const slugOf = (id: string) => id.split("/").at(-2) ?? "";
 export function holeId(author: string, slug: string, versions: Versions | null): string {
   const last = versions?.versions.at(-1)?.v ?? 0;
   return `${author}/${slug}/v${last + 1}`;
+}
+
+/** The id a hole of author's at slug is played and published under: the alias's next version as the chain says (read:
+ *  false, unread: v1, as a new hole). The one rule Play, the stepper and Publish go by. */
+export function nextId(author: string, slug: string): Promise<{ id: string; read: boolean }> {
+  const { rpc, web } = endpoints(window.location.search);
+  return makeChain({ rpc, web }).versions(`${author}/${slug}`).then((v) => ({ id: holeId(author, slug, v), read: true }), () => ({ id: holeId(author, slug, null), read: false }));
 }
 
 /** The weathers to beat in order (required), each with the period it is played in (periodFor). */

@@ -141,8 +141,8 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                   <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
                   {/* its weathers, ticked as holed (published and none holed here since: its line on the chain says it all) */}
                   {!(h && st.stage === "new") && (
-                    <span className={`bholes__state bholes__state--${st.stage}`} aria-label={`Weathers holed: ${st.word}`}>
-                      {st.ticks.map((t, k) => <span key={t.kind} className={t.done ? "on" : undefined}>{k ? " · " : ""}{weatherName(t.kind)}{t.done ? " ✓" : ""}</span>)}
+                    <span className={`bholes__state bholes__state--${st.stage}`} aria-label={`Weathers holed: ${st.word}`} title={st.stage === "ready" ? "Sunk in every weather: ready to publish" : "Each weather marked ○ is still to sink before it can be published"}>
+                      {st.ticks.map((t, k) => <span key={t.kind} className={t.done ? "on" : undefined}>{k ? " · " : ""}{weatherName(t.kind)}{t.done ? " ✓" : " ○"}</span>)}
                     </span>
                   )}
                   {h && live(h)}
