@@ -29,18 +29,19 @@ const DOCK = 56;
 export function frameView(lo: P, hi: P, size: { w: number; h: number }, island?: readonly [P, P]): View {
   const fit = (w: number, h: number, m: number) => Math.min(w / (hi[0] - lo[0] + 2 * m), (h - DOCK) / (hi[1] - lo[1] + 2 * m));
   const now = fit(size.w, size.h, 0), k = clamp(Math.max(Math.min(fit(FRAME_REF.w, FRAME_REF.h, 0), now), fit(size.w, size.h, ROOM)));
-  const half = [size.w / 2 / k, (size.h - DOCK) / 2 / k];
-  // each axis: the sight inside the island where it fits in it, else the island in its middle; the hole in sight first
-  const mid = (i: 0 | 1) => {
-    let c = (lo[i] + hi[i]) / 2;
+  // each axis: the board's span and the sight's (above the dock); the board inside the island where it fits in it,
+  // else the island in the board's middle; the hole in the sight first
+  const full = [size.w / k, size.h / k], sight = [size.w / k, (size.h - DOCK) / k];
+  const start = (i: 0 | 1) => {
+    let s = (lo[i] + hi[i]) / 2 - sight[i] / 2;
     if (island) {
       const [a, b] = [island[0][i], island[1][i]];
-      c = b - a <= 2 * half[i] ? (a + b) / 2 : Math.max(a + half[i], Math.min(b - half[i], c));
-      c = Math.max(hi[i] - half[i], Math.min(lo[i] + half[i], c));
+      s = b - a <= full[i] ? (a + b) / 2 - full[i] / 2 : Math.max(a, Math.min(b - full[i], s));
+      s = Math.max(hi[i] - sight[i], Math.min(lo[i], s));
     }
-    return c - half[i];
+    return s;
   };
-  return { x: mid(0), y: mid(1), k };
+  return { x: start(0), y: start(1), k };
 }
 
 /**

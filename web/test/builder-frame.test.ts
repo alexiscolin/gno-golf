@@ -37,7 +37,7 @@ void test("frameView: on a bigger window, the lane no smaller than on a 1440 by 
 
 // F on the 3D board's island (islandIn: ISLAND round the board, lib/scene/camera.ts islandBox): the sight inside it
 // where it fits, the island in its middle where the sight is the larger, the hole always in sight, each quarter turn.
-void test("frameView: the sight kept on the island, never bare ground past one edge with the scenery cut at the other", () => {
+void test("frameView: the board kept on the island to its foot, never bare ground past one edge with the scenery cut at the other", () => {
   const AROUND = { x: 7, front: 4, back: 10 }, board = { w: 26, h: 44 }; // a tall hole: the owner's
   const ext: [P, P] = [[0, 0], [26, 44]];
   for (const s of [BOARDS.w1440, BOARDS.w1920, BOARDS.w2560])
@@ -45,12 +45,13 @@ void test("frameView: the sight kept on the island, never bare ground past one e
       const look = { ...FLAT, turns }, [lo, hi] = boxIn([ext[0], ext[1], [0, 44], [26, 0]], look), isl = islandIn(board, look, AROUND);
       const v = frameView(lo, hi, s, isl), plain = frameView(lo, hi, s);
       assert.equal(v.k, plain.k, "the same scale as without the island");
-      const sight = [[v.x, v.y], [v.x + s.w / v.k, v.y + (s.h - 56) / v.k]];
+      // the sight: above the dock (the hole in it); the board: to its foot (the island round it)
+      const sight = [[v.x, v.y], [v.x + s.w / v.k, v.y + (s.h - 56) / v.k]], all = [[v.x, v.y], [v.x + s.w / v.k, v.y + s.h / v.k]];
       for (const i of [0, 1]) {
         assert.ok(sight[0][i] <= lo[i] + 1e-9 && sight[1][i] >= hi[i] - 1e-9, `${s.w} turn ${turns}: the hole in sight`);
-        const span = sight[1][i] - sight[0][i], room = isl[1][i] - isl[0][i];
-        if (span <= room) assert.ok(sight[0][i] >= isl[0][i] - 1e-9 && sight[1][i] <= isl[1][i] + 1e-9, `${s.w} turn ${turns} axis ${i}: inside the island`);
-        else assert.ok(Math.abs(sight[0][i] + sight[1][i] - isl[0][i] - isl[1][i]) < 1e-9, `${s.w} turn ${turns} axis ${i}: the island in the middle`);
+        const span = all[1][i] - all[0][i], room = isl[1][i] - isl[0][i];
+        if (span <= room) assert.ok(all[0][i] >= isl[0][i] - 1e-9 && all[1][i] <= isl[1][i] + 1e-9, `${s.w} turn ${turns} axis ${i}: inside the island`);
+        else assert.ok(Math.abs(all[0][i] + all[1][i] - isl[0][i] - isl[1][i]) < 1e-9, `${s.w} turn ${turns} axis ${i}: the island in the middle`);
       }
     }
 });
