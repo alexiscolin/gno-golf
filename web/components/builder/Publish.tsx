@@ -25,8 +25,8 @@ import { endpoints, playLink } from "@/lib/builder/holes";
 import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
 import { census } from "@/lib/builder/drawn";
 import { loadPalette } from "@/lib/builder/palette";
-import { builderScore, proofKey, provedAnyAs, provedAs, shaOf } from "@/lib/builder/proof";
-import { holeId, holeRow } from "@/lib/builder/testmode";
+import { builderScore, proofKey, provedAs, shaOf } from "@/lib/builder/proof";
+import { holeId, holeRow, slugOf } from "@/lib/builder/testmode";
 import { ISSUES } from "@/lib/site";
 import { loadTakedown, takenDown } from "@/lib/takedown";
 import { sameSources } from "@/lib/sim/sources";
@@ -78,8 +78,9 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const cost: Cost | null = checked.ok ? checked.cost : null;
   const nameWhy = checked.ok ? "" : explain(checked.why);
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
-  // the address its rounds were played under (another one typed since: back to it, nothing to play again)
-  const playedAt = key ? provedAnyAs(draft.proofs, draft.world, key, author)?.split("/").at(-2) : undefined;
+  // its address, kept as its rounds were played under (another one: another weather, all played again), changed only on purpose
+  const [moving, setMoving] = useState(false);
+  const fixed = !!proved && !moving;
   const mine = proved ? draft.proofs.filter((p) => p.key === key && p.id === proved) : [];
   const par = proved ? parLine(mine, draft.par) : "", strokes = builderScore(mine);
 
@@ -101,7 +102,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   useEffect(() => void proofKey(draft, host).then((k) => live.current && setKey(k)), [draft, host]);
   useEffect(() => {
     // (another address: its rounds were played under the one before, its weather another)
-    const untested = draft.proofs.some((p) => p.key === key && p.id.split("/")[1] !== draft.slug)
+    const untested = draft.proofs.some((p) => p.key === key && slugOf(p.id) !== draft.slug)
       ? "The rounds that proved it were played under another address: play it again under this one."
       : "The rounds that proved it no longer play out the same on its final data: play it again.";
     if (!hex || !key || !proved) return setReadings((r) => ({ ...r, hole: key && !proved ? untested : undefined }));
@@ -206,8 +207,11 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
           <label className="pub__field">
             <span className="h-sub">Address</span>
             <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
-              disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
-            <small>{v > 1 ? "A new version of your hole at this address: change it for a hole of its own." : "Your hole's link on gno.land: it can't change once published."}</small>
+              readOnly={fixed} disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
+            <small>
+              {moving ? "A new address gives it new weather: you'll play it again there." : v > 1 ? "A new version of your hole at this address." : "Your hole's link on gno.land: it can't change once published."}
+              {fixed && !sent && <> <button type="button" className="linkish" onClick={() => setMoving(true)}>Change address</button></>}
+            </small>
           </label>
           <div className="pub__field">
             <span className="h-sub"><label htmlFor="pub-note">A line for players</label> <small>· optional</small> <InfoTip label="What is a line for players?" note="A tip or a dare from you, in a sentence: players read it under your hole's name in the community holes and on its card as they play it." /></span>
@@ -245,12 +249,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
         </div>
         <div className="pub__foot">
           {step.at === "newer" || step.at === "hole" ? (step.at === "hole" && !/^The rounds/.test(step.why) ? <Button variant="gold" className="btn--wide" onClick={onBuild}>Back to Build</Button>
-            : playedAt && playedAt !== draft.slug ? (
-              <div className="pub__act">
-                <Button className="btn--wide" onClick={onRetest}>Play it again here</Button>
-                <Button variant="gold" className="btn--wide" onClick={() => onDraft({ ...draft, slug: playedAt })}>Back to {playedAt}</Button>
-              </div>
-            ) : <Button variant="gold" className="btn--wide" onClick={onRetest}>Play it again (free)</Button>)
+            : <Button variant="gold" className="btn--wide" onClick={onRetest}>Play it again (free)</Button>)
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
                 : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${aboutGnot(b.most)} GNOT`}</Button>

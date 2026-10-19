@@ -10,7 +10,7 @@
 // every key, in a sheet as the game's (its X, Escape or the dim round it puts it away).
 import { allTiles, pictureOf } from "@/lib/builder/tiles";
 import { cap, required, theWorld } from "@/lib/builder/rules";
-import { weathersSaid } from "@/lib/builder/testmode";
+import { weathersSaid } from "@/lib/builder/rules";
 import type { PaletteEntry } from "@/lib/builder/palette";
 import { KEYS } from "@/lib/builder/keys";
 import { entryName } from "@/lib/builder/names";

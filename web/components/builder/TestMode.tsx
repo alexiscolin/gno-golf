@@ -220,7 +220,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
 
   // the round holed in the weather played (its strokes; 0 not yet), until a play again or the next weather
   const [holed, setHoled] = useState(0);
-  const landed = useRef<(() => void) | null>(null); // (the holing stroke's ball dropped: the game's holed)
+  const landed = useRef<(() => void) | null>(null), dropped = useRef(false); // (the holing stroke's ball dropped: the game's holed)
   // the title card a moment ("Round 2 of 3: Wind"), the weathers just holed, their chips stamped, and those a round held in too, said
   const [said, setSaid] = useFlash(1200, ""), [stamp, setStamp] = useFlash(1200, NONE), [held, setHeld] = useFlash(3600, "");
   // the weathers not proved yet (a try's one: never proved, so never left); the latest, for a replay's chain
@@ -284,7 +284,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const t = setInterval(() => setTick(performance.now()), 100);
     return () => clearInterval(t);
   }, [now?.kind, holed]); // eslint-disable-line react-hooks/exhaustive-deps
-  const fresh = () => (setHoled(0), setTook(null), (since.current = performance.now()));
+  const fresh = () => (setHoled(0), setTook(null), (since.current = performance.now()), (landed.current = null), (dropped.current = false));
   const again = () => (setWhy((w) => (now ? { ...w, [now.kind]: "" } : w)), fresh(), game.current?.reset());
   // a weather chip pressed: that weather played next (its plan period), one sunk already played again; the one playing, from the tee
   const pick = (kind: string) => {
@@ -320,12 +320,13 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const g = (game.current = createGame(canvas, {
       renderer, // (the board's, lent: a game leaves no GL objects of its own on the context)
       chain: testChain(makeChain({ rpc, web }), local, hex),
-      onChange: (s) => ((aiming.current = s.aiming), setSnap(s), s.holed && landed.current?.()),
+      onChange: (s) => ((aiming.current = s.aiming), setSnap(s), (dropped.current = s.holed) && landed.current?.()),
       // known holed as the stroke is struck: what follows waits for the ball to drop (the game's own moment, its cup's
       // sound and the confetti), never a card or the next weather over a ball still rolling
       onHoled: ({ shots }) => {
         const ms = performance.now() - since.current;
         const drop = new Promise<void>((r) => (landed.current = () => ((landed.current = null), r())));
+        if (dropped.current) landed.current?.(); // (the check answered after the drop)
         if (trying) return void drop.then(() => (setTook(ms), setHoled(shots.length), onRound(shots))); // (a try: no replay, no proof; the address asked)
         const proof = replay(local, { key: proofKey, id, kind: now.kind, period: now.period, shots: [...shots] }); // (meanwhile)
         void drop.then(() => (setTook(ms), setHoled(shots.length), setChecking(true), proof)).then(async (p) => {

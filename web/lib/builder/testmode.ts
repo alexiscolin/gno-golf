@@ -11,11 +11,14 @@ import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
 import { periodFor } from "./proof";
-import { listed, required, weatherName } from "./rules";
+import { required, weatherName, weathersSaid } from "./rules";
 import { calmPeriod } from "./quickshot";
 import type { BuilderHost } from "./wasm";
 
 /** The id the draft will be published under: the alias's next version (Versions), the first for a new alias. */
+/** A hole id's address part (author/slug/vN: its slug). */
+export const slugOf = (id: string) => id.split("/").at(-2) ?? "";
+
 export function holeId(author: string, slug: string, versions: Versions | null): string {
   const last = versions?.versions.at(-1)?.v ?? 0;
   return `${author}/${slug}/v${last + 1}`;
@@ -85,7 +88,6 @@ export const nowSaid = (kind: string, at?: { n: number; of: number }) => (at ? `
 export const toGo = (of: number, done: number) => `Sink it in each${!done ? "" : done < of ? ` · ${of - done} to go` : " · all sunk ✓"}`;
 
 /** The weathers in a sentence: "Clear, Wind and Rain". */
-export const weathersSaid = (kinds: readonly string[]) => listed(kinds.map(weatherName));
 
 /** Why Publish is shut: the world's weathers named, or the ones still to sink once some are (left: proofs.ts leftAs). */
 export function publishTip(world: string, left: readonly string[]): string {

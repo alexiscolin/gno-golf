@@ -4,7 +4,7 @@
 import { counts, work, WORK_WARN, type Issue } from "./checks";
 import { plainOf } from "./explain";
 import { draftHole } from "./gg1";
-import { FIELD, listed, weatherName } from "./rules";
+import { FIELD, weathersSaid } from "./rules";
 import type { Cost } from "./wasm";
 import type { Draft, V } from "./draft";
 import { whereOf } from "./edit";
@@ -15,7 +15,6 @@ import { MAX_BYTES, type Validated } from "./pipeline";
 import { BUILDER_LIMITS, pieceCounts } from "./limits";
 
 /** Weathers in a sentence: "Clear and Rain", "Clear, Wind and Rain". */
-const weathers = (kinds: readonly string[]) => listed(kinds.map(weatherName));
 
 /**
  * The dock's one line, said only when nothing else says it: the rounds an
@@ -27,7 +26,7 @@ const weathers = (kinds: readonly string[]) => listed(kinds.map(weatherName));
 export function brokenLine({ errors, proved, rounds }: { errors: number; proved: boolean; rounds?: { kept: readonly string[]; broken: readonly string[] } | null }): string {
   if (errors || proved || !rounds?.broken.length) return "";
   const more = rounds.broken.length - 1;
-  return `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathers(rounds.kept)} still holed` : ""}`;
+  return `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathersSaid(rounds.kept)} still holed` : ""}`;
 }
 
 /** Why Play is off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */

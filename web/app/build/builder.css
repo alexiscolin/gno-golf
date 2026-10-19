@@ -419,7 +419,6 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__review { grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
 .pub__review dd { display: grid; gap: 2px; }
 .pub__review b { font-size: 15px; }
-.pub__review b[aria-invalid="true"] { color: var(--hat-ink); }
 /* a field: its label (.h-sub), its box (the game's 48, its ring its own frame: globals.css), one line why under it */
 .pub__field { display: grid; gap: var(--sp-2); }
 .pub__field > input, .pub__field textarea { min-height: 48px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); resize: none; }
@@ -430,9 +429,8 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__addr > span { white-space: nowrap; }
 .pub__addr > span:last-child { padding: 0 12px 0 2px; color: var(--ink-soft); }
 /* the part typed: inked, underlined as the header's name is (what can be changed), yours and the version soft around it */
-.pub__addr > span:first-child { color: var(--ink-soft); }
+.pub__addr input:read-only { text-decoration: none; } /* (kept: the rounds' address) */
 .pub__addr input { font-weight: 700; color: var(--ink); text-decoration: underline dashed rgba(var(--ink-rgb), .45); text-underline-offset: 5px; }
-.pub__act { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
 .pub__field .h-sub small { font-weight: 600; color: var(--ink-soft); }
 .pub__help { display: flex; justify-content: space-between; gap: var(--sp-3); }
 .pub__help > span:last-child { flex: none; font-variant-numeric: tabular-nums; }

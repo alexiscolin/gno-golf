@@ -109,22 +109,20 @@ export function unproven(proofs: readonly Proof[], world: string, key: string, i
   return required(world).filter((k) => !held.has(k));
 }
 
-/** The id under which the hole as it is now (key) is proved in every weather, among the author's ids for this slug; null if under none. */
-export function provedAs(proofs: readonly Proof[], world: string, key: string, author: string, slug: string): string | null {
-  const ids = new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/${slug}/v`)).map((p) => p.id));
-  return [...ids].find((id) => unproven(proofs, world, key, id).length === 0) ?? null;
-}
+/** The ids under prefix that hold a proof of the hole as it is now (key). */
+const idsUnder = (proofs: readonly Proof[], key: string, prefix: string) => new Set(proofs.filter((p) => p.key === key && p.id.startsWith(prefix)).map((p) => p.id));
+/** The latest id under prefix proving the hole as it is now (key) in every weather; null if none. */
+const provedUnder = (proofs: readonly Proof[], world: string, key: string, prefix: string) => [...idsUnder(proofs, key, prefix)].findLast((id) => unproven(proofs, world, key, id).length === 0) ?? null;
 
-/** The id under which the hole as it is now (key) is proved in every weather, among all the author's ids (any address, a
- *  slug typed since included): what Publish can go back to; null if under none. */
-export function provedAnyAs(proofs: readonly Proof[], world: string, key: string, author: string): string | null {
-  const ids = new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/`)).map((p) => p.id));
-  return [...ids].find((id) => unproven(proofs, world, key, id).length === 0) ?? null;
-}
+/** The id under which the hole as it is now (key) is proved in every weather, among the author's ids for this slug; null if under none. */
+export const provedAs = (proofs: readonly Proof[], world: string, key: string, author: string, slug: string) => provedUnder(proofs, world, key, `${author}/${slug}/v`);
+
+/** The same among all the author's addresses (another slug typed since): the one Publish goes back to; null if under none. */
+export const provedAnyAs = (proofs: readonly Proof[], world: string, key: string, author: string) => provedUnder(proofs, world, key, `${author}/`);
 
 /** The weathers still to prove for the hole as it is now (key): the fewest under any of the author's ids for this slug; with no author, all. */
 export function leftAs(proofs: readonly Proof[], world: string, key: string, author: string | null, slug: string): string[] {
-  const ids = author ? new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/${slug}/v`)).map((p) => p.id)) : [];
+  const ids = author ? idsUnder(proofs, key, `${author}/${slug}/v`) : [];
   return [...ids].map((id) => unproven(proofs, world, key, id)).reduce((a, b) => (b.length < a.length ? b : a), required(world));
 }
 
