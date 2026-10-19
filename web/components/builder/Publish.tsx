@@ -25,7 +25,7 @@ import { endpoints, playLink } from "@/lib/builder/holes";
 import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
 import { census } from "@/lib/builder/drawn";
 import { loadPalette } from "@/lib/builder/palette";
-import { builderScore, proofKey, provedAs, shaOf } from "@/lib/builder/proof";
+import { builderScore, proofKey, provedAnyAs, provedAs, shaOf } from "@/lib/builder/proof";
 import { holeId, holeRow } from "@/lib/builder/testmode";
 import { ISSUES } from "@/lib/site";
 import { loadTakedown, takenDown } from "@/lib/takedown";
@@ -79,7 +79,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const nameWhy = checked.ok ? "" : explain(checked.why);
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
   // the address its rounds were played under (another one typed since: back to it, nothing to play again)
-  const playedAt = key ? draft.proofs.find((p) => p.key === key && p.id.startsWith(`${author}/`))?.id.split("/").at(-2) : undefined;
+  const playedAt = key ? provedAnyAs(draft.proofs, draft.world, key, author)?.split("/").at(-2) : undefined;
   const mine = proved ? draft.proofs.filter((p) => p.key === key && p.id === proved) : [];
   const par = proved ? parLine(mine, draft.par) : "", strokes = builderScore(mine);
 

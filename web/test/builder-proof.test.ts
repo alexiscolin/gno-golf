@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, ID, PERIOD, hexOf, lane, rail } from "./builder-fixture.ts";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
-import { parAllowed, periodFor, proofKey, provedAs, replay, replayed, suggestPar, unproven, type Proof } from "../lib/builder/proof.ts";
+import { parAllowed, periodFor, proofKey, provedAnyAs, provedAs, replay, replayed, suggestPar, unproven, type Proof } from "../lib/builder/proof.ts";
 import { MIN_SHOT_WORK, required } from "../lib/builder/rules.ts";
 import { RULES, shotOf } from "../lib/chain.ts";
 import { PER_CALL } from "../lib/adena.ts";
@@ -143,6 +143,16 @@ void test("provedAs: the hole as it is now proved in every weather under one of 
   assert.equal(provedAs(all, "garden", "k", A, "renamed"), null, "another slug: another id, another weather");
   assert.equal(provedAs(all.slice(1), "garden", "k", A, "lane"), null);
   assert.equal(provedAs([...all, p("", { id: `${A}/lane/v1` })], "garden", "k", A, "lane"), id, "an older version's proof aside");
+});
+
+void test("provedAnyAs: proved under any of the author's addresses (a slug typed since: Publish goes back to it)", () => {
+  const A = "g1" + "a".repeat(38), id = `${A}/lane/v1`;
+  const p = (kind: string, over: Partial<Proof> = {}): Proof => ({ key: "k", id, kind, period: 1, shots: ["0,1"], commits: [[0, 1]], strokes: 1, maxWork: 1, ...over });
+  const all = [p(""), p("wind"), p("rain")];
+  assert.equal(provedAnyAs(all, "garden", "k", A), id, "whatever slug the draft has now");
+  assert.equal(provedAnyAs(all.slice(1), "garden", "k", A), null, "a weather missing");
+  assert.equal(provedAnyAs(all, "garden", "k", "g1" + "b".repeat(38)), null, "another author's");
+  assert.equal(provedAnyAs(all, "garden", "other", A), null, "a piece moved since");
 });
 
 void test("par: the most strokes a proof took plus one, at most 19; a par below that refused", () => {

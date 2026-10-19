@@ -115,6 +115,13 @@ export function provedAs(proofs: readonly Proof[], world: string, key: string, a
   return [...ids].find((id) => unproven(proofs, world, key, id).length === 0) ?? null;
 }
 
+/** The id under which the hole as it is now (key) is proved in every weather, among all the author's ids (any address, a
+ *  slug typed since included): what Publish can go back to; null if under none. */
+export function provedAnyAs(proofs: readonly Proof[], world: string, key: string, author: string): string | null {
+  const ids = new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/`)).map((p) => p.id));
+  return [...ids].find((id) => unproven(proofs, world, key, id).length === 0) ?? null;
+}
+
 /** The weathers still to prove for the hole as it is now (key): the fewest under any of the author's ids for this slug; with no author, all. */
 export function leftAs(proofs: readonly Proof[], world: string, key: string, author: string | null, slug: string): string[] {
   const ids = author ? new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/${slug}/v`)).map((p) => p.id)) : [];
