@@ -148,6 +148,6 @@ void test("summary: Play's one card at the end, each weather proved with its str
 void test("the address, asked once on the game's card: as Play opens (round 1 named, or just a try), else once the try is holed; Adena first, a paste behind a tap", () => {
   const src = fs.readFileSync(new URL("../components/builder/TestMode.tsx", import.meta.url), "utf8");
   assert.ok(src.includes(">Use my Adena address<") && src.includes(">Paste an address<") && src.includes("ADENA_URL") && src.includes("askSaid(draft.world)"));
-  assert.ok(src.includes(">Just try it<") && src.includes("Nothing is signed until you publish."), "the start card: a try kept, nothing signed");
+  assert.ok(src.includes(">Practice first<") && src.includes("Nothing is signed until you publish."), "the start card: a try kept, nothing signed");
   assert.match(src, /function AddressLine/);
 });

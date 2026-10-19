@@ -110,7 +110,7 @@ const Clock = ({ text }: { text: string }) => <span className="tmode__clock">{[.
 
 /** The address, asked once on the game's card: as Play opens (none known yet: the start card, round 1 named, or just a try) or
  *  once a try is holed (how far, what comes next): Adena's account, or one pasted (kept in this browser); nothing signed. */
-function AddressLine({ start, title, head, line, onAddress, children }: { start?: boolean; title: string; head: string; line: string; onAddress: (a: string) => void; children: ReactNode }) {
+function AddressLine({ start, title, head, line, note, onAddress, children }: { start?: boolean; title: string; head: string; line: string; note?: ReactNode; onAddress: (a: string) => void; children: ReactNode }) {
   const [typed, setTyped] = useState("");
   const [paste, setPaste] = useState(false);
   const [why, setWhy] = useState("");
@@ -134,10 +134,13 @@ function AddressLine({ start, title, head, line, onAddress, children }: { start?
         ) : !hasAdena() && <p className="tmode__small">No Adena here (<a href={ADENA_URL} target="_blank" rel="noopener noreferrer">get it</a>), or paste an address.</p>}
         {why && <p role="alert" className="tmode__why">{why}</p>}
         <div className="banner__row">
+          {/* pasting: back to Adena's way at a press */}
+          {paste && <Button onClick={() => (setPaste(false), setTyped(""))}>← Back</Button>}
           {children}
           {!paste && <Button onClick={() => setPaste(true)}>Paste an address</Button>}
           {!paste && hasAdena() && <Button variant="primary" onClick={() => void adena()}>Use my Adena address</Button>}
         </div>
+        {note && <p className="tmode__small">{note}</p>}
     </WonCard>
   );
 }
@@ -426,8 +429,9 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       )}
       {/* no address yet: asked once as Play opens, before round 1 (or just a try: asked again once it is holed) */}
       {now && !card && trying && !holed && !justTry && (
-        <AddressLine start title={draft.title || "Your hole"} head={nowSaid("", atOf(""))} line={START_LINE} onAddress={sign}>
-          <Button onClick={() => (setJustTry(true), fresh(), setSaid(nowSaid("", atOf(""))))}>Just try it</Button>
+        <AddressLine start title={draft.title || "Your hole"} head={nowSaid("", atOf(""))} line={START_LINE} onAddress={sign}
+          note="A practice round: Clear only. Holed, add your address then and it counts; without one, nothing goes on to Publish.">
+          <Button onClick={() => (setJustTry(true), fresh(), setSaid(nowSaid("", atOf(""))))}>Practice first</Button>
         </AddressLine>
       )}
       {now && !card && asking && (

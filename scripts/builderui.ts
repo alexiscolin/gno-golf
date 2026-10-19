@@ -524,11 +524,11 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const at = await tee();
   await key("t", "KeyT");
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--play .tmode__score")`)); k++) await sleep(300);
-  // no address known: asked once as Play opens, round 1 named, on the game's card; Just try it puts it by (a calm try)
+  // no address known: asked once as Play opens, round 1 named, on the game's card; Practice first puts it by (a calm try)
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tmode__sign--start")`)); k++) await sleep(300);
   assert.match(await c.js<string>(`document.querySelector(".tmode__sign--start h2")?.textContent || ""`), /^Round 1 of \d: Clear$/, "the start card names round 1");
   assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".tmode__sign--start button")].some((b) => b.textContent === "Paste an address")`), "the start card: an address pasted");
-  await c.js(`[...document.querySelectorAll(".tmode__sign--start button")].find((b) => b.textContent === "Just try it").click()`);
+  await c.js(`[...document.querySelectorAll(".tmode__sign--start button")].find((b) => b.textContent === "Practice first").click()`);
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".tmode__sign")`)); k++) await sleep(300);
   assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--play .tmode__score") && !document.querySelector(".tmode__sign")`), "Just try it: a calm try, the address not asked again before it is holed");
   assert.match(await c.js<string>(`document.querySelector(".tmode__weathers .eyebrow")?.textContent || ""`), /^Sink it in each/, "the weathers row says what it is");
