@@ -18,6 +18,8 @@
 /* ------------------------------------------------------------ the header: the hole, the three steps, the one action */
 /* three zones, the steps in the middle of the window: the hole on the left, the history and the action on the right */
 .bhead { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--sp-4); min-width: 0; }
+/* a locked step's note open: over the first run's hints (it is what was asked for) */
+.bhead:has(.aimset__pop) { position: relative; z-index: 5; }
 .bhead__start { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
 .bhead .btn { margin: 0; white-space: nowrap; }
 .bhead__name { flex: 0 1 320px; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; line-height: 1.15; }
@@ -328,13 +330,20 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__clock i { display: inline-block; width: .62em; font-style: normal; text-align: center; }
 .tmode .card--weather { min-width: 132px; justify-content: center; } /* (its width kept as the weather changes: the weathers to prove stay put) */
 /* the weathers to prove, as the weather card pictures a sky: one each, the one played gold, ticked once proved */
-.tmode__weathers { display: flex; align-items: stretch; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); }
+.tmode__weathers { display: grid; justify-items: start; gap: 2px; padding: var(--sp-1) var(--sp-2); }
+.tmode__chips { display: flex; align-items: stretch; gap: var(--sp-2); }
+/* the address known, each a button: the weather played next */
+:where(button.tmode__chip) { font: inherit; color: inherit; background: none; cursor: pointer; } /* (no weight: its states' colours over it) */
+button.tmode__chip:hover { border-color: var(--ink); }
+button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 /* a weather to hole, one tile in three states: to hole (a dashed edge), played now (the gold), holed (pale, ticked with its strokes) */
 .tmode__chip { display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 72px; padding: 4px var(--sp-2); border: 2px dashed rgba(var(--ink-rgb), .4); border-radius: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tmode__sky { width: 34px; height: 24px; }
 .tmode__tick { font-size: 12px; line-height: 1; }
 .tmode__chip--now { border: 2px solid var(--ink); background: var(--gold); }
 .tmode__chip--done { border: 2px solid var(--green); background: var(--mint); color: var(--green); }
+/* holed: its tick a badge, the game's green, beside the others still empty */
+.tmode__chip--done .tmode__tick { padding: 2px 6px; border-radius: 999px; background: var(--green); color: var(--white); font-weight: 800; }
 .tmode__chip--bad { border: 2px solid var(--hat-ink); color: var(--hat-ink); background: var(--white); }
 /* a weather just holed: its "✓ in 2" stamped on */
 .tmode__chip--stamp .tmode__tick { animation: bstamp .45s cubic-bezier(.3, 1.6, .5, 1) both; }

@@ -11,7 +11,7 @@ import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
 import { periodFor } from "./proof";
-import { required, weatherName } from "./rules";
+import { listed, required, weatherName } from "./rules";
 import { calmPeriod } from "./quickshot";
 import type { BuilderHost } from "./wasm";
 
@@ -78,8 +78,27 @@ export function finished(o: { strokes: number; kind: string; why?: string }): Fi
   return { title: `Holed in ${o.strokes}`, line: `That ${weatherName(o.kind).toLowerCase()} round doesn't count: ${o.why}`, actions: [{ ...AGAIN, primary: true }, EDIT] };
 }
 
-/** The title card a moment as the next weather starts on its own. */
-export const nowSaid = (kind: string) => `Now: ${weatherName(kind)}`;
+/** The title card a moment as each round starts, the first too: its place among the weathers to sink ("Round 2 of 3: Wind"); one sunk already, played again: "Again: Wind". */
+export const nowSaid = (kind: string, at?: { n: number; of: number }) => (at ? `Round ${at.n} of ${at.of}: ` : "Again: ") + weatherName(kind);
+
+/** The weathers row's eyebrow: what to do, then how many are left once one is sunk ("Sink it in each · 2 to go"). */
+export const toGo = (of: number, done: number) => `Sink it in each${!done ? "" : done < of ? ` · ${of - done} to go` : " · all sunk ✓"}`;
+
+/** The weathers in a sentence: "Clear, Wind and Rain". */
+export const weathersSaid = (kinds: readonly string[]) => listed(kinds.map(weatherName));
+
+/** Why Publish is shut: the world's weathers named, or the ones still to sink once some are (left: proofs.ts leftAs). */
+export function publishTip(world: string, left: readonly string[]): string {
+  const all = required(world);
+  return left.length < all.length ? `Still to sink: ${weathersSaid(left)}.` : `Sink it once in each weather: ${weathersSaid(all)}. Players meet them all.`;
+}
+
+/** The hole-finished card of a try (no address yet): Clear done, what comes next, then why the address. */
+export const askSaid = (world: string) =>
+  `${weatherName("")} ✓ — next: ${weathersSaid(required(world).filter((k) => k))}. Your address names the hole and sets its weather, so we need it once to go on. Nothing is signed.`;
+
+/** Said when a round's shots, replayed in other weathers, hole there too (those weathers proved without a round of their own). */
+export const heldSaid = (from: string, kinds: readonly string[]) => `Your ${weatherName(from)} round holds in ${weathersSaid(kinds)} too ✓`;
 
 /** Play's one card at the end: each weather proved, its strokes and its time in play (ms: this visit's round; one proved before has none), the par they set, Publish the way on. */
 export function summary(rows: readonly { kind: string; strokes: number; ms?: number }[], par: number): Finished {

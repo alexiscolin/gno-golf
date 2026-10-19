@@ -54,6 +54,22 @@ export async function carry(host: BuilderHost, d: Draft, hex: string, key: strin
   return out;
 }
 
+/**
+ * A round just proved (p), its shots replayed in each weather still to prove
+ * (each at its period in testmode.ts plan, as Play plays it): the proofs of those it
+ * holes in too, by the realm's own code as any round's. None is counted
+ * unreplayed; the others stay to play.
+ */
+export async function holdsToo(host: BuilderHost, d: Draft, hex: string, p: Proof, left: readonly { kind: string; period: number }[]): Promise<Proof[]> {
+  const out: Proof[] = [];
+  for (const { kind, period } of left) {
+    if (kind === p.kind || period < 0) continue;
+    const r = await replay(makeLocalChain(host, holeRow(p.id, d), hex, period), { key: p.key, id: p.id, kind, period, shots: [...p.shots] });
+    if (typeof r !== "string") out.push(r);
+  }
+  return out;
+}
+
 /** The weathers the hole before (prev, its key) was proved in that the hole now (key) is not: what an edit dropped. */
 export function dropped(proofs: readonly Proof[], prev: string | null, key: string): string[] {
   if (!prev || prev === key) return [];

@@ -115,6 +115,12 @@ export function provedAs(proofs: readonly Proof[], world: string, key: string, a
   return [...ids].find((id) => unproven(proofs, world, key, id).length === 0) ?? null;
 }
 
+/** The weathers still to prove for the hole as it is now (key): the fewest under any of the author's ids for this slug; with no author, all. */
+export function leftAs(proofs: readonly Proof[], world: string, key: string, author: string | null, slug: string): string[] {
+  const ids = author ? new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/${slug}/v`)).map((p) => p.id)) : [];
+  return [...ids].map((id) => unproven(proofs, world, key, id)).reduce((a, b) => (b.length < a.length ? b : a), required(world));
+}
+
 /** The par the proofs suggest: the most strokes one took, plus one, at most MAX_PAR; 0 with none. */
 export function suggestPar(proofs: readonly Pick<Proof, "strokes">[]): number {
   return proofs.length ? Math.min(MAX_PAR, Math.max(...proofs.map((p) => p.strokes)) + 1) : 0;

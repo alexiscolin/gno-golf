@@ -3,13 +3,14 @@
 // headless Chrome against a dev server with the Builder on, from /build to a
 // proved hole on the Publish form. It opens /build (the first run: the
 // Garden's dogleg and its hints, which the first drag puts away), drags a
-// Bumper onto the starter, presses Play, holes a try in calm weather, pastes
-// the address the hole is proved under in the line the HUD then shows (the
-// try is replayed as the calm proof), holes each weather left (each round
+// Bumper onto the starter, presses Play, pastes the address the hole is
+// proved under on the start card Play opens on (before round 1), holes each
+// weather (a round's shots replayed in the weathers left first: one it holds
+// in is not played), each round
 // found as scripts/starters.ts finds one, through the page's own test chain,
 // builder.wasm; each shot fired as an aim would fire it, through the game's
 // ?camlog hook, and counted as one drag; each next weather starting on its
-// own under its title card), and presses Publish on the summary card the
+// own under its title card, "Round 2 of 3: Wind"), and presses Publish on the summary card the
 // last one ends on. It reports the wall time and the clicks, drags and
 // fields typed in, and fails over 5 minutes or over B6's budget (4 clicks
 // since Play and Hole it are one: 5 before; 2 with Adena already sharing
@@ -126,26 +127,26 @@ try {
   if (await c.js<number>(`document.querySelectorAll(".bhint").length`)) throw new Error("the first run's hints still up after a drag");
   said("drag: a Bumper onto the board (the hints gone with it)");
 
-  // Play: no address known, a try in calm weather, then the address on the hole-finished card
+  // Play: no address known, asked once on the start card before round 1 (pasted: its field shown, then used)
   await until(`!document.querySelector(".bhead__act[aria-disabled]")`, "Play on");
   await click(`document.querySelector(".bhead__act")`, "Play");
-  const kind0 = await holeOne();
-  said(`${kind0}: a try holed`);
-  await until(`!!document.querySelector(".tmode__sign")`, "the address asked on the card, once a try is holed");
+  await until(`!!document.querySelector(".tmode__sign--start")`, "the address asked as Play opens, before round 1");
+  said(`the start card: ${await c.js<string>(`document.querySelector(".tmode__sign--start h2").textContent`)}`);
   await click(button(/^Paste an address/i), "Paste an address");
   await until(`!!document.querySelector(".tmode__addr input")`, "the address field");
   await c.js(`(() => { const el = document.querySelector(".tmode__addr input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(AUTHOR)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   count.typed++;
   await click(button(/^Use this address$/), "Use this address");
-  // the try replayed as the author's calm round: Clear ticked without playing it again
-  await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === "Clear")`, "the try counted as the calm proof", 60_000);
-  said("Clear: the try counted, under the author's address");
+  await until(`!document.querySelector(".tmode__sign") && (document.querySelector(".tmode__now")?.textContent || "").startsWith("Round 1 of ")`, "round 1 under the author's address, named", 30_000);
+  said(`${await c.js<string>(`document.querySelector(".tmode__now").textContent`)}`);
 
   // each weather left holed, the next starting on its own under its title card, the last ending on the summary
   for (let w = 0; w < 6 && !(await c.ev<boolean>(`!!document.querySelector(".tmode__sum")`)); w++) {
     const kind = await holeOne();
     await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === ${JSON.stringify(kind)})`, `${kind} proved`, 60_000);
-    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__now")?.textContent || "").startsWith("Now: ")`, `${kind}: the summary or the next weather's title card`, 10_000);
+    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__now")?.textContent || "").startsWith("Round ")`, `${kind}: the summary or the next round's title card`, 10_000);
+    const held = await c.js<string>(`[...document.querySelectorAll(".tmode__notes p")].map((p) => p.textContent).find((t) => / too ✓$/.test(t)) || ""`);
+    if (held) said(held);
     said(`${kind}: holed and proved · ${await c.js<string>(`document.querySelector(".tmode__sum") ? "the summary" : document.querySelector(".tmode__now").textContent`)}`);
   }
   await until(`!!${onCard(/^Publish →$/)}`, "every weather proved: Publish on the summary", 60_000);

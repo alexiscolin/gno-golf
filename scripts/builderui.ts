@@ -518,13 +518,20 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await sleep(1200);
   const slug = await c.js<string>(`(() => { const k = Object.keys(localStorage).find((x) => x.startsWith("gnogolf.builder.draft.")); return JSON.parse(localStorage.getItem(k)).slug; })()`);
   assert.equal(slug, second.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "the address follows the name");
-  // T: Play, over the editor, no address asked before a round is holed; Escape: back to the editor at the same zoom
+  // T: Play, over the editor; Escape: back to the editor at the same zoom
   await c.js(`document.querySelector(".bhead__roll").blur()`);
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
   const at = await tee();
   await key("t", "KeyT");
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--play .tmode__score")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--play .tmode__score") && !document.querySelector(".tmode__sign")`), "T: Play, the address not asked before a round is holed");
+  // no address known: asked once as Play opens, round 1 named, on the game's card; Just try it puts it by (a calm try)
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tmode__sign--start")`)); k++) await sleep(300);
+  assert.match(await c.js<string>(`document.querySelector(".tmode__sign--start h2")?.textContent || ""`), /^Round 1 of \d: Clear$/, "the start card names round 1");
+  assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".tmode__sign--start button")].some((b) => b.textContent === "Paste an address")`), "the start card: an address pasted");
+  await c.js(`[...document.querySelectorAll(".tmode__sign--start button")].find((b) => b.textContent === "Just try it").click()`);
+  for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".tmode__sign")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--play .tmode__score") && !document.querySelector(".tmode__sign")`), "Just try it: a calm try, the address not asked again before it is holed");
+  assert.match(await c.js<string>(`document.querySelector(".tmode__weathers .eyebrow")?.textContent || ""`), /^Sink it in each/, "the weathers row says what it is");
   assert.equal(await c.js(`!!document.querySelector(".tmode__strip, .tmode__intro")`), false, "no line repeating what Play is for");
   // the game's HUD: its cards in one row along the top, in the window, none over another; no Try again before a shot
   const cards = await c.js<Box[]>(`[...document.querySelectorAll(".tbench--play .hud--top > *")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);

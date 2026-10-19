@@ -9,25 +9,29 @@
 // each palette tile's picture, its name and what it does (tiles.ts), and
 // every key, in a sheet as the game's (its X, Escape or the dim round it puts it away).
 import { allTiles, pictureOf } from "@/lib/builder/tiles";
-import { cap, theWorld } from "@/lib/builder/rules";
+import { cap, required, theWorld } from "@/lib/builder/rules";
+import { weathersSaid } from "@/lib/builder/testmode";
 import type { PaletteEntry } from "@/lib/builder/palette";
 import { KEYS } from "@/lib/builder/keys";
 import { entryName } from "@/lib/builder/names";
 import { MOD } from "./Inspector";
 import { Sheet } from "@/components/ui";
 
-const HINTS = [
+/** The three, the world's weathers named in Play's. */
+const hintsOf = (world: string) => [
   ["palette", "Drag a piece onto the board"],
-  ["test", "Press Play (T): sink it in every weather"],
+  ["test", `Press Play (T): sink it in ${weathersSaid(required(world))}`],
   ["steps", "Then Publish it for anyone to play"],
 ] as const;
 
-export default function Hints({ onDone, glossary = null }: {
+export default function Hints({ world, onDone, glossary = null }: {
+  /** the draft's: the weathers Play's hint names */
+  world: string;
   onDone: () => void;
   /** the "?": the world's pieces under the hints */
   glossary?: { world: string; palette: readonly PaletteEntry[] } | null;
 }) {
-  const hints = (inPanel: boolean) => HINTS.map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
+  const hints = (inPanel: boolean) => hintsOf(world).map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
   // the first run: each hint by its place, the pointer through them
   if (!glossary) return <div className="bhints" role="note" aria-label="Three hints">{hints(false)}</div>;
   const tiles = allTiles(glossary.palette);

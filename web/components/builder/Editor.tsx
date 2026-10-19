@@ -25,9 +25,10 @@ import { frame } from "@/lib/builder/gg1";
 import { notTurned, QUARTER, snap, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
-import { canonicalHex, parAllowed, proofKey, provedAs, type Proof } from "@/lib/builder/proof";
+import { canonicalHex, leftAs, parAllowed, proofKey, provedAs, type Proof } from "@/lib/builder/proof";
 import { dropped, toCarry, withCarried } from "@/lib/builder/carry";
-import { FIELD, listed, weatherName } from "@/lib/builder/rules";
+import { FIELD, listed, required, weatherName } from "@/lib/builder/rules";
+import { publishTip } from "@/lib/builder/testmode";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
@@ -370,6 +371,8 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   }, [want, playOff]); // eslint-disable-line react-hooks/exhaustive-deps -- (play: the render's own)
   // proved as it is now: Publish open and lit (proofs keep while the hole is the same: an undo brings them back)
   const proved = !playOff && !!author && !!provedAs(kept.proofs, kept.world, key!.key!, author, kept.slug);
+  // Publish shut: the weathers named, or the ones still to sink
+  const shut = proved ? "" : publishTip(kept.world, key?.key ? leftAs(kept.proofs, kept.world, key.key, author, kept.slug) : required(kept.world));
   // a round of play's proof, kept in the draft as kept (the step amended: an undo before it drops it with the edit)
   const amend = (f: (k: Draft) => Draft) => (session.amend(f(session.kept())), refresh());
   const prove = (p: Proof) => amend((k) => ({ ...k, proofs: [...k.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }));
@@ -379,7 +382,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} world={draft.world} worlds={WORLDS} step="edit"
-        steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Play it first and sink it in every weather: the chain only takes a hole that can be holed", done: false } }}
+        steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: shut, done: false } }}
         action={{ text: "Play", key: "T", off: playOff, onClick: play }}
         meter={meterFace(clean, est, shape)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
@@ -428,7 +431,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
             onProof={prove} onPar={setPar} tried={tried} onRound={(r) => (setTried(r), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), onPublish(session.kept()))} />
         </div>
       )}
-      {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}
+      {(hints || again) && <Hints world={draft.world} glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}
     </main>
   );
 }

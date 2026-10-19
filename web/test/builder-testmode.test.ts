@@ -5,7 +5,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { clock, finished, holeId, holeRow, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
+import { askSaid, clock, finished, heldSaid, holeId, holeRow, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
+import { holdsToo } from "../lib/builder/carry.ts";
+import { leftAs, replay, type Proof } from "../lib/builder/proof.ts";
 import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { makeChain } from "../lib/chain.ts";
@@ -74,9 +76,59 @@ void test("finished: a round that does not count says why, play it again first; 
   assert.equal(finished({ strokes: 3, kind: "wind" }), null, "the next weather starts on its own; the last, the summary");
 });
 
-void test("nowSaid: the title card as the next weather starts on its own", () => {
-  assert.equal(nowSaid("wind"), "Now: Wind");
-  assert.equal(nowSaid(""), "Now: Clear");
+void test("nowSaid: each round's title card, its place among the weathers to sink; one sunk already, again", () => {
+  assert.equal(nowSaid("", { n: 1, of: 3 }), "Round 1 of 3: Clear");
+  assert.equal(nowSaid("wind", { n: 2, of: 3 }), "Round 2 of 3: Wind");
+  assert.equal(nowSaid("rain"), "Again: Rain");
+});
+
+void test("toGo: the weathers row's eyebrow, how many are left once one is sunk", () => {
+  assert.equal(toGo(3, 0), "Sink it in each");
+  assert.equal(toGo(3, 1), "Sink it in each · 2 to go");
+  assert.equal(toGo(3, 3), "Sink it in each · all sunk ✓");
+});
+
+void test("publishTip, askSaid, heldSaid: the weathers named, never \"every weather\"", () => {
+  assert.equal(publishTip("garden", ["", "wind", "rain"]), "Sink it once in each weather: Clear, Wind and Rain. Players meet them all.");
+  assert.equal(publishTip("island", ["", "wind", "rain", "storm"]), "Sink it once in each weather: Clear, Wind, Rain and Storm. Players meet them all.");
+  assert.equal(publishTip("garden", ["wind", "rain"]), "Still to sink: Wind and Rain.");
+  assert.equal(askSaid("garden"), "Clear ✓ — next: Wind and Rain. Your address names the hole and sets its weather, so we need it once to go on. Nothing is signed.");
+  assert.equal(heldSaid("", ["rain"]), "Your Clear round holds in Rain too ✓");
+  assert.equal(heldSaid("", ["wind", "rain"]), "Your Clear round holds in Wind and Rain too ✓");
+});
+
+void test("leftAs: the weathers still to sink under the author's best id; all with no author or none proved", () => {
+  const mk = (id: string, kind: string, maxWork = 1): Proof => ({ key: "k", id, kind, period: 1, shots: [], commits: [], strokes: 2, maxWork });
+  const v1 = `${A}/mole-run/v1`, v2 = `${A}/mole-run/v2`;
+  assert.deepEqual(leftAs([], "garden", "k", A, "mole-run"), ["", "wind", "rain"]);
+  assert.deepEqual(leftAs([mk(v1, "")], "garden", "k", null, "mole-run"), ["", "wind", "rain"]);
+  assert.deepEqual(leftAs([mk(v1, ""), mk(v2, ""), mk(v2, "rain")], "garden", "k", A, "mole-run"), ["wind"]);
+  assert.deepEqual(leftAs([mk(v1, "", 9e9)], "garden", "k", A, "mole-run"), ["", "wind", "rain"], "a proof past minShotWork is none");
+});
+
+void test("holdsToo: a proved round's shots replayed in the weathers left, each it holes in proved by that replay alone", async () => {
+  const d = lane("garden", []), id = `${A}/mole-run/v1`, hex = hexOf(d), key = "k";
+  host.load(id, hex);
+  const p = plan(host, id, "garden", 5967997), calm = p.find((x) => x.kind === "")!;
+  // a round that holes in calm weather: found by the chain's own simulation (a straight lane)
+  const local = makeLocalChain(host, holeRow(id, d), hex, calm.period);
+  let proof: Proof | null = null;
+  for (let pw = 1; pw <= 10 && !proof; pw += 0.25) {
+    const r = await replay(local, { key, id, kind: "", period: calm.period, shots: [`0.0000,${pw.toFixed(4)}`] });
+    if (typeof r !== "string") proof = r;
+  }
+  assert.ok(proof, "a straight lane holed in one");
+  const left = p.filter((x) => x.kind !== "");
+  const more = await holdsToo(host, d, hex, proof, left);
+  assert.ok(more.some((q) => q.kind === "rain"), "a calm putt down a straight lane holds in the rain too");
+  for (const q of more) {
+    assert.ok(left.some((x) => x.kind === q.kind && x.period === q.period), "each at plan's own period");
+    assert.equal(q.id, id);
+    assert.deepEqual(q.shots, proof.shots);
+    const again = await replay(makeLocalChain(host, holeRow(id, d), hex, q.period), { key, id, kind: q.kind, period: q.period, shots: q.shots });
+    assert.ok(typeof again !== "string", `${q.kind}: holds when replayed`);
+  }
+  assert.deepEqual(await holdsToo(host, d, hex, proof, [{ kind: "wind", period: -1 }]), [], "a weather with no period is never counted");
 });
 
 void test("summary: Play's one card at the end, each weather proved with its strokes and time, Publish the way on", () => {
@@ -93,8 +145,9 @@ void test("summary: Play's one card at the end, each weather proved with its str
   assert.equal(summary([{ kind: "", strokes: 2 }], 0).line, "", "no par yet: nothing said");
 });
 
-void test("the address, asked on the hole-finished card once a try is holed: Adena first, an address pasted behind a tap, where to get Adena", () => {
+void test("the address, asked once on the game's card: as Play opens (round 1 named, or just a try), else once the try is holed; Adena first, a paste behind a tap", () => {
   const src = fs.readFileSync(new URL("../components/builder/TestMode.tsx", import.meta.url), "utf8");
-  assert.ok(src.includes(">Use my Adena address<") && src.includes(">Paste an address<") && src.includes("ADENA_URL") && src.includes("Nothing is signed or published"));
+  assert.ok(src.includes(">Use my Adena address<") && src.includes(">Paste an address<") && src.includes("ADENA_URL") && src.includes("askSaid(draft.world)"));
+  assert.ok(src.includes(">Just try it<") && src.includes("Nothing is signed until you publish."), "the start card: a try kept, nothing signed");
   assert.match(src, /function AddressLine/);
 });
