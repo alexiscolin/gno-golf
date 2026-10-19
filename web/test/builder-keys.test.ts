@@ -37,7 +37,7 @@ void test("KEYS: each key once, in a few words for the key line and a sentence f
 void test("? shows every key (the hints and the glossary); the board's key line the few most used and ?, every key in the glossary", () => {
   assert.deepEqual(press("?"), { t: "help" });
   assert.equal(press("?", { meta: true }), null);
-  assert.deepEqual(KEY_LINE.map((k) => k.key), ["1–4", "R", "modZ", "T", "?"]);
+  assert.deepEqual(KEY_LINE.map((k) => k.key), ["1–4", "B", "R", "modZ", "T", "?"]);
   assert.ok(KEY_LINE.every((k) => KEYS.includes(k)), "the line's keys, the glossary's too");
 });
 

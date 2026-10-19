@@ -1,33 +1,44 @@
 // What a new hole starts from: one of its world's starters (starters.ts,
 // written by scripts/starters.ts), its green read from its rails (surface.ts
-// surfaceOf) so it is painted bigger or smaller at once; a blank lane is
-// no start any more (painting the green replaces it). Each passes every
+// surfaceIn) so it is painted bigger or smaller at once; or from scratch:
+// the smallest plain green the checks take, the tee and the cup at its ends,
+// to draw the hole on (scratch). Each passes every
 // check in every world (test/builder-templates.test.ts): a new hole is never
 // one the Builder refuses, and every edit after it keeps it so.
-import type { Draft } from "./draft";
-import { entryParts } from "./gg1";
+import { emptyDraft, type Draft, type Piece, type V } from "./draft";
+import { entryParts, frame } from "./gg1";
+import { MIN_WIDE, SURFACE_RAIL, surfaceOf } from "./surface";
 import { STARTERS } from "./starters";
-import { surfaceOf } from "./surface";
 import { cap, worldName } from "./rules";
 
-/** A new hole's choice: its name in the list ("dogleg"), its card's title and one line, its par, and the draft it opens. */
+/** A new hole's choice: its name in the list ("dogleg"), its card's title (the starter's, not the new hole's name) and one line, and the draft it opens (its par). */
 export interface Start {
   name: string;
   title: string;
   line: string;
-  par: number;
   draft: Draft;
 }
 
-/** A new hole's choices in a world: its starters (scripts/starters.ts), each a fresh copy, its green painted from its rails, named from its world and starter ("Garden Dogleg", "Island Tidepool"), its address from its name. */
+/** From scratch: the smallest plain green the checks take (MIN_WIDE across, the tee and the cup a ball's room from its ends). */
+const W = 2 * MIN_WIDE, H = MIN_WIDE;
+const rail = (id: string, a: V, b: V): Piece => ({ id, entry: SURFACE_RAIL, geometry: { t: "rail", a, b }, params: {}, clock: { k: "fixed" } });
+
+/** A plain green in a world, walled by itself, the tee and the cup at its ends, framed; par the lowest its world's starters have. */
+export function scratch(world: string): Draft {
+  const own = Object.hasOwn(STARTERS, world) ? Object.values(STARTERS[world]) : [];
+  const d = frame({
+    ...emptyDraft(world), par: Math.min(...own.map((s) => s.par)), tee: [1.5, H / 2], pin: [W - 1.5, H / 2],
+    pieces: [rail("p1", [0, 0], [W, 0]), rail("p2", [W, 0], [W, H]), rail("p3", [W, H], [0, H]), rail("p4", [0, H], [0, 0])],
+  });
+  return { ...d, surface: surfaceOf(d)! };
+}
+
+/** A new hole's choices in a world: its starters (scripts/starters.ts), then from scratch (none for a world with no starters), each a fresh copy, named from its world and starter ("Garden Dogleg", "Island Tidepool"), its address from its name. */
 export function startsIn(world: string): Start[] {
   const own = Object.hasOwn(STARTERS, world) ? STARTERS[world] : {};
   const named = (d: Draft, what: string) => retitle({ ...d, slug: "" }, `${worldName(world)} ${what}`);
-  const painted = (d: Draft): Draft => {
-    const s = surfaceOf(d);
-    return s ? { ...d, surface: s } : d;
-  };
-  return Object.entries(own).map(([name, d]) => ({ name, title: d.title, line: startLine(name, d), par: d.par, draft: named(painted(structuredClone(d)), cap(d.title.replace(/^The /, ""))) }));
+  const starts = Object.entries(own).map(([name, d]) => ({ name, title: d.title, line: startLine(name, d), draft: named(structuredClone(d), cap(d.title.replace(/^The /, ""))) }));
+  return starts.length ? [...starts, { name: "scratch", title: "From scratch", line: "A plain green to draw on", draft: named(scratch(world), "Green") }] : [];
 }
 
 /** What a starter's card says it is, in a line: the straight and the dogleg by their shape, a signature by its world's own piece (its first that is not a rail) and what it does to the ball. */

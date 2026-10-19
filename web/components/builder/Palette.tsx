@@ -1,9 +1,11 @@
 "use client";
 
-// The palette (the GUI spec's B3): the pieces by what they do (tiles.ts),
+// The palette (the GUI spec's B3): the green's two tools on top (Grow,
+// Shrink: Board's paint, B; the one on pressed again puts it down), then the
+// pieces by what they do (tiles.ts),
 // the four a first hole needs first (Bumper, Sand, Water, Slope: its walls
 // are the green's own, painted on the board), the world's others by group
-// under "More pieces" (a Wall there, an inner bank; folded at first: the four
+// under "More pieces" (a Bank there, an inner bank; folded at first: the four
 // fit the column unscrolled; each group folding too), another world's under "From other worlds" (palette.ts HOME,
 // folded at first), each fold kept as left for the visit, and the bin a
 // piece dragged from the board is dropped on to remove it. Every piece is
@@ -22,13 +24,26 @@ import { armOn, foldOpen, lookOf, pictureOf, saveFold, tilesOf, type Fold, type 
 import { entryName } from "@/lib/builder/names";
 import { cap, theWorld, worldName } from "@/lib/builder/rules";
 import { sound } from "@/lib/feel";
+import type { PaintMode } from "@/lib/builder/surface";
 
 /** A look's picture: a file, its place kept (no shift as it loads). */
 const Picture = ({ world, e, px }: { world: string; e: PaletteEntry; px: number }) => (
   <img src={pictureOf(world, e)} width={px} height={px} alt="" draggable={false} decoding="async" />
 );
 
-export default function Palette({ world, palette, armed, off, bin, onArm, chosen }: {
+/** The green's tools, side by side (the pieces kept in sight unscrolled): each its icon (a green patch, + or −), its name, what a drag does (its tip). */
+const TOOLS: readonly { mode: PaintMode; name: string; does: string; sign: string }[] = [
+  { mode: "grow", name: "Grow", does: "a drag makes it bigger", sign: "M12 8v8M8 12h8" },
+  { mode: "shrink", name: "Shrink", does: "a drag makes it smaller", sign: "M8 12h8" },
+];
+const ToolIcon = ({ sign }: { sign: string }) => (
+  <svg className="piece__icon" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="3" y="3" width="18" height="18" rx="4" fill="var(--green)" stroke="var(--ink)" strokeWidth="1.6" />
+    <path d={sign} fill="none" stroke="var(--white)" strokeWidth="2.6" strokeLinecap="round" />
+  </svg>
+);
+
+export default function Palette({ world, palette, armed, off, bin, onArm, chosen, paint }: {
   world: string;
   /** a piece carried on the board: the bin shown, to let it go on */
   bin: boolean;
@@ -39,6 +54,8 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   onArm: (e: PaletteEntry | null) => void;
   /** each piece's look as chosen (its first until then), the editor's (its keys arm it too) */
   chosen: Readonly<Record<string, string>>;
+  /** the green's paint: the way on (null: off), and a tool pressed (the one on: off) */
+  paint?: { mode: PaintMode | null; onMode: (m: PaintMode | null) => void };
 }) {
   const name = worldName(world), { first, more, others } = tilesOf(palette);
   // picked up: the game's wooden tick (put back: nothing)
@@ -52,6 +69,22 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   return (
     <aside className="col palette" aria-label={`${cap(theWorld(world))}'s pieces`}>
       <h2 className="col__head">{name} pieces</h2>
+      {paint && (
+        <section className="palette__tools" aria-label="The green">
+          <h3 className="eyebrow">Green</h3>
+          <div className="ptiles">
+            {TOOLS.map((t) => (
+              <div key={t.mode} className="ptile">
+                <button type="button" className={`piece piece--tool${paint.mode === t.mode ? " piece--on" : ""}`} data-tool={t.mode} aria-pressed={paint.mode === t.mode}
+                  title={`${t.name} the green (B): ${t.does}, its walls following; drag a side to move it, click one to open it`} onClick={() => paint.onMode(paint.mode === t.mode ? null : t.mode)}>
+                  <ToolIcon sign={t.sign} />
+                  <span className="piece__name">{t.name}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {tiles(first)}
       <Folding fold="more" title="More pieces">
         {more.map((g) => (

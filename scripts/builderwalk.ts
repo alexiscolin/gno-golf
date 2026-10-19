@@ -82,7 +82,7 @@ const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMous
 try {
   // open /build: the first run
   await c.send("Page.navigate", { url: `${APP}/build/?camlog` });
-  await until(`document.querySelectorAll(".bhint").length === 3`, "the first run's hints");
+  await until(`document.querySelectorAll(".bhint").length === 4`, "the first run's hints");
   said(`opened on ${await c.js<string>(`document.querySelector(".bhead__name input").value`)}`);
   // the first run's guidance, every part of it seen: in the window, on top, readable
   const unseen = await c.js<string[]>(`(() => {

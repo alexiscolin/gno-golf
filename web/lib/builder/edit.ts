@@ -6,7 +6,7 @@
 // pipeline (pipeline.ts validate), so the board refuses exactly what the
 // issues list would.
 import type { Issue } from "./checks";
-import type { ClockSpec, Draft, Geometry, Piece, V } from "./draft";
+import { nextId, type ClockSpec, type Draft, type Geometry, type Piece, type V } from "./draft";
 import { entryParts, frame } from "./gg1";
 import { pieceName } from "./names";
 import { handlesOf, QUARTER, setHandle, snap, type HandleKey } from "./handles";
@@ -16,6 +16,7 @@ import { about, validate, type ValidateOptions } from "./pipeline";
 import { cap, pt, theWorld } from "./rules";
 import { refusalOf } from "./explain";
 import { pastLimits } from "./limits";
+import { applySurface, narrowed, owned, surfaceIn, type Green } from "./surface";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
 export interface PlaceParams {
@@ -149,29 +150,56 @@ export function editErrors(was: Draft, after: Draft, id: string, o: ValidateOpti
   return v.issues.filter((i) => i.severity === "error" && (about(i, id, v.refs) || !had.has(keyOf(i))));
 }
 
+/** A release's outcome: the draft as it is kept (framed), or why nothing changes. */
+export type Dropped = Draft | { why: string };
+const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: refusalOf(why[0]) } : next);
+
 /**
- * Why the piece may not go where it is in d (put in, or put back in place of
- * its old self); none, it may (editErrors). A piece more than the Builder's
- * limits take (E16) is refused before anything else is asked.
+ * The one edit gate's reasons: an edit past the Builder's limits (E16) is
+ * refused before anything else is asked, then a green left narrower than a
+ * ball plays (surface.ts narrowed), then the errors it brings (errs); none,
+ * it may be made.
  */
+function barred(d: Draft, after: Draft, errs: () => Issue[]): Issue[] {
+  const full = pastLimits(d, after);
+  if (full.length) return full;
+  const narrow = after.surface && after.surface !== d.surface ? narrowed(surfaceIn(d), after.surface) : [];
+  return narrow.length ? narrow : errs();
+}
+/** The editor's gate: after kept (as it is: the caller frames it) if it brings d no error it did not have, past no limit, no green too narrow; else why not, in the player's words. before: d's own errors, when the caller has them. */
+export const gate = (d: Draft, after: Draft, o: ValidateOptions, before?: readonly Issue[]): Dropped =>
+  verdict(after, barred(d, after, () => newErrors(before ?? errorsOf(d, o), after, o)));
+
+/** Why the piece may not go where it is in d (put in, or put back in place of its old self): the gate's, the piece's own errors counted too (editErrors); none, it may. */
 export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
   const after = { ...d, pieces: [...d.pieces.filter((p) => p.id !== piece.id), piece] };
-  const full = pastLimits(d, after);
-  return full.length ? full : editErrors(d, after, piece.id, o, before);
+  return barred(d, after, () => editErrors(d, after, piece.id, o, before));
 }
 /**
- * The checks of a drag from start (or of the armed piece's ghost over it):
- * a piece or an end checked again only when its place or shape changes (a
- * pointer moves many times within one snapped place), the hole as it was
- * checked once a drag.
+ * The checks of a drag from start (or of the armed piece's ghost over it, a
+ * stroke of the paint): a piece or an end checked again only when its place
+ * or shape changes (a pointer moves many times within one snapped place), a
+ * green once for each shape it takes (a stroke goes back over its own), the
+ * hole as it was checked once a drag.
  */
 export function dragCheck(start: Draft, o: ValidateOptions) {
-  let base: readonly Issue[] | null = null, last = "", said: Issue[] = [];
+  let base: readonly Issue[] | null = null, last = "", said: Issue[] = [], green: Green | null | undefined;
   const once = (key: string, run: () => Issue[]) => (key === last ? said : ((last = key), (said = run())));
   const was = () => (base ??= errorsOf(start, o));
+  const greens = new Map<string, string>(), greenKey = (s: { cells: readonly V[]; open: readonly V[] }) => `${s.cells.map(String).sort().join(";")}|${s.open.map(String).sort().join(";")}`;
   return {
     piece: (p: Piece) => once(`${p.id} ${JSON.stringify(p.geometry)} ${JSON.stringify(p.params)}`, () => canPlace(start, p, o, was())),
     end: (which: "tee" | "pin", at: V) => once(`${which} ${at[0]} ${at[1]}`, () => newErrors(was(), { ...start, [which]: at }, o)),
+    /** Why the green may not become s ("" it may). */
+    surface(s: { cells: readonly V[]; open: readonly V[] }): string {
+      const k = greenKey(s), known = greens.get(k);
+      if (known !== undefined) return known;
+      const r = gate(start, applySurface(start, s, green === undefined ? (green = owned(start)) : green), o, was()), why = "why" in r ? r.why : "";
+      greens.set(k, why);
+      return why;
+    },
+    /** Why not, if s was judged already; null if not yet. */
+    known: (s: { cells: readonly V[]; open: readonly V[] }) => greens.get(greenKey(s)) ?? null,
   };
 }
 
@@ -249,9 +277,6 @@ export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptio
   return walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, o).length === 0, which === "tee" ? d.pin : d.tee);
 }
 
-/** A release's outcome: the draft as it is kept (framed), or why nothing changes. */
-export type Dropped = Draft | { why: string };
-const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: refusalOf(why[0]) } : next);
 
 /**
  * A piece let go after a drag toward `to`: clamped with the fast checks
@@ -283,11 +308,7 @@ export function newErrors(before: readonly Issue[], after: Draft, o: ValidateOpt
   return errorsOf(after, o).filter((i) => !had.has(keyOf(i)));
 }
 
-/** A fresh piece name: p and the next number. */
-export function nextId(d: Draft): string {
-  const n = d.pieces.reduce((m, p) => Math.max(m, Number(/^p(\d+)$/.exec(p.id)?.[1] ?? 0)), 0);
-  return `p${n + 1}`;
-}
+export { nextId };
 
 /** The draft without the piece (its proofs kept: their key says whether they still hold, an undo brings them back). */
 export const removePiece = (d: Draft, id: string): Draft => without(d, id);

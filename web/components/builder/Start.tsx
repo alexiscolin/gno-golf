@@ -99,27 +99,25 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
         {/* the worlds as the game's choices side by side, each with its emblem (the cups' own) */}
         <Segmented label="Its world" className="bholes__worlds" options={WORLDS.map((w) => [w, <><Emblem id={w} />{worldName(w)}</>] as const)} value={world} onChange={setWorld} />
       </div>
-      {/* the starters are templates, ready-made holes to change (their green painted bigger or smaller at once: no blank lane to start from) */}
-      <div className="bholes__starts">
-        <section className="bholes__set" aria-label="Start from a template">
-          <h4 className="h-sub bholes__group">Start from a template</h4>
-          <ul>
-            {starts.map((s) => (
-              <li key={s.name}>
-                <button type="button" className="bholes__start" aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
-                  <span className="bholes__map"><HoleMap hole={s.map} className="bholes__svg" /></span>
-                  <b>{s.title}</b>
-                  <span className="bholes__line">{s.line}</span>
-                  <span className="bholes__foot" aria-hidden="true">
-                    <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
-                    <span className={buttonClass({ variant: "gold", size: "s" }, "bholes__go")}>Start <i>→</i></span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
+      {/* the starters are templates, ready-made holes to change (their green painted bigger or smaller at once), from scratch the last */}
+      <section className="bholes__starts" aria-label="Start from a template">
+        <h4 className="h-sub bholes__group">Start from a template</h4>
+        <ul>
+          {starts.map((s) => (
+            <li key={s.name}>
+              <button type="button" className="bholes__start" aria-label={`${s.title}: ${s.line}, par ${s.draft.par}. Start it`} onClick={() => onAdd(s.draft)}>
+                <span className="bholes__map"><HoleMap hole={s.map} className="bholes__svg" /></span>
+                <b>{s.title}</b>
+                <span className="bholes__line">{s.line}</span>
+                <span className="bholes__foot" aria-hidden="true">
+                  <span className="bholes__par">Par {s.draft.par}</span>
+                  <span className={buttonClass({ variant: "gold", size: "s" }, "bholes__go")}>Start <i>→</i></span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </section>
   );
   const mine = (

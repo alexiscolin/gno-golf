@@ -33,11 +33,11 @@ void test("every entry of every Builder world in exactly one tile, each tile one
   }
 });
 
-void test("the four a first hole needs first, each with its common look first; the rest by group, in order (a Wall among them: an inner bank)", () => {
+void test("the four a first hole needs first, each with its common look first; the rest by group, in order (a Bank among them: an inner bank)", () => {
   for (const w of palettes.keys()) {
     const { first, more } = tilesOf(palettes.get(w)!);
     assert.deepEqual(first.map((t) => [t.name, t.looks[0].id]), [["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]], w);
-    assert.ok(more.find((g) => g.group === "Walls")?.tiles.some((t) => t.name === "Wall" && t.does === "an inner bank"), `${w}: the Wall under More pieces`);
+    assert.ok(more.find((g) => g.group === "Walls")?.tiles.some((t) => t.name === "Bank" && t.does === "an inner bank"), `${w}: the Bank under More pieces`);
     assert.deepEqual(more.map((g) => g.group), GROUPS.filter((g) => more.some((x) => x.group === g)), w);
     assert.ok(!more.some((g) => g.tiles.some((t) => first.some((f) => f.key === t.key))), `${w}: a first tile again under More`);
   }

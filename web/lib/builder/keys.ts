@@ -2,13 +2,18 @@
 // asks for, beside the editor's own (arrows, R, Delete, ⌘Z, Enter, Escape),
 // and every key in words, one list for the board's key line (short) and the
 // glossary (long). "mod" is ⌘ on a Mac, Ctrl elsewhere.
+import { COMMON } from "./palette";
 
-/** What a press asks for: a palette piece armed (the first four, n from 0), the hole framed, Play, the 3D board tilted or turned a quarter, the player's view large, the green painted (Grow, then Shrink), every key shown (?); null for none of these. */
+/** The digits that arm a piece: one for each of the palette's first pieces (palette.ts COMMON). */
+const PIECE_KEYS = COMMON.length;
+const NUMBERS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+/** What a press asks for: a palette piece armed (the first ones, n from 0), the hole framed, Play, the 3D board tilted or turned a quarter, the player's view large, the green's paint taken up or put down, every key shown (?); null for none of these. */
 export type KeyAction = { t: "arm"; n: number } | { t: "frame" } | { t: "paint" } | { t: "play" } | { t: "tilt" } | { t: "turn"; by: 1 | -1 } | { t: "view" } | { t: "help" } | null;
 
 export function keyAction(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey"> & { shiftKey?: boolean }): KeyAction {
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
-  if (/^[1-4]$/.test(e.key)) return { t: "arm", n: Number(e.key) - 1 };
+  if (/^[1-9]$/.test(e.key) && Number(e.key) <= PIECE_KEYS) return { t: "arm", n: Number(e.key) - 1 };
   if (e.key === "?") return { t: "help" };
   const k = e.key.toLowerCase();
   return k === "f" ? { t: "frame" } : k === "t" ? { t: "play" } : k === "v" ? { t: "tilt" } : k === "q" ? { t: "turn", by: e.shiftKey ? -1 : 1 } : k === "p" ? { t: "view" } : k === "b" ? { t: "paint" } : null;
@@ -16,8 +21,8 @@ export function keyAction(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" |
 
 /** The keys in words: the key line's few (line: the board's one line, the most used and ?), the glossary's sentence (every one). */
 export const KEYS: readonly { key: string; short: string; long: string; line?: true }[] = [
-  { key: "1–4", short: "Pieces", long: "pick one of the first four pieces", line: true },
-  { key: "B", short: "Grow/Shrink", long: "paints the green: a drag grows it, B again shrinks it, its walls following; a side dragged moves it, a side clicked opens it where water keeps the ball in" },
+  { key: `1–${PIECE_KEYS}`, short: "Pieces", long: `pick one of the first ${NUMBERS[PIECE_KEYS]} pieces`, line: true },
+  { key: "B", short: "Green", long: "paints the green (again: back to the pieces): a drag grows or shrinks it, its walls following (with ⇧, in a straight line); a side dragged moves it, a side clicked opens it where water keeps the ball in", line: true },
   { key: "R", short: "Turn", long: "turns the selected piece", line: true },
   { key: "Enter", short: "Drop", long: "drops the piece in hand between the tee and the cup" },
   { key: "⌫", short: "Delete", long: "deletes it (Delete too)" },
@@ -30,7 +35,7 @@ export const KEYS: readonly { key: string; short: string; long: string; line?: t
   { key: "Q", short: "Rotate", long: "turns the board a quarter (with ⇧, the other way)" },
   { key: "P", short: "View", long: "shows the player's view large, the hole from its tee" },
   { key: "T", short: "Play", long: "plays the hole: each round you sink is a try at the next weather, until every one is holed", line: true },
-  { key: "⇧ drag", short: "Quick shot", long: "on the board (or a drag from the ball by the tee), pulls back a quick shot from the tee, or from where the last one stopped (calm weather; just to try)" },
+  { key: "⇧ drag", short: "Quick shot", long: "on the board, not painting (or a drag from the ball by the tee), pulls back a quick shot from the tee, or from where the last one stopped (calm weather; just to try)" },
   { key: "Esc", short: "Back", long: "drops the piece in hand, the paint, the selection and the quick shots; in play, back to Build (R or ⌫ plays again, V swaps the view)" },
   { key: "?", short: "All keys", long: "the hints again, the world's pieces and every key", line: true },
 ];

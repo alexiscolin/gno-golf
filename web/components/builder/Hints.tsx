@@ -1,7 +1,7 @@
 "use client";
 
-// The first run's three hints (the GUI spec's B1): one by each place a first
-// hole goes through (the palette, Play, the steps), short, never in the way:
+// The first run's hints (the GUI spec's B1): one by each place a first hole
+// goes through (the palette, the green's paint, Play, the steps), short, never in the way:
 // the pointer goes through them, and they are gone at the first drag (the
 // editor's onDone); never a tutorial, and never over the 3D. Shown on the
 // first visit only (templates.ts HINTS_KEY). Asked for again (the header's
@@ -17,9 +17,10 @@ import { entryName } from "@/lib/builder/names";
 import { MOD } from "./Inspector";
 import { Sheet } from "@/components/ui";
 
-/** The three, the world's weathers named in Play's. */
+/** The four, the world's weathers named in Play's. */
 const hintsOf = (world: string) => [
   ["palette", "Drag a piece onto the board"],
+  ["green", "Grow or Shrink (B): drag the green bigger or smaller"],
   ["test", `Press Play (T): sink it in ${weathersSaid(required(world))}`],
   ["steps", "Then Publish it for anyone to play"],
 ] as const;
@@ -33,7 +34,7 @@ export default function Hints({ world, onDone, glossary = null }: {
 }) {
   const hints = (inPanel: boolean) => hintsOf(world).map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
   // the first run: each hint by its place, the pointer through them
-  if (!glossary) return <div className="bhints" role="note" aria-label="Three hints">{hints(false)}</div>;
+  if (!glossary) return <div className="bhints" role="note" aria-label="Four hints">{hints(false)}</div>;
   const tiles = allTiles(glossary.palette);
   return (
     <Sheet label={`How it works, and ${theWorld(glossary.world)}'s pieces`} className="bgloss" onClose={onDone}>

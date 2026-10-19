@@ -141,8 +141,8 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   assert.deepEqual(await c.js<object>(footprint(METER)), unpressed, `${at}: the difficulty chip's box changes as it comes on`);
   assert.equal(await c.js(gold(METER)), true, `${at}: the difficulty chip on, not gold`);
   assert.deepEqual(await c.js<string[]>(misaligned([rows[0]])), [], `${at}: the header out of line with the chip on`);
-  // the palette: every piece one row on one grid (as tall, as wide, one left edge), a piece's looks under it, no badge, no popover
-  const rowsOf = await c.js<{ l: number; w: number; h: number }[]>(`[...document.querySelectorAll(".palette .ptile > .piece")].filter((e) => e.checkVisibility()).map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, w: r.width, h: r.height }; })`);
+  // the palette: every piece one row on one grid (as tall, as wide, one left edge; the green's two tools over them, side by side), a piece's looks under it, no badge, no popover
+  const rowsOf = await c.js<{ l: number; w: number; h: number }[]>(`[...document.querySelectorAll(".palette .ptile > .piece:not(.piece--tool)")].filter((e) => e.checkVisibility()).map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, w: r.width, h: r.height }; })`);
   for (const r of rowsOf) assert.ok(Math.abs(r.l - rowsOf[0].l) < 0.5 && Math.abs(r.w - rowsOf[0].w) < 0.5 && Math.abs(r.h - rowsOf[0].h) < 0.5, `${at}: a palette row off the others' grid (${JSON.stringify(r)} against ${JSON.stringify(rowsOf[0])})`);
   assert.equal(await c.js(`document.querySelectorAll(".palette .look, .palette .ptile__looks, .palette [aria-haspopup]").length`), 0, `${at}: a look left in the palette (the Inspector's now)`);
   const pal = await c.js<{ sh: number; ch: number }>(`(() => { const p = document.querySelector(".palette"); return { sh: p.scrollHeight, ch: p.clientHeight }; })()`);
@@ -178,7 +178,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const at = `start ${w}×${h}`;
   assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth || document.querySelector(".bholes").scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
   const cards = await c.js<Box[]>(`[...document.querySelectorAll(".bholes__start")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
-  assert.equal(cards.length, 3, `${at}: three starters (no blank lane: the green is painted)`);
+  assert.equal(cards.length, 4, `${at}: three starters and from scratch`);
   for (const b of cards) assert.ok(b.b <= h - 16 && b.l >= 0 && b.r <= w, `${at}: a starter's card below the fold or out of the window (${JSON.stringify(b)})`);
   const back = (await box(c, ".screen__back"))!;
   for (const sel of [".bholes__sign", ".bholes__bar", ".bholes__starts"]) assert.ok(!overlap(back, (await box(c, sel))!), `${at}: ${sel} under the corner's Back`);
@@ -215,14 +215,14 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 
-// the first run: a new player lands on the Garden's dogleg with three hints, the pointer through them, gone at the first drag,
+// the first run: a new player lands on the Garden's dogleg with four hints, the pointer through them, gone at the first drag,
 // never shown again
 {
   const c = await launch({ width: 1280, height: 800 });
   await c.send("Emulation.setFocusEmulationEnabled", { enabled: true });
   await c.send("Page.navigate", { url: `${APP}/build/` });
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bhint, .bholes__starts button")`)); k++) await sleep(500);
-  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "three hints");
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 4, "four hints");
   assert.equal(await c.js(`document.querySelector(".bhead__name input").value`), "Garden Dogleg", "on the Garden's dogleg");
   assert.equal(await c.js(`!!document.querySelector(".bhint__ok, .bhints button")`), false, "no Got it: nothing to press");
   assert.equal(await c.js(`getComputedStyle(document.querySelector(".bhints")).pointerEvents`), "none", "the pointer through them");
@@ -234,7 +234,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
       assert.ok(!overlap(part, at), `hint ${i + 1} covers the ${end === "pin" ? "cup" : "tee"}`);
     }
   }
-  assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: three hints, no glossary");
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: four hints, no glossary");
   // a piece taken from the palette (the first drag's press): the hints gone
   const tile = await centre(c, ".palette [data-tile]");
   await c.send("Input.dispatchMouseEvent", { type: "mousePressed", x: tile[0], y: tile[1], button: "left", buttons: 1, clickCount: 1 });
@@ -244,12 +244,12 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.send("Page.reload");
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(500);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "never again: the drafts screen, the dogleg kept");
-  // "?": the three hints again and, under them, one screen of the world's pieces (each tile's picture, name, what it does), the keys
+  // "?": the four hints again and, under them, one screen of the world's pieces (each tile's picture, name, what it does), the keys
   await c.js(`document.querySelector(".bholes__starts button").click()`);
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".palette .piece")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bhead [aria-label^='How it works']").click()`);
   await sleep(500);
-  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "?: the three hints");
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 4, "?: the four hints");
   // (the world's own: another world's, under From other worlds, are theirs)
   const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length - document.querySelectorAll('.palette [data-fold="others"] [data-tile]').length`);
   assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the world's own");
@@ -671,9 +671,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 
-// the green painted: B arms Grow, a drag below the dogleg's lower wall grows the green and walls it (one step), B again
-// Shrink paints it back out (the same walls again), each an undo away; a stroke over the tee is refused, said at the
-// board's foot; a hole walled by hand says why where the tool would be
+// the green painted: its tools atop the palette under Green (Grow, Shrink), B takes up Grow, a drag below the dogleg's lower
+// wall grows the green and walls it (one step), the panel says how it goes; Shrink paints it back out (the same walls
+// again), each an undo away; a stroke over the tee is refused, said at the board's foot; B again puts it down
 {
   const c = await editor(1280, 800);
   const key = async (key: string, code: string, modifiers = 0) => {
@@ -697,11 +697,14 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   };
   const cells = () => c.js<number>(`(document.querySelector(".board__cells")?.getAttribute("d").match(/M/g) ?? []).length`);
   const walls = () => c.js<string>(`[...document.querySelectorAll("[data-piece]")].map((e) => e.getAttribute("aria-label")).sort().join("; ")`);
-  const tool = () => c.js<string>(`document.querySelector(".board__tools .on")?.textContent ?? ""`);
+  const tool = () => c.js<string>(`document.querySelector(".palette [data-tool][aria-pressed=true]")?.dataset.tool ?? ""`);
   await c.js(`document.querySelector(".board").focus()`);
+  assert.equal(await c.js(`document.querySelector(".palette__tools h3")?.textContent`), "Green", "the tools named");
+  assert.equal(await c.js(`document.querySelectorAll(".palette [data-tool]").length`), 2, "Grow and Shrink");
   assert.equal(await tool(), "", "the paint off at first");
   await key("b", "KeyB");
-  assert.equal(await tool(), "Grow", "B: Grow");
+  assert.equal(await tool(), "grow", "B: Grow");
+  assert.match(await c.js<string>(`document.querySelector(".bside .nothing")?.textContent ?? ""`), /Drag to grow \(or shrink\) the green/, "the panel: how the paint goes");
   const n0 = await cells(), w0 = await walls();
   assert.ok(n0 > 0, "the dogleg's green drawn");
   await stroke([5, 12.5], [14, 12.5], async () => {
@@ -710,8 +713,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const n1 = await cells(), w1 = await walls();
   assert.ok(n1 > n0, `Grow: the green grew (${n0} → ${n1} cells)`);
   assert.notEqual(w1, w0, "Grow: its walls followed");
-  await key("b", "KeyB");
-  assert.equal(await tool(), "Shrink", "B again: Shrink");
+  await c.js(`document.querySelector(".palette [data-tool=shrink]").click()`);
+  await sleep(200);
+  assert.equal(await tool(), "shrink", "Shrink pressed");
   await stroke([5, 12.5], [14, 12.5]);
   assert.equal(await cells(), n0, "Shrink: the green back as it was");
   assert.equal(await walls(), w0, "Shrink: its walls as they were");
@@ -721,9 +725,23 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.deepEqual([await cells(), await walls()], [n0, w0], "⌘Z: the grow undone, one step");
   // the tee painted out: refused, said at the board's foot, nothing changed
   const tee = await c.js<[number, number]>(`(() => { const m = / at \\(([\\d.]+), ([\\d.]+)\\)/.exec(document.querySelector("[data-end=tee]").getAttribute("aria-label")); return [+m[1], +m[2]]; })()`);
-  await stroke([tee[0] - 1, tee[1]], [tee[0] + 1, tee[1]]);
+  await stroke([tee[0] - 1.5, tee[1]], [tee[0] + 1.5, tee[1]]); // (from beside the tee: a press on it drags it)
   assert.ok((await c.js<string>(`document.querySelector(".board__said")?.textContent ?? ""`)).length > 0, "the tee painted out: said why");
   assert.deepEqual([await cells(), await walls()], [n0, w0], "the tee painted out: nothing changed");
+  await key("b", "KeyB");
+  assert.equal(await tool(), "", "B again: back to the pieces");
+  await key("b", "KeyB");
+  assert.equal(await tool(), "shrink", "B: the last way again");
+  // painting, the tee still drags: pressed on it, it moves (no stroke)
+  const t0 = await c.js<string>(`document.querySelector("[data-end=tee]").getAttribute("aria-label")`), n2 = await cells();
+  await stroke([tee[0], tee[1]], [tee[0] + 1, tee[1]]);
+  assert.notEqual(await c.js<string>(`document.querySelector("[data-end=tee]").getAttribute("aria-label")`), t0, "the tee dragged while painting");
+  assert.equal(await cells(), n2, "no stroke under it");
+  await key("z", "KeyZ", 4);
+  await c.js(`document.querySelector(".palette [data-tool=shrink]").click()`);
+  await sleep(200);
+  assert.equal(await tool(), "", "the one on pressed again: off");
+  await key("b", "KeyB");
   await key("Escape", "Escape");
   assert.equal(await c.js(`!!document.querySelector(".board__cells")`), false, "Esc: the paint put down");
   console.log("paint: ok");
@@ -791,11 +809,11 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   await sleep(200);
   const hovered = await outline(".board__piece:hover > :first-child");
   assert.ok(hovered === null || hovered <= 4, `${w}×${h}@${dpr}: a wall hovered drawn ${hovered} px wide`);
-  const tiles = await c.js<number>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])").length`);
+  const tiles = await c.js<number>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled]):not(.piece--tool)").length`);
   assert.ok(tiles >= 5, `${w}: the palette's tiles (${tiles})`);
   for (let t = 0; t < tiles; t++) {
-    const name = await c.js<string>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])")[${t}].textContent.trim().slice(0, 30)`);
-    await c.js(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])")[${t}].click()`);
+    const name = await c.js<string>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled]):not(.piece--tool)")[${t}].textContent.trim().slice(0, 30)`);
+    await c.js(`document.querySelectorAll(".palette .ptile > .piece:not([disabled]):not(.piece--tool)")[${t}].click()`);
     await sleep(150);
     const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
     await mouse("mouseMoved", spot[0] - 8, spot[1]); await mouse("mouseMoved", ...spot);
@@ -821,9 +839,9 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   const wallPx = await outline(".board__piece--on > :first-child");
   assert.ok(wallPx !== null && wallPx <= 4, `${w}×${h}@${dpr}: the right wall selected, its outline ${wallPx} px wide`);
   // every row: armed from the keyboard (Enter: gold, pressed again: put back), and carried onto the board by a drag (its ghost there)
-  const rowsN = await c.js<number>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])").length`);
+  const rowsN = await c.js<number>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled]):not(.piece--tool)").length`);
   for (let k = 0; k < rowsN; k++) {
-    const sel = `document.querySelectorAll(".palette .ptile > .piece:not([disabled])")[${k}]`, label = await c.js<string>(`${sel}.querySelector(".piece__name").textContent`);
+    const sel = `document.querySelectorAll(".palette .ptile > .piece:not([disabled]):not(.piece--tool)")[${k}]`, label = await c.js<string>(`${sel}.querySelector(".piece__name").textContent`);
     await c.js(`${sel}.focus()`);
     await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
     await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });

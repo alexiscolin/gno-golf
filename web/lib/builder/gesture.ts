@@ -6,8 +6,12 @@
 // follows, checked as it goes (the fast checks), and let go stays where it
 // may or stops at the last place on its way where it may, judged with the
 // census before it is kept (edit.ts dropMove, dropHandle, dropEnd). The
-// board's own gestures in pixels (a pan, a pinch, a quick shot's pull) are
-// the board's.
+// green painted (surface.ts) is a target too: a stroke of the brush grows or
+// shrinks it (Shift: along one axis), a side dragged moves by whole cells, a
+// side clicked opens or shuts; the ghost at once, judged by the gate when
+// the board asks (judge: a frame at most), let go one step for the editor's
+// gate (onPaint). The board's own gestures in pixels (a pan, a pinch, a
+// quick shot's pull) are the board's.
 import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, ghostAt, movePiece, nextId, whereOf } from "./edit";
 import { refusalOf } from "./explain";
 import { frame } from "./gg1";
@@ -16,9 +20,10 @@ import { entry as entryIn, type PaletteEntry } from "./palette";
 import type { ValidateOptions } from "./pipeline";
 import type { Issue } from "./checks";
 import type { Draft, Piece, V } from "./draft";
+import { moveSide, painted, PAINT_OFF, SIDE_HAND, SIDE_LOCKED, strokeCells, toggleSide, type Green, type PaintMode, type Side } from "./surface";
 
-/** What the pointer pressed on: a piece, a handle of the selected one, the tee or the cup; null for the board. */
-export type Target = { t: "piece"; id: string } | { t: "handle"; key: HandleKey } | { t: "end"; which: "tee" | "pin" } | null;
+/** What the pointer pressed on: a piece, a handle of the selected one, the tee or the cup, the green under the brush or one of its sides (painting); null for the board. */
+export type Target = { t: "piece"; id: string } | { t: "handle"; key: HandleKey } | { t: "end"; which: "tee" | "pin" } | { t: "brush" } | { t: "side"; i: number } | null;
 /** The board as the gesture sees it at a press, a move or a release. */
 export interface Env {
   draft: Draft;
@@ -28,7 +33,11 @@ export interface Env {
   selected: string | null;
   /** the grid's step: 0.5, or 0.25 with Alt held */
   step: number;
+  /** painting: the way, and the green as it stands (surface.ts owned) */
+  paint?: { mode: PaintMode; green: Green } | null;
 }
+/** A green as a stroke leaves it. */
+export type Painted = { cells: V[]; open: V[] };
 /** What the gesture does to the editor's draft and selection. */
 export interface Out {
   onPreview: (d: Draft) => void;
@@ -38,21 +47,26 @@ export interface Out {
   onSelect: (id: string | null) => void;
   onDisarm: () => void;
   onBin: (id: string) => void;
+  /** a stroke or a side let go: the green it makes, and what to say if the gate refuses it (a side opened: where it may) */
+  onPaint: (s: Painted, refused?: string) => void;
 }
-/** What a move shows: the armed piece's ghost, or the grabbed thing's place; why it may not stay ("" it may); the snapped place (a grid step taken when it changes). */
+/** What a move shows: the armed piece's ghost, or the grabbed thing's place; why it may not stay ("" it may); a stroke's green (wash: null, none; why null, not judged yet: judge); the snapped place (a grid step taken when it changes). */
 export interface Shown {
   ghost?: { p: Piece; why: string };
   live?: { id: string; why: string };
+  wash?: (Painted & { why: string | null }) | null;
   cell: string;
 }
-/** What a release did: a piece placed or moved (its id: the pop), or why nothing changed. */
-export type Let = { placed: string } | { moved?: string } | { refused: string } | null;
+/** What a release did: a piece placed or moved (its id: the pop), a green let go to the editor, or why nothing changed. */
+export type Let = { placed: string } | { moved?: string } | { refused: string } | { painted: true } | null;
 
 type Checker = ReturnType<typeof dragCheck>;
 type Grab =
   | { t: "piece"; id: string; start: Draft; grab: V; check: Checker }
   | { t: "handle"; id: string; key: HandleKey; start: Draft; check: Checker }
-  | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker };
+  | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker }
+  | { t: "paint"; grow: boolean; green: Green; from: V; last: V; brushed: Map<string, V>; now: Painted; check: Checker }
+  | { t: "side"; green: Green; side: Side; from: V; by: number; now: Painted | null; check: Checker };
 
 const firstWhy = (is: readonly Issue[]) => (is[0] ? refusalOf(is[0]) : "");
 
@@ -60,7 +74,10 @@ export function makeGesture(out: Out) {
   let grab: Grab | null = null;
   // the armed piece's checks over the draft as it is (a place checked once, however often the pointer passes)
   let armedCheck: { of: Draft; c: Checker } | null = null;
+  // (the paint's too: a green judged once for the draft, a stroke, a hover over a side)
   const armedOf = (e: Env) => (armedCheck?.of === e.draft ? armedCheck.c : (armedCheck = { of: e.draft, c: dragCheck(e.draft, e.quick) }).c);
+  /** The stroke's green as it stands, with why not when known (judged already for that shape), else null. */
+  const washOf = (d: Extract<Grab, { t: "paint" | "side" }>) => d.now && { ...d.now, why: d.check.known(d.now) };
   // the armed entry's piece, centred under the pointer, every point of it on the grid (the hole's: from its tee)
   const ghostOf = (e: Env, at: V): Piece => ghostAt(e.armed!, nextId(e.draft), at, e.step, e.draft.tee);
   return {
@@ -72,6 +89,12 @@ export function makeGesture(out: Out) {
      * (true); on the board, the selection let go (false: the board's to pan).
      */
     down(e: Env, at: V, target: Target): boolean {
+      const p = e.paint;
+      if (p && target?.t === "brush") {
+        const brushed = new Map(strokeCells(at, at, p.green.cells).map((c) => [c.join(), c]));
+        return (grab = { t: "paint", grow: p.mode === "grow", green: p.green, from: at, last: at, brushed, now: { cells: painted(p.green.cells, [...brushed.values()], p.mode === "grow"), open: p.green.open }, check: armedOf(e) }), true;
+      }
+      if (p && target?.t === "side") return (grab = { t: "side", green: p.green, side: p.green.sides[target.i], from: at, by: 0, now: null, check: armedOf(e) }), true;
       if (e.armed) return true;
       if (target?.t === "handle" && e.selected) return (grab = { t: "handle", id: e.selected, key: target.key, start: e.draft, check: dragCheck(e.draft, e.quick) }), true;
       if (target?.t === "end") return (grab = { t: "end", which: target.which, start: e.draft, check: dragCheck(e.draft, e.quick) }), true;
@@ -83,13 +106,28 @@ export function makeGesture(out: Out) {
       out.onSelect(null);
       return false;
     },
-    /** The pointer moved to at: what it shows (null: nothing armed or grabbed). */
-    move(e: Env, at: V): Shown | null {
+    /** The pointer moved to at: what it shows (null: nothing armed or grabbed); line: Shift held, a stroke kept along one axis from where it began. */
+    move(e: Env, at: V, { line = false } = {}): Shown | null {
+      const g = grab;
+      if (g?.t === "paint") {
+        if (line) at = Math.abs(at[0] - g.from[0]) >= Math.abs(at[1] - g.from[1]) ? [at[0], g.from[1]] : [g.from[0], at[1]];
+        const n = g.brushed.size;
+        for (const c of strokeCells(g.last, at, g.green.cells)) g.brushed.set(c.join(), c);
+        g.last = at;
+        if (g.brushed.size !== n) g.now = { cells: painted(g.green.cells, [...g.brushed.values()], g.grow), open: g.green.open };
+        return { wash: washOf(g), cell: String(g.brushed.size) };
+      }
+      if (g?.t === "side") {
+        // whole cells along its outward normal; the author's wall on it: it stays
+        const by = Math.round((at[0] - g.from[0]) * g.side.out[0] + (at[1] - g.from[1]) * g.side.out[1]);
+        if (by !== g.by) (g.by = by), (g.now = by ? moveSide(g.green, g.side, by) : null);
+        return { wash: g.now && (g.side.hand ? { ...g.now, why: SIDE_HAND } : washOf(g)), cell: String(by) };
+      }
       if (e.armed && !grab) {
         const p = ghostOf(e, at), cell = whereOf(p.geometry).join();
         return { ghost: { p, why: firstWhy(armedOf(e).piece(p)) }, cell };
       }
-      const d = grab;
+      const d = g;
       if (!d) return null;
       const on = (v: V) => snap(v, e.step, d.start.tee);
       if (d.t === "piece") {
@@ -109,9 +147,16 @@ export function makeGesture(out: Out) {
       return { live: { id: d.which, why: firstWhy(d.check.end(d.which, v)) }, cell: v.join() };
     },
     /** Let go at at: keep (Shift held) keeps the piece armed for another; bin: let go over the palette's bin. */
-    up(e: Env, at: V, { keep = false, bin = false } = {}): Let {
+    up(e: Env, at: V, { keep = false, bin = false, click = false } = {}): Let {
       const d = grab;
       grab = null;
+      if (d?.t === "paint") return out.onPaint(d.now), { painted: true };
+      if (d?.t === "side") {
+        // a click: opened or shut (the author's wall on it: neither); else the side moved
+        if (d.side.hand && (d.by || click)) return { refused: SIDE_HAND };
+        if (d.by && d.now) return out.onPaint(d.now), { painted: true };
+        return click ? (out.onPaint({ cells: d.green.cells, open: toggleSide(d.green.open, d.side) }, d.side.open ? undefined : SIDE_LOCKED), { painted: true }) : null;
+      }
       if (e.armed && !d) {
         const p = ghostOf(e, at), why = canPlace(e.draft, p, e.full);
         if (why.length) return { refused: refusalOf(why[0]) };
@@ -132,9 +177,23 @@ export function makeGesture(out: Out) {
       out.onCommit();
       return d.t === "piece" ? { moved: d.id } : {};
     },
-    /** The gesture dropped (a pinch, the pointer lost): the grabbed thing back where it was. */
+    /** The stroke's green judged (the board asks once a frame at most): why not ("" it may); null, no stroke. */
+    judge(): string | null {
+      const d = grab;
+      return (d?.t === "paint" || d?.t === "side") && d.now ? (d.t === "side" && d.side.hand ? SIDE_HAND : d.check.surface(d.now)) : null;
+    },
+    /** Why side i of the green may not open (or shut), on the draft as it is: "" it may (judged once a draft). */
+    sideWhy(e: Env, i: number): string {
+      const g = e.paint?.green, s = g?.sides[i];
+      if (!g || !s) return PAINT_OFF;
+      const why = s.hand ? SIDE_HAND : armedOf(e).surface({ cells: g.cells, open: toggleSide(g.open, s) });
+      return why && !s.open && !s.hand ? SIDE_LOCKED : why;
+    },
+    /** A stroke or a side under way. */
+    painting: () => grab?.t === "paint" || grab?.t === "side",
+    /** The gesture dropped (a pinch, the pointer lost, the paint put down): the grabbed thing back where it was. */
     cancel() {
-      if (grab) out.onCancel();
+      if (grab && grab.t !== "paint" && grab.t !== "side") out.onCancel();
       grab = null;
     },
   };

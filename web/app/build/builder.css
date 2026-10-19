@@ -83,6 +83,14 @@
 /* a piece's card: its row, and its looks' tray under a hairline */
 .ptile { min-width: 0; border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 2px 0 var(--ink); overflow: hidden; }
 .piece { display: grid; grid-template: auto auto / var(--pic) minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); width: 100%; min-width: 0; padding: 6px var(--sp-3) 6px 6px; border: 0; background: none; font: inherit; color: var(--ink); cursor: grab; touch-action: none; text-align: left; }
+.piece--tool { cursor: pointer; }
+.piece__icon { grid-row: 1 / 3; width: var(--pic); height: var(--pic); padding: 8px; border-radius: 10px; background: rgba(var(--ink-rgb), .06); }
+/* the green's tools, over the pieces: their own small heading */
+.palette__tools { display: grid; gap: var(--sp-2); }
+.palette__tools h3 { margin: 0; }
+.palette__tools .ptiles { grid-template-columns: 1fr 1fr; gap: var(--sp-2); --pic: 30px; }
+.palette__tools .piece { grid-template: auto / var(--pic) minmax(0, 1fr); column-gap: var(--sp-2); padding: 4px var(--sp-2) 4px 4px; }
+.palette__tools .piece__icon { grid-row: auto; padding: 2px; }
 .piece img { grid-row: 1 / 3; width: var(--pic); height: var(--pic); border-radius: 10px; pointer-events: none; background: rgba(var(--ink-rgb), .06); }
 .piece__name { align-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 800; line-height: 1.2; }
 /* what it does: two lines when it needs them, never cut (the picture's height holds both) */
@@ -115,7 +123,8 @@
 .board__grid line.major { stroke: rgba(255, 255, 255, .3); }
 .board__piece { cursor: move; }
 .board__piece--on > :first-child, .board__end--on > :first-child { filter: drop-shadow(0 0 .25px var(--gold)) drop-shadow(0 0 .25px var(--gold)); }
-.board__end { cursor: move; }
+.board__end { cursor: grab; }
+.board__end:active { cursor: grabbing; }
 /* the keyboard's focus on a piece, the tee or the cup (selected as it lands) */
 .board__piece:focus, .board__end:focus { outline: none; }
 .board__piece:focus-visible > :first-child, .board__end:focus-visible > :first-child { filter: drop-shadow(0 0 .3px var(--ink)) drop-shadow(0 0 .3px var(--gold)) drop-shadow(0 0 .3px var(--gold)); }
@@ -241,11 +250,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .bholes__worlds button { flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 4px var(--sp-4) 4px var(--sp-2); white-space: nowrap; }
 .bholes__worlds svg { width: 32px; height: 32px; }
-/* the starts: the templates under their label, every card one column of the same three */
-.bholes__starts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--sp-5); row-gap: var(--sp-3); }
-.bholes__set { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-rows: subgrid; grid-row: span 2; }
-.bholes__group { grid-column: 1 / -1; }
-.bholes__set ul { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; margin: 0; padding: 0; list-style: none; }
+/* the starts: the templates under their label (from scratch the last), four cards a row */
+.bholes__starts { display: grid; gap: var(--sp-3); }
+.bholes__starts ul { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-5); margin: 0; padding: 0; list-style: none; }
 .bholes__start {
   display: grid; grid-template-rows: auto auto 1fr auto; justify-items: start; gap: 4px; width: 100%; height: 100%; padding: 0 0 var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card);
   background: var(--white); font: inherit; color: var(--ink); text-align: left; cursor: pointer; overflow: hidden; box-shadow: var(--shadow-btn); transition: transform var(--t-pop) var(--spring), box-shadow .2s;
@@ -478,13 +485,14 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .meter--3 > i > b.on { background: var(--ink-soft); }
 .meter--none { color: var(--ink-soft); }
 
-/* the first run's hints: three short notes by the palette, Play and the steps, gone at the first drag */
+/* the first run's hints: four short notes by the palette, the green's tool, Play and the steps, gone at the first drag */
 .bhints { position: fixed; inset: 0; z-index: 4; pointer-events: none; } /* (under a sheet: the player's view large) */
 .bhint { position: absolute; display: flex; align-items: center; gap: var(--sp-2); max-width: 260px; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); font-size: 15px; font-weight: 700; color: var(--ink); }
 .bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; } /* (as About's steps) */
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Play's at the board's top right, under the
    steps'; the palette's lower, by its tiles; the pointer through them all (gone at the first drag) */
 .bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
+.bhint--green { left: calc(var(--palette-w) + 24px); top: 130px; } /* (by the palette's Green, at its top) */
 .bhint--test { right: calc(var(--col-w) + 3 * var(--sp-4)); top: 160px; }
 .bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
 /* the "?": the game's sheet (ui.tsx Sheet: its dim, its X), wider: the three hints then the world's pieces (each tile's picture,
@@ -513,18 +521,17 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .board__keys { white-space: nowrap; } /* (one line: the few keys most used; ? shows them all) */
 .board__keys > span { white-space: nowrap; }
 .board__keys > span:not(:last-child)::after { content: "\00a0·"; }
-/* the green's paint (Board's, B): the tool at the top left (or why it is off, in its place); the green faint, each side of its outline a line to drag or
-   click (open: dashed; locked: it cannot open, dimmed), the stroke one ghost (green where it may go, red where not), its walls drawn */
-.board__tools { position: absolute; left: var(--sp-3); top: var(--sp-3); z-index: 1; }
-.board__tools--off { max-width: min(360px, calc(100% - 2 * var(--sp-3))); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink-soft); pointer-events: none; }
+/* the green's paint (Board's, B; its tools the palette's): the green faint, each side of its outline a line to drag or
+   click (open: dashed; hovered and locked: it stays as it is, dimmed, no gold), the stroke one ghost (green where it may go, red where not), its walls drawn */
 .board--paint .board__map { cursor: crosshair; }
 .board__cells { fill: rgba(255, 255, 255, .1); }
 .board__side > line:not(.board__hit) { stroke: var(--white); stroke-width: 3px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .board__side--open > line:not(.board__hit) { stroke-dasharray: 6 5; }
 .board__side--locked > line:not(.board__hit) { opacity: .55; }
-.board__side:hover > line:not(.board__hit) { stroke: var(--gold); opacity: 1; }
+.board__side:not(.board__side--locked):hover > line:not(.board__hit) { stroke: var(--gold); opacity: 1; }
 .board__side--ew { cursor: ew-resize; }
 .board__side--ns { cursor: ns-resize; }
+.board__side--locked { cursor: not-allowed; }
 .board__wash path { fill: rgba(92, 214, 140, .45); }
 .board__wash line { stroke: #1c9a55; stroke-width: 3px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .board__wash--no path { fill: rgba(225, 75, 59, .35); }

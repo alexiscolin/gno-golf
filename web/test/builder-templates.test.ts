@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
+import { owned } from "../lib/builder/surface.ts";
 import { firstRun, retitle, slugOf, startsIn, typedSlug } from "../lib/builder/templates.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
@@ -50,17 +51,27 @@ void test("the starters: three a world, each whole, passing every check, holed i
 
 void test("startsIn: a world's starters (no blank lane: the green is painted), each a copy of its own, its green painted", () => {
   const s = startsIn("island");
-  assert.deepEqual(s.map((x) => x.name), ["straight", "dogleg", "signature"]);
-  assert.deepEqual([s[0].title, s[0].par], ["Straight", 2]);
-  assert.ok(s.every((x) => x.draft.surface?.cells.length), "each painted at once");
+  assert.deepEqual(s.map((x) => x.name), ["straight", "dogleg", "signature", "scratch"]);
+  assert.deepEqual([s[0].title, s[0].draft.par], ["Straight", 2]);
+  assert.ok(s.every((x) => owned(x.draft)?.cells.length), "each painted at once (its green read from its rails)");
   s[0].draft.pieces.length = 0;
   assert.ok(STARTERS.island.straight.pieces.length > 0, "a starter is never changed through its copy");
   assert.deepEqual(startsIn("nowhere"), []);
 });
 
+void test("from scratch: the smallest plain green, the tee and the cup only, passing every check in every world, painted at once", async () => {
+  for (const world of Object.keys(FIELD)) {
+    const d = startsIn(world).at(-1)!.draft, palette = await loadPalette(world);
+    assert.equal(d.pieces.length, 4, `${world}: its four walls only`);
+    assert.ok(d.surface && owned(d)!.ids.length === 4, `${world}: its green its own`);
+    assert.ok(d.par > 0, world);
+    assert.deepEqual(validate(d, { host, palette, census }).issues.filter((i) => i.severity === "error").map((i) => i.text), [], world);
+  }
+});
+
 void test("startsIn: each card says in a line what it is, a signature by its world's own piece", () => {
   const lines = Object.fromEntries(Object.keys(FIELD).map((w) => [w, startsIn(w).map((x) => `${x.title}: ${x.line}`)]));
-  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The moon bridge: A moon bridge in the lane: roll up and over it"]);
+  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The moon bridge: A moon bridge in the lane: roll up and over it", "From scratch: A plain green to draw on"]);
   assert.equal(lines.island[2], "The tidepool: A tidepool in the lane: keep the ball out of it");
   assert.equal(lines.town[2], "The funbox: A funbox in the lane: roll up and over it");
   assert.equal(lines.mountain[2], "The kicker: A kicker in the lane: roll up and over it");
