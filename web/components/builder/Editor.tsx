@@ -12,7 +12,9 @@
 // it: the same zoom, selection and history after): with the author's
 // address, each round a try at the next weather not holed, its proof kept
 // in the draft (TestMode); the difficulty's change said as it comes ("par 3
-// → 4"), and a ghost ball runs the meter's line after a drop.
+// → 4"), and a ghost ball runs the meter's line after a drop. The green is
+// painted on the board (B: Grow, Shrink; surface.ts), each stroke one step
+// through the same gate (paintEdit), refused with why.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { useFlash } from "@/components/common";
@@ -36,7 +38,8 @@ import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import type { Hole } from "@/lib/scene/data";
-import Board from "./Board";
+import Board, { type PaintMode } from "./Board";
+import { paintEdit, paintOff } from "@/lib/builder/surface";
 import Checks from "./Checks";
 import Header from "./Header";
 import Inspector, { useOnce } from "./Inspector";
@@ -101,6 +104,9 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const [selected, setSelected] = useState<string | null>(null);
   const [show, setShow] = useState<{ id: string; n: number } | null>(null); // Show me: the piece to frame
   const [armed, setArmed] = useState<PaletteEntry | null>(null);
+  // the green's paint (B): on, Grow or Shrink; a piece armed puts it down
+  const [paint, setPaint] = useState<PaintMode | null>(null);
+  const arm = (e: PaletteEntry | null) => (setArmed(e), e && setPaint(null));
   const [binShown, setBinShown] = useState(false); // a piece carried on the board: the palette's bin shown
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState<{ of: Draft; v: Validated; state: Hole | null } | null>(null);
@@ -292,6 +298,14 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     tryEdit({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? movePiece(piece, to) : p)) }, "");
   };
   const fix = (i: Issue) => quick && tryEdit(fixOf(i, draft, quick), "No free place near it: move it by hand.");
+  // a stroke of the paint let go: the green and its walls, if the hole holds and the limits take it (one step)
+  const paintTo = (g: { cells: V[]; open: V[] }) => {
+    if (!full) return;
+    const r = paintEdit(draft, g, full);
+    if ("why" in r) return say(r.why);
+    set(r);
+  };
+  const paintWhy = paintOff(draft);
   // the keyboard: the tee or the cup moved as a drag lets it go; the armed piece dropped between them, then selected
   const moveEnd = (which: "tee" | "pin", d: V) => {
     if (!quick || !full) return;
@@ -338,16 +352,17 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
         if (!en) return;
         if (off.has(en.id)) return say(off.get(en.id)!);
         if (armed?.id !== en.id) sound("select");
-        return setArmed(en);
+        return arm(en);
       }
       if (act?.t === "frame") return setFrameAsk((n) => n + 1);
+      if (act?.t === "paint") return paintWhy ? say(paintWhy) : (setArmed(null), setPaint((m) => (m === "grow" ? "shrink" : "grow")));
       if (act?.t === "help") return setAgain(true);
       if (act?.t === "tilt") return setLook((l) => ({ ...l, tilt: l.tilt ? 0 : TILT }));
       if (act?.t === "turn") return setLook((l) => ({ ...l, turns: (l.turns + act.by + 4) % 4 }));
       if (act?.t === "play") return play();
       if (act?.t === "view") return setLarge(true);
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
-      if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]), setTrail([]));
+      if (e.key === "Escape") return (setArmed(null), setPaint(null), setSelected(null), setShots([]), setTrail([]));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       // (an arrow moves a piece the way it points on the screen, however the board is turned)
       const step = (k: string) => fromPlane(arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V, { turns: look.turns, tilt: 0 });
@@ -406,8 +421,8 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const amend = (f: (k: Draft) => Draft) => (session.amend(f(session.kept())), refresh());
   const prove = (p: Proof) => amend((k) => ({ ...k, proofs: [...k.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }));
   const setPar = (par: number) => playing && amend((k) => (parAllowed(k.proofs.filter((q) => q.key === playing.key), k.par) ? k : { ...k, par }));
-  // the first run's hints: gone at the first drag (a piece taken from the palette, or one carried on the board)
-  useEffect(() => void (hints && (armed || binShown) && onHinted()), [hints, armed, binShown, onHinted]);
+  // the first run's hints: gone at the first drag (a piece taken from the palette, one carried on the board, the paint taken up)
+  useEffect(() => void (hints && (armed || binShown || paint) && onHinted()), [hints, armed, binShown, paint, onHinted]);
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} world={draft.world} worlds={WORLDS} step="edit"
@@ -419,7 +434,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
         onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, dice)))), setDice((n) => n + 1), refresh())} />
       {palette && quick && full ? (
         <>
-          <Palette world={draft.world} palette={palette} armed={armed} off={off} bin={binShown} onArm={setArmed} chosen={looks} />
+          <Palette world={draft.world} palette={palette} armed={armed} off={off} bin={binShown} onArm={arm} chosen={looks} />
           <div className="centre">
             {/* the proofs an edit dropped, an undo away (the edit undone, they are the hole's again) */}
             {toast && !sameShape(kept, toast.back) && (
@@ -431,6 +446,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !blinking, keep: blinking && piece?.clock.k === "substep", eye }}
               keys={keysLine} onLanded={() => void (landed.current = "next")} roll={roll}
+              paint={{ mode: paint, off: paintWhy, onMode: (m) => (m && setArmed(null), setPaint(m)), onPaint: paintTo }}
               ball={{
                 played: shotsShown, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? shotsPlayed.at(-1) ?? null : null,
                 line: lineOn && guess && est?.of === shape && draft === kept ? { path: guess.path, heat: guess.heat } : null,

@@ -186,7 +186,7 @@ function zoneOf(kind: string, skin: string, g: Exclude<Geometry, { t: "rail" | "
 
 /**
  * The draft moved so its extent starts at the margin: by whole grid steps,
- * so Fit shifts it by none. The extent is Fit's, less the bars: rail ends,
+ * so Fit shifts it by none; its painted green with it. The extent is Fit's, less the bars: rail ends,
  * post edges, the tee and the cup (E1b holds every bar inside them).
  */
 export function frame(d: Draft): Draft {
@@ -212,6 +212,7 @@ export function frame(d: Draft): Draft {
   return {
     ...d, tee: sub(d.tee, s), pin: sub(d.pin, s),
     pieces: d.pieces.map((p) => ({ ...p, geometry: move(p.geometry), params: p.params.to ? { ...p.params, to: sub(p.params.to, s) } : p.params })),
+    ...(d.surface && { surface: { ...d.surface, cells: d.surface.cells.map((c) => sub(c, s)), open: d.surface.open.map((m) => sub(m, s)) } }),
   };
 }
 

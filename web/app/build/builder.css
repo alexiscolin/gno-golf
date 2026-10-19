@@ -212,7 +212,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__h small { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; }
 
 /* the workshop's sign: a blueprint (the build emblem's), the Miner out of his disc on its left, its words, its three steps */
-/* the blueprint (the build emblem's): the sign's paper, and the blank lane's picture */
+/* the blueprint (the build emblem's): the sign's paper */
 .bholes {
   --blueprint: linear-gradient(rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px,
     linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, #2f6db3;
@@ -241,10 +241,9 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .bholes__worlds button { flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 4px var(--sp-4) 4px var(--sp-2); white-space: nowrap; }
 .bholes__worlds svg { width: 32px; height: 32px; }
-/* the starts: the templates under their label, the blank lane under its own, every card one column of the same four */
-.bholes__starts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--sp-5); row-gap: var(--sp-3); }
-.bholes__set { display: grid; grid-column: span 3; grid-template-columns: subgrid; grid-template-rows: subgrid; grid-row: span 2; }
-.bholes__set--blank { grid-column: span 1; }
+/* the starts: the templates under their label, every card one column of the same three */
+.bholes__starts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--sp-5); row-gap: var(--sp-3); }
+.bholes__set { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-rows: subgrid; grid-row: span 2; }
 .bholes__group { grid-column: 1 / -1; }
 .bholes__set ul { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; margin: 0; padding: 0; list-style: none; }
 .bholes__start {
@@ -259,7 +258,6 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* the map on the world's panel colour, its dots: the hole as the game draws one */
 .bholes__map { display: grid; place-items: center; width: 100%; padding: var(--sp-3) 0; border-bottom: var(--edge); background: var(--panel-dots), var(--c1); }
 .bholes__svg { width: min(136px, 100%); aspect-ratio: 1; filter: drop-shadow(0 3px 0 var(--ink)); }
-.bholes__start--blank .bholes__map { background: var(--blueprint); }
 .bholes__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); width: 100%; padding: var(--sp-1) var(--sp-3) 0; }
 .bholes__par { padding: 2px 10px; border: 2px solid var(--ink); border-radius: var(--pill); font-size: 13px; font-weight: 800; }
 /* Start, a small gold button's look (the whole card is the button) */
@@ -515,6 +513,22 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .board__keys { white-space: nowrap; } /* (one line: the few keys most used; ? shows them all) */
 .board__keys > span { white-space: nowrap; }
 .board__keys > span:not(:last-child)::after { content: "\00a0·"; }
+/* the green's paint (Board's, B): the tool at the top left (or why it is off, in its place); the green faint, each side of its outline a line to drag or
+   click (open: dashed; locked: it cannot open, dimmed), the stroke one ghost (green where it may go, red where not), its walls drawn */
+.board__tools { position: absolute; left: var(--sp-3); top: var(--sp-3); z-index: 1; }
+.board__tools--off { max-width: min(360px, calc(100% - 2 * var(--sp-3))); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink-soft); pointer-events: none; }
+.board--paint .board__map { cursor: crosshair; }
+.board__cells { fill: rgba(255, 255, 255, .1); }
+.board__side > line:not(.board__hit) { stroke: var(--white); stroke-width: 3px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.board__side--open > line:not(.board__hit) { stroke-dasharray: 6 5; }
+.board__side--locked > line:not(.board__hit) { opacity: .55; }
+.board__side:hover > line:not(.board__hit) { stroke: var(--gold); opacity: 1; }
+.board__side--ew { cursor: ew-resize; }
+.board__side--ns { cursor: ns-resize; }
+.board__wash path { fill: rgba(92, 214, 140, .45); }
+.board__wash line { stroke: #1c9a55; stroke-width: 3px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.board__wash--no path { fill: rgba(225, 75, 59, .35); }
+.board__wash--no line { stroke: #c8322b; }
 /* quick shots and the meter's line (Board's ball): paths in the board's units, their strokes in pixels; the latest bright, three before it faded */
 .board__shots polyline { fill: none; stroke: var(--white); stroke-width: 2.5px; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .board__shots polyline.old { opacity: .35; }

@@ -1,18 +1,16 @@
 // What a new hole starts from: one of its world's starters (starters.ts,
-// written by scripts/starters.ts), or a blank lane of rails with the tee and
-// the cup at its ends, framed. Each passes every check in every world
-// (test/builder-templates.test.ts): a new hole is never one the Builder
-// refuses, and every edit after it keeps it so.
-import { emptyDraft, type Draft, type Piece, type V } from "./draft";
-import { entryParts, frame } from "./gg1";
+// written by scripts/starters.ts), its green read from its rails (surface.ts
+// surfaceOf) so it is painted bigger or smaller at once; a blank lane is
+// no start any more (painting the green replaces it). Each passes every
+// check in every world (test/builder-templates.test.ts): a new hole is never
+// one the Builder refuses, and every edit after it keeps it so.
+import type { Draft } from "./draft";
+import { entryParts } from "./gg1";
 import { STARTERS } from "./starters";
+import { surfaceOf } from "./surface";
 import { cap, worldName } from "./rules";
 
-/** The blank lane's size: long enough to play, narrow enough to aim. */
-const W = 28, H = 12;
-const rail = (id: string, a: V, b: V): Piece => ({ id, entry: "*/rail/", geometry: { t: "rail", a, b }, params: {}, clock: { k: "fixed" } });
-
-/** A new hole's choice: its name in the list ("dogleg", "blank"), its card's title and one line, its par (0: none yet), and the draft it opens. */
+/** A new hole's choice: its name in the list ("dogleg"), its card's title and one line, its par, and the draft it opens. */
 export interface Start {
   name: string;
   title: string;
@@ -21,14 +19,15 @@ export interface Start {
   draft: Draft;
 }
 
-/** A new hole's choices in a world: its starters (scripts/starters.ts), then a blank lane; each a fresh copy, named from its world and starter ("Garden Dogleg", "Island Tidepool"), its address from its name. */
+/** A new hole's choices in a world: its starters (scripts/starters.ts), each a fresh copy, its green painted from its rails, named from its world and starter ("Garden Dogleg", "Island Tidepool"), its address from its name. */
 export function startsIn(world: string): Start[] {
   const own = Object.hasOwn(STARTERS, world) ? STARTERS[world] : {};
   const named = (d: Draft, what: string) => retitle({ ...d, slug: "" }, `${worldName(world)} ${what}`);
-  return [
-    ...Object.entries(own).map(([name, d]) => ({ name, title: d.title, line: startLine(name, d), par: d.par, draft: named(structuredClone(d), cap(d.title.replace(/^The /, ""))) })),
-    { name: "blank", title: "Blank lane", line: "An empty lane, all yours", par: 0, draft: named(blank(world), "Lane") },
-  ];
+  const painted = (d: Draft): Draft => {
+    const s = surfaceOf(d);
+    return s ? { ...d, surface: s } : d;
+  };
+  return Object.entries(own).map(([name, d]) => ({ name, title: d.title, line: startLine(name, d), par: d.par, draft: named(painted(structuredClone(d)), cap(d.title.replace(/^The /, ""))) }));
 }
 
 /** What a starter's card says it is, in a line: the straight and the dogleg by their shape, a signature by its world's own piece (its first that is not a rail) and what it does to the ball. */
@@ -79,12 +78,4 @@ export const typedSlug = (typed: string) => typed.toLowerCase().replace(/[^a-z0-
 export function retitle(d: Draft, title: string): Draft {
   const follows = !d.proofs.length && (!d.slug || d.slug === slugOf(d.title));
   return { ...d, title, slug: follows ? slugOf(title) : d.slug };
-}
-
-/** A blank hole in a world. */
-export function blank(world: string): Draft {
-  return frame({
-    ...emptyDraft(world), tee: [3, H / 2], pin: [W - 3, H / 2],
-    pieces: [rail("p1", [0, 0], [W, 0]), rail("p2", [W, 0], [W, H]), rail("p3", [W, H], [0, H]), rail("p4", [0, H], [0, 0])],
-  });
 }

@@ -1,8 +1,9 @@
 "use client";
 
 // The palette (the GUI spec's B3): the pieces by what they do (tiles.ts),
-// the five a first hole needs first (Wall, Bumper, Sand, Water, Slope), the
-// world's others by group under "More pieces" (folded at first: the five
+// the four a first hole needs first (Bumper, Sand, Water, Slope: its walls
+// are the green's own, painted on the board), the world's others by group
+// under "More pieces" (a Wall there, an inner bank; folded at first: the four
 // fit the column unscrolled; each group folding too), another world's under "From other worlds" (palette.ts HOME,
 // folded at first), each fold kept as left for the visit, and the bin a
 // piece dragged from the board is dropped on to remove it. Every piece is
@@ -12,8 +13,8 @@
 // next one placed takes it). Press a row and it follows the pointer onto
 // the board (Board's ghost); a press arms it, always (a refused drop leaves
 // it armed: pressed again, it is carried again, never put back); from the
-// keyboard, Enter arms it and again puts it back (1 to 5 arm the first
-// five). A limit reached switches the pieces it would pass off, with why. It
+// keyboard, Enter arms it and again puts it back (1 to 4 arm the first
+// four). A limit reached switches the pieces it would pass off, with why. It
 // scrolls in itself.
 import { useState, type ReactNode } from "react";
 import { type PaletteEntry } from "@/lib/builder/palette";

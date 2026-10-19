@@ -1,5 +1,5 @@
-// What a new hole starts from (lib/builder/templates.ts, starters.ts): a
-// blank lane, or one of its world's three starters, each passing every check
+// What a new hole starts from (lib/builder/templates.ts, starters.ts): one
+// of its world's three starters, its green painted from its rails, each passing every check
 // and holed in every weather its world asks for (the rounds kept by
 // scripts/starters.ts): a new hole is never one the Builder refuses.
 import { test } from "node:test";
@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { blank, firstRun, retitle, slugOf, startsIn, typedSlug } from "../lib/builder/templates.ts";
+import { firstRun, retitle, slugOf, startsIn, typedSlug } from "../lib/builder/templates.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
 import { unknownEntry } from "../lib/builder/edit.ts";
@@ -48,19 +48,19 @@ void test("the starters: three a world, each whole, passing every check, holed i
   }
 });
 
-void test("startsIn: a world's starters then a blank lane, each a copy of its own", () => {
+void test("startsIn: a world's starters (no blank lane: the green is painted), each a copy of its own, its green painted", () => {
   const s = startsIn("island");
-  assert.deepEqual(s.map((x) => x.name), ["straight", "dogleg", "signature", "blank"]);
+  assert.deepEqual(s.map((x) => x.name), ["straight", "dogleg", "signature"]);
   assert.deepEqual([s[0].title, s[0].par], ["Straight", 2]);
-  assert.deepEqual([s[3].title, s[3].par], ["Blank lane", 0], "a blank lane has no par yet");
+  assert.ok(s.every((x) => x.draft.surface?.cells.length), "each painted at once");
   s[0].draft.pieces.length = 0;
   assert.ok(STARTERS.island.straight.pieces.length > 0, "a starter is never changed through its copy");
-  assert.deepEqual(startsIn("nowhere").map((x) => x.name), ["blank"]);
+  assert.deepEqual(startsIn("nowhere"), []);
 });
 
 void test("startsIn: each card says in a line what it is, a signature by its world's own piece", () => {
   const lines = Object.fromEntries(Object.keys(FIELD).map((w) => [w, startsIn(w).map((x) => `${x.title}: ${x.line}`)]));
-  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The moon bridge: A moon bridge in the lane: roll up and over it", "Blank lane: An empty lane, all yours"]);
+  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The moon bridge: A moon bridge in the lane: roll up and over it"]);
   assert.equal(lines.island[2], "The tidepool: A tidepool in the lane: keep the ball out of it");
   assert.equal(lines.town[2], "The funbox: A funbox in the lane: roll up and over it");
   assert.equal(lines.mountain[2], "The kicker: A kicker in the lane: roll up and over it");
@@ -71,16 +71,6 @@ void test("the starters are made of their world's own pieces: none borrowed from
   for (const world of Object.keys(FIELD)) {
     const palette = await loadPalette(world);
     for (const s of startsIn(world)) for (const p of s.draft.pieces) assert.ok(palette.some((e) => e.id === p.entry && !e.borrowed), `${world} ${s.name}: ${p.entry}`);
-  }
-});
-
-void test("blank: a plain lane that passes every check, in every world", async () => {
-  for (const world of Object.keys(FIELD)) {
-    const d = blank(world), palette = await loadPalette(world);
-    assert.equal(d.world, world);
-    assert.ok(d.pieces.length >= 4, world);
-    const errors = validate(d, { host, palette, census }).issues.filter((i) => i.severity === "error");
-    assert.deepEqual(errors.map((i) => `${i.rule} ${i.text}`), [], world);
   }
 });
 
@@ -96,7 +86,7 @@ void test("defaults: a new hole is named from its world and starter, its address
   const dog = startsIn("garden").find((s) => s.name === "dogleg")!;
   assert.equal(dog.draft.title, "Garden Dogleg");
   assert.equal(dog.draft.slug, "garden-dogleg");
-  assert.equal(startsIn("mountain").find((s) => s.name === "blank")!.draft.title, "Mountain Lane");
+  assert.equal(startsIn("mountain").find((s) => s.name === "straight")!.draft.title, "Mountain Straight");
   assert.equal(startsIn("island").find((s) => s.name === "signature")!.draft.title, "Island Tidepool", "a signature named by its piece");
   assert.equal(slugOf("  Le Grand Saut! "), "le-grand-saut");
   assert.match(slugOf("!!!"), /^hole-[a-z0-9]{6}$/, "nothing of a-z0-9 left: an address of its own");

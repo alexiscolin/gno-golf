@@ -33,10 +33,11 @@ void test("every entry of every Builder world in exactly one tile, each tile one
   }
 });
 
-void test("the five a first hole needs first, each with its common look first; the rest by group, in order", () => {
+void test("the four a first hole needs first, each with its common look first; the rest by group, in order (a Wall among them: an inner bank)", () => {
   for (const w of palettes.keys()) {
     const { first, more } = tilesOf(palettes.get(w)!);
-    assert.deepEqual(first.map((t) => [t.name, t.looks[0].id]), [["Wall", "*/rail/"], ["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]], w);
+    assert.deepEqual(first.map((t) => [t.name, t.looks[0].id]), [["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]], w);
+    assert.ok(more.find((g) => g.group === "Walls")?.tiles.some((t) => t.name === "Wall" && t.does === "an inner bank"), `${w}: the Wall under More pieces`);
     assert.deepEqual(more.map((g) => g.group), GROUPS.filter((g) => more.some((x) => x.group === g)), w);
     assert.ok(!more.some((g) => g.tiles.some((t) => first.some((f) => f.key === t.key))), `${w}: a first tile again under More`);
   }
@@ -89,14 +90,14 @@ void test("each piece's looks, in the Inspector: every look of a piece of severa
   }
 });
 
-void test("1 to 5 arm the first five pieces, each in its look as chosen (its first until then); past five, nothing", () => {
+void test("1 to 4 arm the first four pieces, each in its look as chosen (its first until then); past four, nothing", () => {
   const p = palettes.get("island")!, { first } = tilesOf(p);
-  assert.deepEqual([0, 1, 2, 3, 4].map((n) => armedByKey(p, n, {})?.id), first.map((t) => t.looks[0].id), "the first look of each");
-  const water = first[3], lagoon = water.looks.find((e) => e.skin === "lagoon")!;
-  assert.equal(armedByKey(p, 3, { [water.key]: lagoon.id })?.id, lagoon.id, "4: the water as chosen, the lagoon");
+  assert.deepEqual([0, 1, 2, 3].map((n) => armedByKey(p, n, {})?.id), first.map((t) => t.looks[0].id), "the first look of each");
+  const water = first[2], lagoon = water.looks.find((e) => e.skin === "lagoon")!;
+  assert.equal(armedByKey(p, 2, { [water.key]: lagoon.id })?.id, lagoon.id, "3: the water as chosen, the lagoon");
   assert.equal(lookOf(water, { [water.key]: lagoon.id }), lagoon);
   assert.equal(lookOf(water, { [water.key]: "a look it has not" }), water.looks[0], "a look not its own: its first");
-  assert.equal(armedByKey(p, 5, {}), null, "6: nothing");
+  assert.equal(armedByKey(p, 4, {}), null, "5: nothing");
 });
 
 void test("the moving pieces the course's own holes have: the mountain's snow cannon and falling serac, the island's blowhole, each timed from the start", () => {

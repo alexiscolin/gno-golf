@@ -17,9 +17,15 @@
 // the board says it is no proof. The meter's best line is drawn when the
 // header's difficulty chip asks; after a drop that held, a ghost ball runs
 // it once (a second, never with reduced motion). The keys most used are
-// said at its foot on a browser's first visit.
+// said at its foot on a browser's first visit. The green is painted too
+// (surface.ts; the tool at its top left, B): Grow, a drag paints cells in
+// under a two-cell brush, Shrink paints them out, a side of its outline
+// dragged moves the whole side, a side clicked opens or shuts it; the
+// stroke drawn as one ghost (green, or red with why), let go one step,
+// judged by the editor's gate (refused: said at the board's foot). A side
+// that cannot open is drawn locked.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
-import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
+import { errorsOf, middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { boxIn, centreOn, FLAT, frameView, islandIn, gridLines, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
 import { BOARD, MARGIN } from "@/lib/builder/gg1";
@@ -35,12 +41,13 @@ import Scene, { type Eye } from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
-import { Chip } from "@/components/ui";
+import { Chip, Segmented } from "@/components/ui";
 import { chain, labelAt, lean, reactionAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
 import { KEY_LINE } from "@/lib/builder/keys";
 import { pt, xy } from "@/lib/builder/rules";
 import { pulled, type Played, type QuickShot } from "@/lib/builder/quickshot";
+import { moveSide, outline, owned, paintEdit, painted, railsOf, strokeCells, toggleSide, type Side } from "@/lib/builder/surface";
 import type { Shown } from "@/lib/builder/difficulty";
 
 export interface BoardProps {
@@ -86,6 +93,17 @@ export interface BoardProps {
   /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D);
    *  eye: the player's view painted from the same scene */
   scene?: { state: Hole | null; of: Draft | null; paused?: boolean; keep?: boolean; eye?: Eye };
+  /** the green's paint (surface.ts): the tool as on (null: the pieces), why it is off for this hole ("" it is not), a stroke let go (the editor's gate judges it) */
+  paint?: Paint;
+}
+
+/** The paint tool's two ways. */
+export type PaintMode = "grow" | "shrink";
+export interface Paint {
+  mode: PaintMode | null;
+  off: string;
+  onMode: (m: PaintMode | null) => void;
+  onPaint: (s: { cells: V[]; open: V[] }) => void;
 }
 
 /** The quick shots on the board: those played (the latest last; null, one the realm refused), the one being pulled, and the meter's line. */
@@ -105,10 +123,15 @@ export interface Ball {
 /** The board's own gestures, in pixels: a pan, a quick shot's pull (the edits are the gesture's: gesture.ts). */
 type Drag =
   | { t: "pan"; from: V; view: View }
+  | { t: "paint"; last: V; cells: V[] }
+  | { t: "side"; side: Side; from: V; press: [number, number]; by: number }
   | { t: "aim"; press: [number, number]; from: V | null; stroke: number; shot: string | null };
 
 /** What the dock covers at the board's foot (px): F frames the hole above it. */
 const DOCK = { bottom: 56 };
+
+/** Cells as one path (each its unit square). */
+const cellsPath = (cells: readonly V[]) => cells.map((c) => `M${c[0]} ${c[1]}h1v1h-1z`).join("");
 
 /** The extent the view frames at first: the tee, the cup and every piece, with a margin. */
 function extent(d: Draft): [V, V] {
@@ -138,6 +161,13 @@ export default function Board(props: BoardProps) {
   const drag = useRef<Drag | null>(null);
   const pointers = useRef(new Map<number, V>());
   const [ghost, setGhost] = useState<{ p: Piece; why: string } | null>(null);
+  // the paint: the green as it stands (owned: its own rails), the stroke's ghost with why not, each side's lock (why it cannot open or shut)
+  const mode = props.paint && !props.paint.off ? props.paint.mode : null;
+  const green = useMemo(() => owned(draft), [draft]);
+  const sides = useMemo(() => (green ? outline(green.cells, green.open) : []), [green]);
+  const [wash, setWash] = useState<{ cells: V[]; open: V[]; why: string } | null>(null);
+  const [locks, setLocks] = useState<{ of: Draft; why: string[] } | null>(null);
+  const base = useRef<{ of: Draft; errors: ReturnType<typeof errorsOf> } | null>(null);
   // the edits (gesture.ts), their callbacks the latest props' (one gesture a mount)
   const outs = useRef(props);
   outs.current = props;
@@ -197,6 +227,12 @@ export default function Board(props: BoardProps) {
   const stepped = (key: string) => key !== cell.current && ((cell.current = key), tick());
   // disarmed (Escape, a drop): its ghost goes with it
   useEffect(() => void (!armed && setGhost(null)), [armed]);
+  // painting: each side tried open (or shut) on the hole as it stands, after the board is drawn (a check each)
+  useEffect(() => {
+    if (!mode || !green || locks?.of === draft) return;
+    const t = setTimeout(() => setLocks({ of: draft, why: sides.map((sd) => whyNot({ cells: green.cells, open: toggleSide(green.open, sd) })) }), 0);
+    return () => clearTimeout(t);
+  }, [mode, draft]); // eslint-disable-line react-hooks/exhaustive-deps -- (green, sides: the draft's)
 
   // the container's size, and the view framing the hole at first
   useLayoutEffect(() => {
@@ -255,6 +291,15 @@ export default function Board(props: BoardProps) {
     return () => el.removeEventListener("wheel", wheel);
   }, []);
 
+  /** Why the green may not become s on the hole as it stands (the fast checks: the editor's gate judges a stroke let go with the census); "" it may. */
+  function whyNot(s: { cells: V[]; open: V[] }): string {
+    if (base.current?.of !== draft) base.current = { of: draft, errors: errorsOf(draft, quick) };
+    const r = paintEdit(draft, s, quick, base.current.errors);
+    return "why" in r ? r.why : "";
+  }
+  /** The stroke's ghost: the green it makes, and why not. */
+  const washed = (s: { cells: V[]; open: V[] }) => setWash({ ...s, why: whyNot(s) });
+
   if (!view) return <section className="board" ref={box} aria-label="The board" />;
   const shown = view;
   // the board point under the pointer, projected onto the ground through the look (view.ts toBoard)
@@ -280,6 +325,14 @@ export default function Board(props: BoardProps) {
       const last = props.ball.last, rest = props.ball.played.at(-1);
       const on = last && rest && !rest.holed && (hit?.dataset.shot === "rest" || (!hit?.dataset.shot && Math.hypot(at[0] - rest.rest[0], at[1] - rest.rest[1]) <= Math.max(1, 14 / shown.k))) ? { from: rest.rest, stroke: last.stroke + 1 } : null;
       return void (drag.current = { t: "aim", press: [e.clientX, e.clientY], from: on?.from ?? null, stroke: on?.stroke ?? 0, shot: null });
+    }
+    if (mode && green) {
+      // painting: a side pressed moves it (or, let go where it was, opens or shuts it); anywhere else a stroke
+      const side = (e.target as Element).closest<HTMLElement>("[data-side]")?.dataset.side;
+      if (side !== undefined) return void (drag.current = { t: "side", side: sides[Number(side)], from: at, press: [e.clientX, e.clientY], by: 0 });
+      const cells = strokeCells(at, at, green.cells);
+      drag.current = { t: "paint", last: at, cells };
+      return washed({ cells: painted(green.cells, cells, mode === "grow"), open: green.open });
     }
     const target: Target = hit?.dataset.handle ? { t: "handle", key: hit.dataset.handle as HandleKey } : hit?.dataset.end ? { t: "end", which: hit.dataset.end as "tee" | "pin" }
       : hit?.dataset.piece ? { t: "piece", id: hit.dataset.piece } : null;
@@ -312,6 +365,21 @@ export default function Board(props: BoardProps) {
       return;
     }
     if (d?.t === "pan") return void setView({ ...d.view, x: d.view.x - (e.clientX - d.from[0]) / d.view.k, y: d.view.y - (e.clientY - d.from[1]) / d.view.k });
+    if (d?.t === "paint" && green && mode) {
+      const more = strokeCells(d.last, at, green.cells), n = d.cells.length;
+      d.cells = [...new Map([...d.cells, ...more].map((c) => [c.join(), c])).values()];
+      d.last = at;
+      if (d.cells.length !== n) (stepped(String(d.cells.length)), washed({ cells: painted(green.cells, d.cells, mode === "grow"), open: green.open }));
+      return;
+    }
+    if (d?.t === "side" && green) {
+      // whole cells along its outward normal
+      const by = Math.round((at[0] - d.from[0]) * d.side.out[0] + (at[1] - d.from[1]) * d.side.out[1]);
+      if (by === d.by) return;
+      d.by = by;
+      stepped(String(by));
+      return by ? washed({ cells: moveSide(green.cells, d.side, by), open: green.open }) : setWash(null);
+    }
     const shown = gesture.move(env, at);
     if (!shown) return;
     stepped(shown.cell);
@@ -327,6 +395,13 @@ export default function Board(props: BoardProps) {
     setLive(null);
     props.onCarry?.(false);
     if (d?.t === "aim") return (props.ball?.onAim(null), void (d.shot && props.ball?.onShot({ from: d.from, stroke: d.stroke, shot: d.shot })));
+    if ((d?.t === "paint" || d?.t === "side") && green) {
+      const w = wash;
+      setWash(null);
+      // a click on a side: opened or shut; else the stroke's green. The editor's gate judges it (a locked side, a red ghost: nothing changes, why said)
+      if (d.t === "side" && !d.by && Math.hypot(e.clientX - d.press[0], e.clientY - d.press[1]) < 6) return props.paint?.onPaint({ cells: green.cells, open: toggleSide(green.open, d.side) });
+      return void (w && props.paint?.onPaint({ cells: w.cells, open: w.open }));
+    }
     if (d) return; // (a pan)
     const bin = document.elementsFromPoint(e.clientX, e.clientY).some((x) => x.closest("[data-bin]"));
     const r = gesture.up(env, at, { keep: e.shiftKey, bin });
@@ -357,10 +432,10 @@ export default function Board(props: BoardProps) {
   // the tee's and the cup's badges: where they are, upright and at the board's scale whatever the look
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
-    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
+    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why || wash?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}${mode ? " board--paint" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
       {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} eye={props.scene.eye} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), setWash(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
         onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>
         <defs><marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerUnits="userSpaceOnUse" markerWidth="0.8" markerHeight="0.8" orient="auto"><path d="M0 0 6 3 0 6z" fill="#fff" /></marker></defs>
         {/* the board in its units, looked at through the look (view.ts matrixOf); the tee's and the cup's badges upright over it */}
@@ -380,7 +455,23 @@ export default function Board(props: BoardProps) {
               : <PieceShape p={p} state={bad.has(p.id) ? "bad" : undefined} hit={!pending(p)} />}
           </g>
         ))}
-        {sel && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}
+        {/* painting: the green as it stands, faint; each side of its outline, to drag or click (open: dashed; locked: it cannot open) */}
+        {mode && green && (
+          <g className="board__green">
+            <path className="board__cells" d={cellsPath(green.cells)} pointerEvents="none" />
+            {sides.map((sd, i) => {
+              const why = locks?.of === draft ? locks.why[i] : "", across = sd.out[0] ? " board__side--ew" : " board__side--ns";
+              return (
+                <g key={`${sd.a.join()} ${sd.b.join()}`} data-side={i} className={`board__side${sd.open ? " board__side--open" : ""}${why ? " board__side--locked" : ""}${across}`}>
+                  <title>{`Drag to move this side${why ? `. It stays ${sd.open ? "open" : "shut"}: ${why}` : `; click to ${sd.open ? "shut" : "open"} it`}`}</title>
+                  <line x1={sd.a[0]} y1={sd.a[1]} x2={sd.b[0]} y2={sd.b[1]} />
+                  <line className="board__hit" x1={sd.a[0]} y1={sd.a[1]} x2={sd.b[0]} y2={sd.b[1]} stroke="transparent" strokeWidth={Math.max(0.6, 14 / view.k)} />
+                </g>
+              );
+            })}
+          </g>
+        )}
+        {sel && !mode && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}
         {line && (
           <g className="board__line" pointerEvents="none">
             {line.heat.map(([x, y, n]) => <circle key={`${x} ${y}`} cx={x} cy={y} r={0.5} opacity={0.06 + 0.44 * (n / most)} />)}
@@ -403,6 +494,13 @@ export default function Board(props: BoardProps) {
           </circle>
         )}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
+        {/* the stroke as one ghost: the green it makes, and its walls */}
+        {wash && (
+          <g className={`board__wash${wash.why ? " board__wash--no" : ""}`} pointerEvents="none">
+            <path d={cellsPath(wash.cells)} />
+            {railsOf(wash.cells, wash.open).map((r) => <line key={`${r.a.join()} ${r.b.join()}`} x1={r.a[0]} y1={r.a[1]} x2={r.b[0]} y2={r.b[1]} />)}
+          </g>
+        )}
         {fx.map((f) => (
           <g key={f.n} className={`board__fx board__fx--${f.kind}`} pointerEvents="none">
             {f.p && <g className="board__shrink"><PieceShape p={f.p} /></g>}
@@ -417,13 +515,20 @@ export default function Board(props: BoardProps) {
         {ball && !armed && <g data-shot="tee" className="board__shot board__shot--tee" transform={badge(draft.tee)} aria-hidden="true"><title>Pull back to play a quick shot (just to try)</title><circle className="board__ball" cx={teeBall[0]} cy={teeBall[1]} r={0.38} /><circle className="board__hit" cx={teeBall[0]} cy={teeBall[1]} r={ballHit} /></g>}
       </svg>
       {ball && (aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: just to try</Chip>}
+      {/* the paint (B): Grow or Shrink, the one on pressed again back to the pieces; off for a hole walled by hand, said in its place */}
+      {props.paint && (props.paint.off ? <p className="board__tools board__tools--off">{props.paint.off}</p> : (
+        <div className="board__tools" title="Paint the green (B): a drag grows or shrinks it, its walls follow; drag a side to move it, click one to open it">
+          <Segmented<PaintMode | ""> label="Paint the green" options={[["grow", "Grow"], ["shrink", "Shrink"]]} value={mode ?? ""} onChange={(m) => props.paint!.onMode(m === mode || !m ? null : m)} />
+        </div>
+      ))}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
       {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
       {props.keys && !props.said && <p className="board__keys" aria-hidden="true">{KEY_LINE.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
-      {(flash || ghost || live || (aiming && ball?.aimed)) && (
-        <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">
-          {flash ? flash.text : ghost ? ghost.why || `${armed ? entryName(armed) : ""} · ${xy(whereOf(ghost.p.geometry))}` : live ? live.why || "Let go to place it" : "Let go to play it"}
+      {(flash || ghost || live || wash || (aiming && ball?.aimed)) && (
+        <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why || wash?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">
+          {flash ? flash.text : ghost ? ghost.why || `${armed ? entryName(armed) : ""} · ${xy(whereOf(ghost.p.geometry))}` : live ? live.why || "Let go to place it"
+            : wash ? wash.why || `Let go to ${drag.current?.t === "side" ? "move the side" : mode === "shrink" ? "shrink the green" : "grow the green"}` : "Let go to play it"}
         </span>
       )}
     </section>

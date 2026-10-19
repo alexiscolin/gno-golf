@@ -128,8 +128,8 @@ export function paletteOf(world: string, own: Skins = {}, sea = false): PaletteE
   return out;
 }
 
-/** The pieces a first hole needs, first in the palette and named plainly (the GUI spec's B3); the world's others under "More pieces". */
-const COMMON = [["Wall", "*/rail/"], ["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]] as const;
+/** The pieces a first hole needs, first in the palette and named plainly (the GUI spec's B3); the world's others under "More pieces" (a Wall among them: the green walls itself, Board's Grow, so one by hand is an inner bank). */
+const COMMON = [["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]] as const;
 
 /** A palette's common pieces, in that order, each named plainly (those it has). */
 export const commonOf = (palette: readonly PaletteEntry[]) =>

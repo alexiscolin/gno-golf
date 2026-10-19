@@ -37,7 +37,7 @@ export const TILES: readonly { key: string; name: string; does: string; group: G
   { key: "air", name: "Moving air", does: "blows in bursts", group: "Moving pieces", takes: (e) => e.kind === "air" },
   { key: "spout", name: "Timed tunnel", does: "throws, then rests", group: "Moving pieces", takes: (e) => e.kind === "tunnel" && e.clocks[0] !== "fixed" },
   { key: "fall", name: "Timed trap", does: "now and then", group: "Moving pieces", takes: (e) => e.kind === "hazard" && e.clocks[0] !== "fixed" },
-  { key: "wall", name: "Wall", does: "edges the lane", group: "Walls", takes: (e) => e.kind === "rail" },
+  { key: "wall", name: "Wall", does: "an inner bank", group: "Walls", takes: (e) => e.kind === "rail" },
   { key: "barrier", name: "Barrier", does: "blocks the way", group: "Walls", takes: (e) => e.kind === "bar" },
   { key: "bumper", name: "Bumper", does: "bounces hard", group: "Obstacles", takes: (e) => e.kind === "post" && kicks(e.skin) },
   { key: "obstacle", name: "Obstacle", does: "in the way", group: "Obstacles", takes: (e) => e.kind === "post" },

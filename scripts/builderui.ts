@@ -8,7 +8,7 @@
 // header, Undo keeps its place as Play's reason comes and goes, what Play
 // says when it is off is readable, and the note of a browser that keeps
 // nothing covers no control; undo and redo stand whole in the header; the
-// palette shows its first five unscrolled (More pieces folded), folds as
+// palette shows its first four unscrolled (More pieces folded), folds as
 // left for the visit; the start screen (a player back) never scrolls
 // sideways, keeps clear of the corner's Back and shows its starters above
 // the fold. Exits non-zero on the first failure.
@@ -111,7 +111,7 @@ for (const [w, h] of SIZES) {
 // the buttons in a row as tall as one another, on one top and their words on one baseline (Button's sizes): the
 // header's (Back, the steps, the meter, ?, undo, redo, the action), the Inspector's; off, a button keeps the box it has
 // on (undo, before and after an edit), and so does one on (the difficulty chip showing its line: gold, as every on
-// control); the palette's pieces are rows on one grid, no look under them, its first five whole with no scroll
+// control); the palette's pieces are rows on one grid, no look under them, its first four whole with no scroll
 for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   const c = await editor(w, h);
   const at = `buttons ${w}×${h}`;
@@ -178,7 +178,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const at = `start ${w}×${h}`;
   assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth || document.querySelector(".bholes").scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
   const cards = await c.js<Box[]>(`[...document.querySelectorAll(".bholes__start")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
-  assert.equal(cards.length, 4, `${at}: three starters and a blank lane`);
+  assert.equal(cards.length, 3, `${at}: three starters (no blank lane: the green is painted)`);
   for (const b of cards) assert.ok(b.b <= h - 16 && b.l >= 0 && b.r <= w, `${at}: a starter's card below the fold or out of the window (${JSON.stringify(b)})`);
   const back = (await box(c, ".screen__back"))!;
   for (const sel of [".bholes__sign", ".bholes__bar", ".bholes__starts"]) assert.ok(!overlap(back, (await box(c, sel))!), `${at}: ${sel} under the corner's Back`);
@@ -208,12 +208,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.deepEqual(await c.js(`[...document.querySelectorAll(".bholes__sign .front__head > *")].map((e) => e.tagName + " " + e.className + " " + e.textContent)`), ["SPAN eyebrow The Builder", "H2 worlds__title Hard hats on!"], `${at}: the head is not a front screen's`);
   // one h1, the page's name off screen (build/gate.tsx), as the game's pages
   assert.deepEqual(await c.js(`[...document.querySelectorAll("h1")].map((e) => e.className + " " + e.textContent)`), ["sr-only The Builder"], `${at}: the page's h1`);
-  // the starters as templates, the blank lane as one of the cards, as big, under its own label, its own picture
-  assert.deepEqual(await c.js<string[]>(`[...document.querySelectorAll(".bholes__group")].map((e) => e.textContent)`), ["Start from a template", "Or start blank"], `${at}: the start's groups`);
-  const blank = cards[3], first = cards[0];
-  assert.ok(Math.abs(blank.r - blank.l - (first.r - first.l)) <= 1 && Math.abs(blank.b - blank.t - (first.b - first.t)) <= 1, `${at}: the blank lane's card is not a starter's size`);
-  assert.equal(await c.js<string>(`document.querySelector(".bholes__start--blank b").textContent`), "Blank lane");
-  assert.ok(await c.js<boolean>(`!!document.querySelector(".bholes__start--blank .bholes__blank")`), `${at}: the blank lane has no picture of its own`);
+  // the starters as templates, under their label, each card as big as the others
+  assert.deepEqual(await c.js<string[]>(`[...document.querySelectorAll(".bholes__group")].map((e) => e.textContent)`), ["Start from a template"], `${at}: the start's groups`);
+  assert.ok(cards.every((b) => Math.abs(b.r - b.l - (cards[0].r - cards[0].l)) <= 1 && Math.abs(b.b - b.t - (cards[0].b - cards[0].t)) <= 1), `${at}: the starters' cards not one size`);
   console.log(`${at}: ok`);
   c.kill();
 }
@@ -441,7 +438,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("two tabs: ok");
   c.kill();
 }
-// the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
+// the keys: 1 to 4 pick the palette's first four, Space and a drag pan (a piece under it too), F frames the hole,
 // T plays over the editor, Escape comes back to it as it was; the board's key line says them; a look chosen in the
 // Inspector is its piece's from then on (the next one armed takes it)
 {
@@ -454,10 +451,10 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
   await c.js(`document.querySelector(".board").focus()`);
   await key("2", "Digit2");
-  assert.equal(await c.js(`document.querySelector(".palette .piece--on .piece__name")?.textContent`), "Bumper", "2: the second piece, armed");
+  assert.equal(await c.js(`document.querySelector(".palette .piece--on .piece__name")?.textContent`), "Sand", "2: the second piece, armed");
   await key("Escape", "Escape");
-  // 4 and Enter: the water dropped between the tee and the cup, selected; its last look chosen in the Inspector, then 4 arms that look
-  await key("4", "Digit4");
+  // 3 and Enter: the water dropped between the tee and the cup, selected; its last look chosen in the Inspector, then 3 arms that look
+  await key("3", "Digit3");
   await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
   await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`document.querySelectorAll(".insp__looks .look").length > 1`)); k++) await sleep(300);
@@ -466,8 +463,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelector('.insp__looks .look[aria-pressed="true"]')?.dataset.look`), water, "the look chosen: the piece's, gold");
   await key("Escape", "Escape");
   await c.js(`document.querySelector(".board").focus()`);
-  await key("4", "Digit4");
-  assert.equal(await c.js(`document.querySelector(".palette .piece--on")?.dataset.look`), water, "4: the water in the look last chosen");
+  await key("3", "Digit3");
+  assert.equal(await c.js(`document.querySelector(".palette .piece--on")?.dataset.look`), water, "3: the water in the look last chosen");
   await key("Escape", "Escape");
   await c.js(`document.querySelector("[data-piece]").focus()`);
   await sleep(300);
@@ -477,7 +474,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "z", code: "KeyZ", modifiers: 4, windowsVirtualKeyCode: 90 });
   await sleep(500);
   const keys = await c.js<string>(`document.querySelector(".board__keys").textContent`);
-  for (const k of ["1–5", "R", "T", "?"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
+  for (const k of ["1–4", "R", "T", "?"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
   // ?: every key, in the glossary
   await key("?", "Slash");
   assert.ok(await c.js<boolean>(`["Space", "F", "V", "Q", "Esc", "⌫"].every((k) => document.querySelector(".bgloss__keys")?.textContent.includes(k))`), "?: the glossary with every key");
@@ -644,7 +641,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("fixes: ok");
   c.kill();
 }
-// every palette entry dropped on a blank lane, at a laptop's size and a retina one's: the selection's outline and a hover's
+// every palette entry dropped on the straight starter's lane, at a laptop's size and a retina one's: the selection's outline and a hover's
 // a few css px whatever the zoom (never a stroke in the board's units: a fat capsule over the cup), no overlay drawn empty
 // the open hole changed, then deleted, in another tab: this tab's edits not written over it, said, and its choice kept
 {
@@ -671,6 +668,65 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`[...document.querySelectorAll(".bench__unkept--elsewhere button")].find((b) => /Open it as kept/.test(b.textContent)).click()`);
   await sleep(800);
   assert.equal(await c.js(`!!document.querySelector(".bholes")`), true, "opened as kept: gone, so back to the holes");
+  c.kill();
+}
+
+// the green painted: B arms Grow, a drag below the dogleg's lower wall grows the green and walls it (one step), B again
+// Shrink paints it back out (the same walls again), each an undo away; a stroke over the tee is refused, said at the
+// board's foot; a hole walled by hand says why where the tool would be
+{
+  const c = await editor(1280, 800);
+  const key = async (key: string, code: string, modifiers = 0) => {
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, modifiers, ...(key.length === 1 && !modifiers && { text: key }), windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, modifiers, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) });
+    await sleep(200);
+  };
+  const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  // a board point on the screen (the plane's matrix: flat, as opened)
+  const onScreen = (x: number, y: number) => c.js<[number, number]>(`(() => { const m = document.querySelector(".board__plane").getScreenCTM(); return [m.a * ${x} + m.c * ${y} + m.e, m.b * ${x} + m.d * ${y} + m.f]; })()`);
+  const stroke = async (from: [number, number], to: [number, number], mid?: () => Promise<void>) => {
+    const a = await onScreen(...from), b = await onScreen(...to);
+    await mouse("mouseMoved", ...a); await mouse("mousePressed", ...a);
+    for (let i = 1; i <= 8; i++) {
+      await mouse("mouseMoved", a[0] + ((b[0] - a[0]) * i) / 8, a[1] + ((b[1] - a[1]) * i) / 8);
+      await sleep(40);
+    }
+    await mid?.();
+    await mouse("mouseReleased", ...b);
+    await sleep(1200);
+  };
+  const cells = () => c.js<number>(`(document.querySelector(".board__cells")?.getAttribute("d").match(/M/g) ?? []).length`);
+  const walls = () => c.js<string>(`[...document.querySelectorAll("[data-piece]")].map((e) => e.getAttribute("aria-label")).sort().join("; ")`);
+  const tool = () => c.js<string>(`document.querySelector(".board__tools .on")?.textContent ?? ""`);
+  await c.js(`document.querySelector(".board").focus()`);
+  assert.equal(await tool(), "", "the paint off at first");
+  await key("b", "KeyB");
+  assert.equal(await tool(), "Grow", "B: Grow");
+  const n0 = await cells(), w0 = await walls();
+  assert.ok(n0 > 0, "the dogleg's green drawn");
+  await stroke([5, 12.5], [14, 12.5], async () => {
+    assert.equal(await c.js(`!!document.querySelector(".board__wash:not(.board__wash--no) path")`), true, "Grow: one green ghost as it is dragged");
+  });
+  const n1 = await cells(), w1 = await walls();
+  assert.ok(n1 > n0, `Grow: the green grew (${n0} → ${n1} cells)`);
+  assert.notEqual(w1, w0, "Grow: its walls followed");
+  await key("b", "KeyB");
+  assert.equal(await tool(), "Shrink", "B again: Shrink");
+  await stroke([5, 12.5], [14, 12.5]);
+  assert.equal(await cells(), n0, "Shrink: the green back as it was");
+  assert.equal(await walls(), w0, "Shrink: its walls as they were");
+  await key("z", "KeyZ", 4);
+  assert.deepEqual([await cells(), await walls()], [n1, w1], "⌘Z: the shrink undone, one step");
+  await key("z", "KeyZ", 4);
+  assert.deepEqual([await cells(), await walls()], [n0, w0], "⌘Z: the grow undone, one step");
+  // the tee painted out: refused, said at the board's foot, nothing changed
+  const tee = await c.js<[number, number]>(`(() => { const m = / at \\(([\\d.]+), ([\\d.]+)\\)/.exec(document.querySelector("[data-end=tee]").getAttribute("aria-label")); return [+m[1], +m[2]]; })()`);
+  await stroke([tee[0] - 1, tee[1]], [tee[0] + 1, tee[1]]);
+  assert.ok((await c.js<string>(`document.querySelector(".board__said")?.textContent ?? ""`)).length > 0, "the tee painted out: said why");
+  assert.deepEqual([await cells(), await walls()], [n0, w0], "the tee painted out: nothing changed");
+  await key("Escape", "Escape");
+  assert.equal(await c.js(`!!document.querySelector(".board__cells")`), false, "Esc: the paint put down");
+  console.log("paint: ok");
   c.kill();
 }
 
@@ -718,9 +774,9 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   await c.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: dpr, mobile: false });
   await c.send("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("gnogolf.builder.hinted", "1"); } catch {}` });
   await c.send("Page.navigate", { url: `${APP}/build/` });
-  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__start--blank")`)); k++) await sleep(500);
-  await c.js(`document.querySelector(".bholes__start--blank").click()`);
-  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece=p1]")`)); k++) await sleep(300);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts .bholes__start")`)); k++) await sleep(500);
+  await c.js(`document.querySelector(".bholes__starts .bholes__start").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece=r1]")`)); k++) await sleep(300);
   await sleep(1500);
   await c.js(`document.querySelectorAll(".palette details").forEach((d) => d.setAttribute("open", ""))`);
   await sleep(300);
@@ -729,7 +785,7 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   const outline = (sel: string) => c.js<number | null>(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const s = getComputedStyle(e), sw = parseFloat(s.strokeWidth) || 0;
     return s.vectorEffect === "non-scaling-stroke" ? sw : sw * Math.hypot(e.getScreenCTM().a, e.getScreenCTM().b); })()`);
   const empty = () => c.js<string[]>(`[...document.querySelectorAll(".centre .measure, .centre .btoast, .centre .bbroken, .centre [role=status]")].filter((e) => e.offsetParent && !e.textContent.trim()).map((e) => e.className)`);
-  const lane = (await box(c, "[data-piece=p1]"))!, spot: [number, number] = [lane.l + (lane.r - lane.l) * 0.45, lane.t + 140];
+  const lane = (await box(c, "[data-piece=r1]"))!, spot: [number, number] = [lane.l + (lane.r - lane.l) * 0.45, lane.t + 140];
   // a hover on the lane's top wall
   await mouse("mouseMoved", (lane.l + lane.r) / 2, lane.t + 1);
   await sleep(200);
@@ -758,8 +814,8 @@ for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
     await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   }
   // the lane's right wall selected: a thin outline, the cup's badge on top of it
-  await c.js(`document.querySelector("[data-piece=p2]").dispatchEvent(new FocusEvent("focus"))`);
-  const r2 = (await box(c, "[data-piece=p2]"))!;
+  await c.js(`document.querySelector("[data-piece=r2]").dispatchEvent(new FocusEvent("focus"))`);
+  const r2 = (await box(c, "[data-piece=r2]"))!;
   await mouse("mousePressed", (r2.l + r2.r) / 2, (r2.t + r2.b) / 2 + 30); await mouse("mouseReleased", (r2.l + r2.r) / 2, (r2.t + r2.b) / 2 + 30);
   await sleep(300);
   const wallPx = await outline(".board__piece--on > :first-child");

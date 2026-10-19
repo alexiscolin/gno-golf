@@ -188,12 +188,12 @@ void test("the palette covers the course: every course piece whose skin has an e
   assert.deepEqual(out, []);
 });
 
-void test("the five common pieces first, named plainly, in every Builder world: Wall, Bumper, Sand, Water, Slope (the rest under More pieces)", async () => {
+void test("the four common pieces first, named plainly, in every Builder world: Bumper, Sand, Water, Slope (the rest, a Wall among them, under More pieces)", async () => {
   for (const world of Object.keys(FIELD)) {
     const p = await loadPalette(world), common = commonOf(p);
-    assert.deepEqual(common.map((c) => c.name), ["Wall", "Bumper", "Sand", "Water", "Slope"], world);
+    assert.deepEqual(common.map((c) => c.name), ["Bumper", "Sand", "Water", "Slope"], world);
     for (const c of common) assert.ok(p.includes(c.entry), `${world} ${c.name}: one of its own entries`);
-    assert.deepEqual(common.map((c) => c.entry.kind), ["rail", "post", "surface", "hazard", "slope"], world);
+    assert.deepEqual(common.map((c) => c.entry.kind), ["post", "surface", "hazard", "slope"], world);
   }
 });
 

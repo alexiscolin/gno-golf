@@ -57,6 +57,17 @@ export interface Proof {
   strokes: number;
   maxWork: number;
 }
+/**
+ * The green as painted (surface.ts), the editor's own: its unit cells (each
+ * its low corner, on the hole's lattice), the outline's unit edges left
+ * open (each its middle), and the rails it walled itself with. Never in the
+ * bytes (gg1.ts): the chain sees only the rails.
+ */
+export interface Surface {
+  cells: V[];
+  open: V[];
+  ids: string[];
+}
 export interface Draft {
   v: 1;
   world: string;
@@ -71,6 +82,8 @@ export interface Draft {
   pulses: Pulse[];
   note: string;
   proofs: Proof[];
+  /** the green as painted; none: walled by hand (an older draft, a published hole opened) */
+  surface?: Surface;
 }
 
 /** A draft's limits, beside GG1's own (gg1.ts LIMITS): what the editor holds at once. */
@@ -85,6 +98,8 @@ export const DRAFTS_KEY = "gnogolf.builder.drafts";
 /** A hole's name and note at most (runes), as the realm keeps them. */
 export const MAX_TITLE = 40, MAX_NOTE = 140;
 const MAX_PULSES = 16;
+/** A painted green's cells at most: the board's whole (96 a side). */
+const MAX_CELLS = 96 * 96;
 
 /**
  * A grid value: a multiple of a quarter from origin, the tee's (the hole's
@@ -134,6 +149,15 @@ const isProof = (x: unknown) =>
   Array.isArray(x.shots) && x.shots.every((s) => typeof s === "string") && Array.isArray(x.commits) && x.commits.every((c) => Array.isArray(c) && c.length === 2 && c.every(Number.isInteger)) &&
   Number.isInteger(x.strokes) && isNum(x.maxWork);
 
+/** A painted green: cells on the grid, all on one unit lattice (their corners a whole unit apart), open edges on it too, its rails by name. */
+function isSurface(s: unknown, tee: V): s is Surface {
+  if (!isObj(s) || !Array.isArray(s.cells) || !Array.isArray(s.open) || !Array.isArray(s.ids)) return false;
+  if (!s.cells.length || s.cells.length > MAX_CELLS || s.open.length > MAX_CELLS || s.ids.length > MAX_PIECES) return false;
+  if (!s.cells.every((c) => gridV(c, tee)) || !s.open.every((c) => gridV(c, tee)) || !s.ids.every((i) => typeof i === "string")) return false;
+  const [o] = s.cells, whole = (x: number) => Math.abs(x - Math.round(x)) < 1e-6;
+  return s.cells.every((c) => whole(c[0] - o[0]) && whole(c[1] - o[1])) && s.open.every((m) => whole(2 * (m[0] - o[0])) && whole(2 * (m[1] - o[1])));
+}
+
 /** A draft from a file or the browser, whole; or why it is refused, in a sentence. */
 export function parseDraft(text: string): Draft | string {
   let d: unknown;
@@ -174,6 +198,7 @@ export function parseDraft(text: string): Draft | string {
     if (c === "clock") return `Piece ${p.id} has a timing that is not whole numbers.`;
   }
   if (!Array.isArray(d.proofs) || !d.proofs.every(isProof)) return "The draft's proofs are not rounds the Builder made.";
+  if (d.surface !== undefined && !isSurface(d.surface, d.tee)) return "The draft's green is not one the Builder painted.";
   return rebuild(d as unknown as Draft);
 }
 
@@ -205,6 +230,7 @@ function rebuild(d: Draft): Draft {
     pieces: d.pieces.map((p) => ({ id: p.id, entry: p.entry, geometry: geometry(p.geometry), params: params(p.params), clock: clock(p.clock) })),
     pulses: d.pulses.map((q) => ({ every: q.every, on: q.on, phase: q.phase })),
     proofs: d.proofs.map((p) => ({ key: p.key, id: p.id, kind: p.kind, period: p.period, shots: [...p.shots], commits: p.commits.map(([a, b]): [number, number] => [a, b]), strokes: p.strokes, maxWork: p.maxWork })),
+    ...(d.surface && { surface: { cells: d.surface.cells.map(v), open: d.surface.open.map(v), ids: [...d.surface.ids] } }),
   };
 }
 

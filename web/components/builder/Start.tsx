@@ -63,8 +63,8 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   const [wipe, setWipe] = useState<number | null>(null); // the draft asked to be deleted, before the sheet's yes
   const file = useRef<HTMLInputElement>(null);
   const router = useRouter(); // (the game's menu without a reload: the app's own navigation)
-  // each starter's map, and whether it is the blank lane (its own group, its own card)
-  const starts = useMemo(() => startsIn(world).map((s) => ({ ...s, map: draftMap(s.draft), blank: s.name === "blank" })), [world]);
+  // each starter's map
+  const starts = useMemo(() => startsIn(world).map((s) => ({ ...s, map: draftMap(s.draft) })), [world]);
   const keys = useKeys(drafts, host);
   const { chain, keep } = useMemo(() => {
     const { rpc, web, keep } = endpoints(window.location.search);
@@ -99,28 +99,26 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
         {/* the worlds as the game's choices side by side, each with its emblem (the cups' own) */}
         <Segmented label="Its world" className="bholes__worlds" options={WORLDS.map((w) => [w, <><Emblem id={w} />{worldName(w)}</>] as const)} value={world} onChange={setWorld} />
       </div>
-      {/* the starters are templates, ready-made holes to change; the blank lane one card of the same row, under its own label */}
+      {/* the starters are templates, ready-made holes to change (their green painted bigger or smaller at once: no blank lane to start from) */}
       <div className="bholes__starts">
-        {([["Start from a template", false], ["Or start blank", true]] as const).map(([label, blank]) => (
-          <section key={label} className={`bholes__set${blank ? " bholes__set--blank" : ""}`} aria-label={label}>
-            <h4 className="h-sub bholes__group">{label}</h4>
-            <ul>
-              {starts.filter((s) => s.blank === blank).map((s) => (
-                <li key={s.name}>
-                  <button type="button" className={`bholes__start${s.blank ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
-                    <span className={`bholes__map${s.blank ? " bholes__blank" : ""}`}><HoleMap hole={s.map} className="bholes__svg" /></span>
-                    <b>{s.title}</b>
-                    <span className="bholes__line">{s.line}</span>
-                    <span className="bholes__foot" aria-hidden="true">
-                      <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
-                      <span className={buttonClass({ variant: "gold", size: "s" }, "bholes__go")}>Start <i>→</i></span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        <section className="bholes__set" aria-label="Start from a template">
+          <h4 className="h-sub bholes__group">Start from a template</h4>
+          <ul>
+            {starts.map((s) => (
+              <li key={s.name}>
+                <button type="button" className="bholes__start" aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
+                  <span className="bholes__map"><HoleMap hole={s.map} className="bholes__svg" /></span>
+                  <b>{s.title}</b>
+                  <span className="bholes__line">{s.line}</span>
+                  <span className="bholes__foot" aria-hidden="true">
+                    <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
+                    <span className={buttonClass({ variant: "gold", size: "s" }, "bholes__go")}>Start <i>→</i></span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </section>
   );

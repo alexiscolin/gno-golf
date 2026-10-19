@@ -2,7 +2,7 @@
 // together by what they do, one tile each, with what it does in two or three
 // words and its looks to choose from (a pond: a lagoon, a tidepool, a
 // fountain or a canal; each look still its own entry, as the chain stores
-// it), chosen in the Inspector for the piece selected. The five a first hole needs first (palette.ts commonOf), the rest of
+// it), chosen in the Inspector for the piece selected. The four a first hole needs first (palette.ts commonOf), the rest of
 // the world's own by group under "More", another world's under "From other
 // worlds". Each look has its picture, drawn by the game's own
 // meshes offline (media/builder/tiles.mjs) and served as a file.
@@ -64,7 +64,7 @@ export const lookOf = (t: Tile, chosen: Readonly<Record<string, string>>): Palet
 /** The looks a piece offers (the Inspector's, for the piece selected): every one of a piece of several, in its order; none for a piece of one. */
 export const looksShown = (t: Tile): readonly PaletteEntry[] => (t.looks.length > 1 ? t.looks : []);
 
-/** Every tile of the palette in its order: the world's first five, then each group's (the glossary's); with others, the other worlds' after them. */
+/** Every tile of the palette in its order: the world's first four, then each group's (the glossary's); with others, the other worlds' after them. */
 export function allTiles(palette: readonly PaletteEntry[], withOthers = false): Tile[] {
   const { first, more, others } = tilesOf(palette);
   return [...first, ...more.flatMap((g) => g.tiles), ...(withOthers ? others : [])];
@@ -81,13 +81,13 @@ export const tileOf = (palette: readonly PaletteEntry[], id: string): Tile | nul
  */
 export const armOn = (armed: PaletteEntry | null, e: PaletteEntry, how: "press" | "key"): PaletteEntry | null => (how === "key" && armed?.id === e.id ? null : e);
 
-/** What 1 to 5 arm (n from 0): the first five pieces, each in its look as chosen; null past them. */
+/** What 1 to 4 arm (n from 0): the first four pieces, each in its look as chosen; null past them. */
 export function armedByKey(palette: readonly PaletteEntry[], n: number, chosen: Readonly<Record<string, string>>): PaletteEntry | null {
   const t = tilesOf(palette).first[n];
   return t ? lookOf(t, chosen) : null;
 }
 
-/** The palette's folding sections, each open at first or not: "More pieces" and "From other worlds" folded (the five a first hole needs in sight, the column unscrolled), each group ("group/Walls") open once "More pieces" is. */
+/** The palette's folding sections, each open at first or not: "More pieces" and "From other worlds" folded (the four a first hole needs in sight, the column unscrolled), each group ("group/Walls") open once "More pieces" is. */
 export const FOLDS: Readonly<Record<string, boolean>> = { more: false, others: false };
 export type Fold = "more" | "others" | `group/${Group}`;
 const foldKey = (k: Fold) => `gnogolf.builder.fold.${k}`;
