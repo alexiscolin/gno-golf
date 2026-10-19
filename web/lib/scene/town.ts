@@ -12,7 +12,7 @@ import { bakeLocal, look, weatherLooks } from "./bake";
 import { animate } from "./state";
 import { timeOf } from "./camera";
 import { gnomelet, brolly, bunting, mailbox } from "./props";
-import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
+import { seeded, lookSeed, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
 import { ud, type Hole } from "./data";
 import type { Bar, Skins } from "./worlds";
 import { boxOf, smoothstep, type Terrain } from "../terrain";
@@ -836,7 +836,7 @@ function skyline(rand: Rand, X0: number, X1: number, Z0: number) {
 function decor(s: Hole) {
   const g = new THREE.Group();
   const W = s.board.w, H = s.board.h;
-  const rand = seeded("town" + s.name + s.hole);
+  const rand = seeded("town" + lookSeed(s));
   const X0 = -ISLAND.x + 0.8, X1 = W + ISLAND.x - 0.8;
   const Z0 = -ISLAND.back + 0.8;
   const time = timeOf(s.hole), night = time !== "day";

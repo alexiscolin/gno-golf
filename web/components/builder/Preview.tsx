@@ -14,13 +14,19 @@ import { disposeCourse } from "@/lib/scene/materials";
 import { loadWorld } from "@/lib/scene/worlds";
 import type { Hole } from "@/lib/scene/data";
 
+/** The orbit as it frames: no turn, no tilt, the overview's distance. */
+const FRAMED: Readonly<{ yaw: number; pitch: number; zoom: number }> = { yaw: 0, pitch: 0, zoom: 1 };
+
 /** capture: set to a function that draws the view now and gives its canvas (read it in the same task: a share card). */
 export default function Preview({ state, fresh, capture }: { state: Hole | null; fresh: boolean; capture?: { current: (() => HTMLCanvasElement | null) | null } }) {
   const box = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement | null>(null);
   const three = useRef<{ renderer: THREE.WebGLRenderer; scene: ReturnType<typeof makeScene>; camera: THREE.PerspectiveCamera; course: THREE.Object3D | null } | null>(null);
   const [failed, setFailed] = useState(false);
-  // the orbit: a turn round the hole's middle and a tilt (radians), the distance's factor; redraw: the latest draw
-  const orbit = useRef({ yaw: 0, pitch: 0, zoom: 1 }), redraw = useRef<() => void>(() => {});
+  // the orbit: a turn round the hole's middle and a tilt (radians), the distance's factor; the latest draw, and one asked
+  // for the next frame (a drag's moves drawn once a frame); the drag's last point
+  const orbit = useRef({ ...FRAMED }), redraw = useRef<() => void>(() => {}), frame = useRef(0), drag = useRef<{ x: number; y: number } | null>(null);
+  const turned = () => void (frame.current ||= requestAnimationFrame(() => ((frame.current = 0), redraw.current())));
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   // a canvas of its own each mount (React mounts twice in development, on the same element): its WebGL
   // context freed when it goes, not when the canvas is collected (a browser holds about sixteen)
@@ -79,24 +85,18 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
   if (failed) return <p className="preview preview--off">The 3D view can&apos;t run here; the board shows the hole as it is.</p>;
   return (
     <div className="preview" ref={box} role="img" aria-label="The hole in 3D, as players will see it" title="Drag to turn round it, scroll to zoom, double click to frame it"
-      onPointerDown={(e) => {
-        const el = e.currentTarget;
-        el.setPointerCapture(e.pointerId);
-        let [x, y] = [e.clientX, e.clientY];
-        const move = (m: PointerEvent) => {
-          const o = orbit.current;
-          o.yaw -= (m.clientX - x) * 0.01;
-          o.pitch = Math.max(-0.5, Math.min(0.9, o.pitch + (m.clientY - y) * 0.006));
-          [x, y] = [m.clientX, m.clientY];
-          redraw.current();
-        };
-        const up = () => (el.removeEventListener("pointermove", move), el.removeEventListener("pointerup", up), el.removeEventListener("pointercancel", up));
-        el.addEventListener("pointermove", move);
-        el.addEventListener("pointerup", up);
-        el.addEventListener("pointercancel", up);
+      onPointerDown={(e) => (e.currentTarget.setPointerCapture(e.pointerId), (drag.current = { x: e.clientX, y: e.clientY }))}
+      onPointerMove={(e) => {
+        const d = drag.current, o = orbit.current;
+        if (!d) return;
+        o.yaw -= (e.clientX - d.x) * 0.01;
+        o.pitch = Math.max(-0.5, Math.min(0.9, o.pitch + (e.clientY - d.y) * 0.006));
+        drag.current = { x: e.clientX, y: e.clientY };
+        turned();
       }}
-      onWheel={(e) => ((orbit.current.zoom = Math.max(0.35, Math.min(1.8, orbit.current.zoom * Math.exp(e.deltaY * 0.0015)))), redraw.current())}
-      onDoubleClick={() => ((orbit.current = { yaw: 0, pitch: 0, zoom: 1 }), redraw.current())}>
+      onPointerUp={() => void (drag.current = null)} onPointerCancel={() => void (drag.current = null)}
+      onWheel={(e) => ((orbit.current.zoom = Math.max(0.35, Math.min(1.8, orbit.current.zoom * Math.exp(e.deltaY * 0.0015)))), turned())}
+      onDoubleClick={() => ((orbit.current = { ...FRAMED }), turned())}>
       <span className="pill">{state ? (fresh ? "3D · in sync" : "3D · catching up") : "3D · waiting for the checks"}</span>
     </div>
   );

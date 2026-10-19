@@ -60,8 +60,6 @@ export function buildHole(s: Hole, { defer = false, census }: { defer?: boolean;
   state.report = census ? censusOf(s, census) : null;
   for (const z of s.zones) if (emptyZone(z)) report(z, { by: "hidden", why: "empty" });
   if (s.zones.some(emptyZone)) s = { ...s, zones: s.zones.filter((z) => !emptyZone(z)) }; // nothing to draw of a zone with no area
-  // a built hole's scenery not seeded by its name: renamed (in the Builder, at Publish), it keeps its look
-  if (!s.official && s.name) s = { ...s, name: "" };
   state.live = [];
   state.tubes = new Map();
   state.timed = [];

@@ -114,23 +114,6 @@ export function unproven(proofs: readonly Proof[], world: string, key: string, i
  *  version (published since) proves nothing: the next one has weather of its own. */
 export const provedAt = (proofs: readonly Proof[], world: string, key: string, next: string): string | null => (unproven(proofs, world, key, next).length === 0 ? next : null);
 
-/** The ids under prefix that hold a proof of the hole as it is now (key). */
-const idsUnder = (proofs: readonly Proof[], key: string, prefix: string) => new Set(proofs.filter((p) => p.key === key && p.id.startsWith(prefix)).map((p) => p.id));
-/** The latest id under prefix proving the hole as it is now (key) in every weather; null if none. */
-const provedUnder = (proofs: readonly Proof[], world: string, key: string, prefix: string) => [...idsUnder(proofs, key, prefix)].findLast((id) => unproven(proofs, world, key, id).length === 0) ?? null;
-
-/** The id under which the hole as it is now (key) is proved in every weather, among the author's ids for this slug; null if under none. */
-export const provedAs = (proofs: readonly Proof[], world: string, key: string, author: string, slug: string) => provedUnder(proofs, world, key, `${author}/${slug}/v`);
-
-/** The same among all the author's addresses (another slug typed since): the one Publish goes back to; null if under none. */
-export const provedAnyAs = (proofs: readonly Proof[], world: string, key: string, author: string) => provedUnder(proofs, world, key, `${author}/`);
-
-/** The weathers still to prove for the hole as it is now (key): the fewest under any of the author's ids for this slug; with no author, all. */
-export function leftAs(proofs: readonly Proof[], world: string, key: string, author: string | null, slug: string): string[] {
-  const ids = author ? idsUnder(proofs, key, `${author}/${slug}/v`) : [];
-  return [...ids].map((id) => unproven(proofs, world, key, id)).reduce((a, b) => (b.length < a.length ? b : a), required(world));
-}
-
 /** The par the proofs suggest: the most strokes one took, plus one, at most MAX_PAR; 0 with none. */
 export function suggestPar(proofs: readonly Pick<Proof, "strokes">[]): number {
   return proofs.length ? Math.min(MAX_PAR, Math.max(...proofs.map((p) => p.strokes)) + 1) : 0;

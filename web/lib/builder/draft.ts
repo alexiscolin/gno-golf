@@ -253,6 +253,15 @@ export function newKey() {
   last = Math.max(Date.now(), last + 1);
   return `${DRAFT_PREFIX}${last}-${Math.random().toString(36).slice(2, 10)}`;
 }
+/**
+ * A draft kept by a Builder that let a proved hole's address drift from its
+ * rounds' (typed again, or following its name): the latest round's address
+ * again, as the hole's address is fixed once proved (templates.ts retitle).
+ */
+export function slugSettled(d: Draft): Draft {
+  const at = d.proofs.at(-1)?.id.split("/").at(-2);
+  return at && at !== d.slug && isSlug(at) ? { ...d, slug: at } : d;
+}
 const started = (key: string) => Number.parseInt(key.slice(DRAFT_PREFIX.length), 10);
 
 /**
@@ -266,7 +275,7 @@ export function loadDrafts(): Kept[] {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       const d = key?.startsWith(DRAFT_PREFIX) ? parseDraft(localStorage.getItem(key) ?? "") : "";
-      if (key && typeof d !== "string") out.push({ key, draft: d });
+      if (key && typeof d !== "string") out.push({ key, draft: slugSettled(d) });
     }
     return out.sort((a, b) => started(a.key) - started(b.key) || (a.key < b.key ? -1 : 1));
   } catch {
@@ -297,7 +306,7 @@ function fromList(): Kept[] {
     } catch {
       moved = false;
       const draft = parseDraft(JSON.stringify(x));
-      if (typeof draft !== "string") unmoved.push({ key, draft });
+      if (typeof draft !== "string") unmoved.push({ key, draft: slugSettled(draft) });
     }
   });
   if (moved) localStorage.removeItem(DRAFTS_KEY);

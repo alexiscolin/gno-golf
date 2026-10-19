@@ -31,8 +31,9 @@ export default function Builder() {
   const [host, setHost] = useState<BuilderHost | null>(null);
   const [failed, setFailed] = useState("");
   const [drafts, setDrafts] = useState<Kept[]>([]);
-  // the draft open (its key), how many times opened (a fresh editor each), the step, and whether Play opens at once (back from Publish)
-  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "publish"; play?: boolean } | null>(null);
+  // the draft open (its key), how many times opened (a fresh editor each), the step, whether Play opens at once (back from
+  // Publish), and the id the editor found it proved under (Publish's)
+  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "publish"; play?: boolean; next?: string } | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
   const [hints, setHints] = useState(false);
@@ -136,7 +137,7 @@ export default function Builder() {
             steps={{ edit: { locked: "", done: true }, play: { locked: "", done: true }, publish: { locked: "", done: false } }}
             action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))}
             onStep={(s) => s !== "publish" && edit(s === "play")} onBack={() => edit()} />
-          <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onBuild={() => edit()} onDone={() => {}} />
+          <Publish host={host} draft={d} author={author} next={open.next ?? ""} onDraft={(x) => update(() => x)} onRetest={() => edit(true)} onBuild={() => edit()} onDone={() => {}} />
           {unkeptNote}
         </div>
       );
@@ -144,7 +145,7 @@ export default function Builder() {
     return (
       <>
         <Editor key={`${open.at}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null), unkept || setDrafts(loadDrafts()))}
-          onPublish={(x) => (update(() => x), setOpen({ ...open, step: "publish" }))} onAuthor={setAuthor} play={open.play} opened={opened}
+          onPublish={(next) => setOpen({ ...open, step: "publish", next })} onAuthor={setAuthor} play={open.play} opened={opened}
           hints={hints} onHinted={onHinted} />
         {unkeptNote}
       </>

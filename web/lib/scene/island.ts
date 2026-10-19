@@ -10,7 +10,7 @@ import { bakeLocal, look, weatherLooks } from "./bake";
 import { gnomelet, brolly } from "./props";
 import { animate, state } from "./state";
 import { timeOf, islandBox } from "./camera";
-import { seeded, ISLAND, GRASS, placer, type Rand } from "./common";
+import { seeded, lookSeed, ISLAND, GRASS, placer, type Rand } from "./common";
 import { zoneDetail } from "./zones";
 import { ud, type Hole, type Height, type TubePath } from "./data";
 import type { FadeItem } from "./materials";
@@ -1282,7 +1282,7 @@ function footprints(from: THREE.Vector3, to: THREE.Vector3, y: Height) {
 function decor(s: Hole, bank: Height = () => 0): THREE.Group {
   const g = new THREE.Group();
   const W = s.board.w, H = s.board.h;
-  const rand = seeded(s.name + s.hole + "isle");
+  const rand = seeded(lookSeed(s) + "isle");
   const wrand = seeded(s.hole + "isle weather"); // the weather looks' own: rand's draws, so the layout, stay as they were
   const sh = shape(s);
   const time = timeOf(s.hole);

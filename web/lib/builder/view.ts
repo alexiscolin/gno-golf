@@ -14,24 +14,23 @@ const clamp = (k: number) => Math.max(K_MIN, Math.min(K_MAX, k));
 export const FRAME_REF = { w: 782, h: 714 };
 /** The world shown round the hole at most, each side (board units), on a board bigger than FRAME_REF. */
 const ROOM = 6;
-/** What the dock covers at the board's foot (px): the hole is framed above it. */
-const DOCK = 56;
 
 /**
  * F: the box lo..hi (in the view's plane) framed in a board of size: fitted,
  * as it always was, on a board no bigger than FRAME_REF; on a bigger one the
  * room past what FRAME_REF would give shows the world round it, up to ROOM
  * a side, the hole never drawn smaller than FRAME_REF draws it (nor larger
- * than it filling the board). Given the island (islandIn), the sight is moved,
+ * than it filling the board); framed above what covers the board's foot
+ * (inset.bottom, px: the dock). Given the island (islandIn), the sight is moved,
  * the hole kept in it, to lie inside the island where it can, or to have the
  * island in its middle along an axis the island is shorter than it on.
  */
-export function frameView(lo: P, hi: P, size: { w: number; h: number }, island?: readonly [P, P]): View {
-  const fit = (w: number, h: number, m: number) => Math.min(w / (hi[0] - lo[0] + 2 * m), (h - DOCK) / (hi[1] - lo[1] + 2 * m));
+export function frameView(lo: P, hi: P, size: { w: number; h: number }, inset: { bottom: number }, island?: readonly [P, P]): View {
+  const fit = (w: number, h: number, m: number) => Math.min(w / (hi[0] - lo[0] + 2 * m), (h - inset.bottom) / (hi[1] - lo[1] + 2 * m));
   const now = fit(size.w, size.h, 0), k = clamp(Math.max(Math.min(fit(FRAME_REF.w, FRAME_REF.h, 0), now), fit(size.w, size.h, ROOM)));
   // each axis: the board's span and the sight's (above the dock); the board inside the island where it fits in it,
   // else the island in the board's middle; the hole in the sight first
-  const full = [size.w / k, size.h / k], sight = [size.w / k, (size.h - DOCK) / k];
+  const full = [size.w / k, size.h / k], sight = [size.w / k, (size.h - inset.bottom) / k];
   const start = (i: 0 | 1) => {
     let s = (lo[i] + hi[i]) / 2 - sight[i] / 2;
     if (island) {

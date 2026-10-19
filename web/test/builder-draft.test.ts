@@ -3,7 +3,7 @@
 // its history; its persistence.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DRAFTS_KEY, MAX_PIECES, dropDraft, emptyDraft, exportDraft, history, keptText, loadDrafts, newKey, onGrid, parseDraft, saveDraft, saveOver, type Draft } from "../lib/builder/draft.ts";
+import { DRAFTS_KEY, MAX_PIECES, dropDraft, emptyDraft, exportDraft, history, keptText, loadDrafts, newKey, onGrid, parseDraft, saveDraft, saveOver, slugSettled, type Draft } from "../lib/builder/draft.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
 
 const base = (): Draft => ({
@@ -126,6 +126,18 @@ void test("persistence: saved and loaded as written, oldest first; a store that 
   } finally {
     localStorage.getItem = get;
   }
+});
+
+void test("persistence: a proved draft whose address drifted from its rounds' (an earlier Builder) loads at the latest round's", () => {
+  localStorage.clear();
+  const proof = (id: string) => ({ key: "ab".repeat(32), id, kind: "", period: 1, shots: ["0,1"], commits: [[0, 1]] as [number, number][], strokes: 1, maxWork: 1 });
+  const d = { ...base(), slug: "typed-since", proofs: [proof("g1x/old-run/v1"), proof("g1x/mole-run/v2")] };
+  saveDraft(newKey(), d);
+  assert.deepEqual(drafts(), [{ ...d, slug: "mole-run" }]);
+  const plain = base();
+  assert.equal(slugSettled(plain), plain, "no rounds: as it is");
+  const kept = { ...d, slug: "mole-run" };
+  assert.equal(slugSettled(kept), kept, "already its rounds': the same draft");
 });
 
 void test("persistence: two tabs on one browser never write over each other's drafts", () => {

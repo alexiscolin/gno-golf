@@ -5,9 +5,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { askSaid, clock, finished, heldSaid, holeId, holeRow, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
+import { askSaid, clock, finished, heldSaid, holeId, holeRow, nextId, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
 import { holdsIn, holdsToo } from "../lib/builder/carry.ts";
-import { leftAs, provedAt, replay, type Proof } from "../lib/builder/proof.ts";
+import { provedAt, replay, type Proof } from "../lib/builder/proof.ts";
 import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { makeChain } from "../lib/chain.ts";
@@ -98,13 +98,12 @@ void test("publishTip, askSaid, heldSaid: the weathers named, never \"every weat
   assert.equal(heldSaid(null, ["", "wind"]), "Your practice round holds in Clear and Wind ✓");
 });
 
-void test("leftAs: the weathers still to sink under the author's best id; all with no author or none proved", () => {
+void test("provedAt, nextId: proved under the alias's next version only; that id as the chain says, v1 unread", async () => {
   const mk = (id: string, kind: string, maxWork = 1): Proof => ({ key: "k", id, kind, period: 1, shots: [], commits: [], strokes: 2, maxWork });
   const v1 = `${A}/mole-run/v1`, v2 = `${A}/mole-run/v2`;
-  assert.deepEqual(leftAs([], "garden", "k", A, "mole-run"), ["", "wind", "rain"]);
-  assert.deepEqual(leftAs([mk(v1, "")], "garden", "k", null, "mole-run"), ["", "wind", "rain"]);
-  assert.deepEqual(leftAs([mk(v1, ""), mk(v2, ""), mk(v2, "rain")], "garden", "k", A, "mole-run"), ["wind"]);
-  assert.deepEqual(leftAs([mk(v1, "", 9e9)], "garden", "k", A, "mole-run"), ["", "wind", "rain"], "a proof past minShotWork is none");
+  const versions = { version: 1, slot: `${A}/mole-run`, versions: [{ id: v1, v: 1, height: 1, by: A, sha: "", note: "", next: "" }] };
+  assert.deepEqual(await nextId({ versions: () => Promise.resolve(versions) }, A, "mole-run"), { id: v2, read: true });
+  assert.deepEqual(await nextId({ versions: () => Promise.reject(new Error("down")) }, A, "mole-run"), { id: v1, read: false });
   // the one rule the stepper, Play and Publish go by: every weather under the alias's next version
   const all = (id: string) => ["", "wind", "rain"].map((k) => mk(id, k));
   assert.equal(provedAt(all(v1), "garden", "k", v1), v1);

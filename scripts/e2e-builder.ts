@@ -32,7 +32,7 @@ const { emptyDraft, MAX_PIECES } = await import("../web/lib/builder/draft.ts");
 const { validate } = await import("../web/lib/builder/pipeline.ts");
 const { FIELD } = await import("../web/lib/builder/rules.ts");
 const { STARTERS } = await import("../web/lib/builder/starters.ts");
-const { canonicalHex, proofKey, provedAs, replay, shaOf, suggestPar } = await import("../web/lib/builder/proof.ts");
+const { canonicalHex, proofKey, provedAt, replay, shaOf, suggestPar } = await import("../web/lib/builder/proof.ts");
 const { plan, holeId, holeRow } = await import("../web/lib/builder/testmode.ts");
 const { dayRows } = await import("../web/lib/community.ts");
 const { makeLocalChain } = await import("../web/lib/builder/localchain.ts");
@@ -194,7 +194,7 @@ async function publish(label: string, d0: Draft, signer: string): Promise<{ id: 
   const hex = finalHex(d, host, name) ?? "";
   const checked = host.check(d.slug, hex, note);
   const key = await proofKey(d, host);
-  const proved = key ? provedAs(d.proofs, d.world, key, author, d.slug) : null;
+  const proved = key ? provedAt(d.proofs, d.world, key, id) : null;
   const hole = hex && key && proved ? await holeHolds({ ...d, title: name }, hex, key, proved, { host, palette: await loadPalette(d.world), census }) : "The rounds that proved it no longer play out the same on its final data: test it again.";
   const sha = await shaOf(hex);
   const step = publishSteps({ publishing: r0.publishing, rules: r0.rules, writer: r0.writer, taken: r0.taken, versions: r0.versions, hole, name: checked.ok ? "" : checked.why }, { author, slug: d.slug, proved: proved ?? "", sha, realm: chain.realm });
@@ -349,7 +349,7 @@ if (v1) {
   is("second version: the same data again", "publishSteps, v1's data", "same", again.at);
   const d2: Draft = { ...plain, pieces: [...plain.pieces, placePiece(post, "p1", [15, 3])], proofs: v1.draft.proofs };
   const k2 = await proofKey(d2, host);
-  is("second version: v1's proofs do not hold", "provedAs(v1's proofs, the new key)", "null", String(provedAs(d2.proofs, "garden", k2!, KEYS.a1, "plain-lane")));
+  is("second version: v1's proofs do not hold", "provedAt(v1's proofs, the new key)", "null", String(provedAt(d2.proofs, "garden", k2!, v1.id)));
   const v2 = await publish("second version", { ...d2, proofs: [] }, "a1");
   if (v2) {
     const vs = await chain.versions(`${KEYS.a1}/plain-lane`);

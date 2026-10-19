@@ -14,7 +14,7 @@ import { timeOf } from "./camera";
 import { hidesPlay } from "./sight";
 import { gnomelet, bunting, stone, smoke } from "./props";
 import { bakeLocal, look, weatherLooks, instances } from "./bake";
-import { seeded, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
+import { seeded, lookSeed, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
 import { ud, type Hole, type Height } from "./data";
 import { GAP_Y, type Bar, type Skins } from "./worlds";
 import type { Terrain } from "../terrain";
@@ -1112,7 +1112,7 @@ function archSpots(s: Hole) {
 function decor(s: Hole, bank: Height = () => 0) {
   const g = new THREE.Group();
   const W = s.board.w, H = s.board.h;
-  const rand = seeded("mountain" + s.name + s.hole);
+  const rand = seeded("mountain" + lookSeed(s));
   const X0 = -ISLAND.x + 0.8, X1 = W + ISLAND.x - 0.8;
   const Z0 = -ISLAND.back + 0.8, Z1 = H + ISLAND.front - 0.6;
   const night = timeOf(s.hole) !== "day";

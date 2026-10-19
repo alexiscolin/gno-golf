@@ -11,13 +11,15 @@ type P = readonly [number, number];
 const HOLES: [P, P][] = [[[-1.5, -1.5], [27.5, 25.5]], [[-1.5, 3], [45, 15]]];
 // the board each window gives (clientWidth by clientHeight, measured: 1280 and 1440 wide, 1920 and 2560)
 const BOARDS = { w1280: { w: 678, h: 614 }, w1440: FRAME_REF, w1920: { w: 1262, h: 894 }, w2560: { w: 1902, h: 1254 } };
+/** What the dock covers at the board's foot (px, Board.tsx's): the hole framed above it. */
+const DOCK = { bottom: 56 };
 /** What F gave before: the extent fitted, the dock's 56 off the height. */
 const before = ([lo, hi]: [P, P], s: { w: number; h: number }) => Math.max(3, Math.min(90, Math.min(s.w / (hi[0] - lo[0]), (s.h - 56) / (hi[1] - lo[1]))));
 
 void test("frameView: on a 1440 by 900 window and smaller, the hole framed exactly as before", () => {
   for (const ext of HOLES)
     for (const s of [BOARDS.w1280, BOARDS.w1440]) {
-      const v = frameView(ext[0], ext[1], s);
+      const v = frameView(ext[0], ext[1], s, DOCK);
       assert.equal(v.k, before(ext, s));
       assert.ok(Math.abs(v.x + s.w / 2 / v.k - (ext[0][0] + ext[1][0]) / 2) < 1e-9, "centred as before");
     }
@@ -26,7 +28,7 @@ void test("frameView: on a 1440 by 900 window and smaller, the hole framed exact
 void test("frameView: on a bigger window, the lane no smaller than on a 1440 by 900 one, and the world shown round it", () => {
   for (const ext of HOLES)
     for (const s of [BOARDS.w1920, BOARDS.w2560]) {
-      const v = frameView(ext[0], ext[1], s), ref = before(ext, FRAME_REF);
+      const v = frameView(ext[0], ext[1], s, DOCK), ref = before(ext, FRAME_REF);
       assert.ok(v.k >= ref - 1e-9, `${s.w}x${s.h}: ${v.k} px a unit, under the 1440's ${ref}`);
       // the room past the extent on the side that limits it (board units), at least 2
       const room = Math.min((s.w / v.k - (ext[1][0] - ext[0][0])) / 2, ((s.h - 56) / v.k - (ext[1][1] - ext[0][1])) / 2);
@@ -43,7 +45,7 @@ void test("frameView: the board kept on the island to its foot, never bare groun
   for (const s of [BOARDS.w1440, BOARDS.w1920, BOARDS.w2560])
     for (const turns of [0, 1, 2, 3]) {
       const look = { ...FLAT, turns }, [lo, hi] = boxIn([ext[0], ext[1], [0, 44], [26, 0]], look), isl = islandIn(board, look, AROUND);
-      const v = frameView(lo, hi, s, isl), plain = frameView(lo, hi, s);
+      const v = frameView(lo, hi, s, DOCK, isl), plain = frameView(lo, hi, s, DOCK);
       assert.equal(v.k, plain.k, "the same scale as without the island");
       // the sight: above the dock (the hole in it); the board: to its foot (the island round it)
       const sight = [[v.x, v.y], [v.x + s.w / v.k, v.y + (s.h - 56) / v.k]], all = [[v.x, v.y], [v.x + s.w / v.k, v.y + s.h / v.k]];

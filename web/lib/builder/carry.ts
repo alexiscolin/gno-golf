@@ -70,10 +70,10 @@ export const holdsToo = (host: BuilderHost, d: Draft, hex: string, p: Proof, lef
  * round's; a weather with no period is left to play.
  */
 export async function holdsIn(host: BuilderHost, d: Draft, hex: string, r: { key: string; id: string; shots: readonly string[] }, left: readonly { kind: string; period: number }[]): Promise<Proof[]> {
-  const out: Proof[] = [];
+  const out: Proof[] = [], row = holeRow(r.id, d);
   for (const { kind, period } of left) {
     if (period < 0) continue;
-    const p = await replay(makeLocalChain(host, holeRow(r.id, d), hex, period), { key: r.key, id: r.id, kind, period, shots: [...r.shots] });
+    const p = await replay(makeLocalChain(host, row, hex, period), { key: r.key, id: r.id, kind, period, shots: [...r.shots] });
     if (typeof p !== "string") out.push(p);
   }
   return out;

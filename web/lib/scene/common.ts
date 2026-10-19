@@ -3,7 +3,7 @@
 // helpers every world's decor uses. Its own module so
 // the scene files import it without importing each other (and without cycles).
 import type * as THREE from "three";
-import type { Height } from "./data";
+import type { Height, Hole } from "./data";
 
 /** A random in [0, 1): seeded() makes one. */
 export type Rand = () => number;
@@ -18,6 +18,11 @@ export const seeded = (str: string): Rand => {
     return ((h ^= h >>> 16) >>> 0) / 4294967296;
   };
 };
+
+/** What a hole's own scenery is seeded by: a course hole's name and id, as it always was (an older realm's, saying
+ *  nothing of official, one: engine.ts's reading); a built hole's id alone (renamed, in the Builder or at Publish, it
+ *  keeps its look). */
+export const lookSeed = (s: Pick<Hole, "name" | "hole" | "official">) => (s.official !== false ? s.name : "") + s.hole;
 
 /** The island's margins around the green, in board units. */
 export const ISLAND = { x: 7, front: 4, back: 10, soil: 4 };

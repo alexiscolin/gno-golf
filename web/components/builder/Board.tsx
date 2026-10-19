@@ -107,6 +107,9 @@ type Drag =
   | { t: "pan"; from: V; view: View }
   | { t: "aim"; press: [number, number]; from: V | null; stroke: number; shot: string | null };
 
+/** What the dock covers at the board's foot (px): F frames the hole above it. */
+const DOCK = { bottom: 56 };
+
 /** The extent the view frames at first: the tee, the cup and every piece, with a margin. */
 function extent(d: Draft): [V, V] {
   let lo: V = [Math.min(d.tee[0], d.pin[0]), Math.min(d.tee[1], d.pin[1])], hi: V = [Math.max(d.tee[0], d.pin[0]), Math.max(d.tee[1], d.pin[1])];
@@ -205,7 +208,7 @@ export default function Board(props: BoardProps) {
   const framed = (): View => {
     // the extent's corners in the view's plane (turned, tilted), and their box; the sight kept on the 3D world's island
     const [a, b] = extent(draft), [lo, hi] = boxIn([a, b, [a[0], b[1]], [b[0], a[1]]], look);
-    return frameView(lo, hi, size, in3d ? islandIn(boardOf(draft, props.scene?.state), look, ISLAND) : undefined);
+    return frameView(lo, hi, size, DOCK, in3d ? islandIn(boardOf(draft, props.scene?.state), look, ISLAND) : undefined);
   };
   useEffect(() => {
     if (view || !size.w) return;

@@ -428,15 +428,9 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__field > .h-sub + small { margin-top: calc(-1 * var(--sp-1)); } /* its why under its title, read before typing */
 .pub__field > input, .pub__field textarea { min-height: 48px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); resize: none; }
 .pub__field > input::placeholder, .pub__field textarea::placeholder { color: var(--ink-soft); }
-.pub__field [aria-invalid="true"], .pub__addr:has(input[aria-invalid="true"]) { border-color: var(--hat-ink); }
-/* the address, one box (nameform's): yours, its own part typed in place, its version; mono for the address alone */
-.pub__addr { background: var(--white); font-size: 14px; }
-.pub__addr > span { white-space: nowrap; }
-.pub__addr > span:last-child { padding: 0 12px 0 2px; color: var(--ink-soft); }
-/* the part typed: inked, underlined as the header's name is (what can be changed), yours and the version soft around it */
+.pub__field [aria-invalid="true"] { border-color: var(--hat-ink); }
 .pub__link { font-family: var(--mono, ui-monospace, monospace); overflow-wrap: anywhere; } /* the address read: yours and its version soft round the hole's own */
 .pub__link > span { font-weight: 600; color: var(--ink-soft); }
-.pub__addr input { font-weight: 700; color: var(--ink); text-decoration: underline dashed rgba(var(--ink-rgb), .45); text-underline-offset: 5px; }
 .pub__field .h-sub small { font-weight: 600; color: var(--ink-soft); }
 .pub__help { display: flex; justify-content: space-between; gap: var(--sp-3); }
 .pub__help > span:last-child { flex: none; font-variant-numeric: tabular-nums; }

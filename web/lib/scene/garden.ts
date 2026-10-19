@@ -14,7 +14,7 @@ import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, bro
 // here, and the seed is the hole's own name, so each course keeps its garden
 // from one visit to the next.
 
-import { seeded, ISLAND, GRASS, placer, tangentInto, type Rand } from "./common";
+import { seeded, lookSeed, ISLAND, GRASS, placer, tangentInto, type Rand } from "./common";
 import { smoothstep } from "../terrain";
 import { look, weatherLooks } from "./bake";
 import { ud, type Hole, type Height } from "./data";
@@ -673,10 +673,10 @@ const BACKDROPS: Record<string, (b: Backdrop) => THREE.Group> = { hills, stream,
  * low things. The seed is the hole's id, so a course keeps its garden.
  */
 function decor(s: Hole, bank: Height = () => 0): THREE.Group {
-  if (cloudy(s.hole)) return cloudSea({ rand: seeded(s.name + s.hole), W: s.board.w, H: s.board.h });
+  if (cloudy(s.hole)) return cloudSea({ rand: seeded(lookSeed(s)), W: s.board.w, H: s.board.h });
   const g = new THREE.Group();
   const W = s.board.w, H = s.board.h;
-  const rand = seeded(s.name + s.hole);
+  const rand = seeded(lookSeed(s));
   const X0 = -ISLAND.x + 0.8, X1 = W + ISLAND.x - 0.8;
   const Z0 = -ISLAND.back + 0.8, Z1 = H + ISLAND.front - 0.6;
 

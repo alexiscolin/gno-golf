@@ -39,7 +39,7 @@ import { endpoints, keepAuthor } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
 import { holdsIn, holdsToo } from "@/lib/builder/carry";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
-import { askSaid, clock, finished, heldSaid, toGo, holeRow, nextId, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
+import { askSaid, clock, finished, heldSaid, toGo, holeRow, nowSaid, parSaid, plan, summary, testChain, TRY_HOLE, tryPlan, type Act } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
 import { NO_GL } from "@/lib/builder/editor";
 import { hold, onStage, stageCanvas, stageRenderer, stageUp } from "@/lib/builder/stage";
@@ -145,7 +145,7 @@ function AddressLine({ start, title, head, line, note, onAddress, children }: { 
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, tried = null, onAuthor, onProof, onPar, onRound, onTried, onPublish, onLeave }: {
+export default function TestMode({ host, draft, hex, proofKey, author, next, guess = 0, tried = null, onAuthor, onProof, onPar, onRound, onTried, onPublish, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -153,6 +153,9 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   /** proof.ts proofKey of the draft */
   proofKey: string;
   author: string | null;
+  /** the author's id: the alias's next version as the editor read it (testmode.ts nextId; read: false, unread: v1); null
+   *  while it is read */
+  next: { id: string; read: boolean } | null;
   /** the difficulty meter's par (0: none): shown, as a guess, until the rounds set it */
   guess?: number;
   /** a try holed before the address was given, its shots: replayed first in each weather, the author's rounds where it holds */
@@ -171,7 +174,6 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   /** Escape: back to the editor (not while aiming: Escape drops the aim, the game's) */
   onLeave: () => void;
 }) {
-  const [id, setId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   // no address yet: rounds in calm weather, just to try (the address asked once one is holed)
   const trying = !author;
@@ -209,16 +211,10 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     return () => removeEventListener("keydown", key, true);
   });
 
-  // the hole's id: the author's alias's next version, as the chain says (v1 if it cannot be read): holes.ts nextId, as the
-  // stepper and Publish read it
-  useEffect(() => {
-    if (!author) return setId(TRY_HOLE);
-    if (!draft.slug) return;
-    void nextId(author, draft.slug).then(({ id: next, read }) => {
-      setId(next);
-      if (!read) setAside("The chain could not be read: played as a new hole (v1). If it has versions already, play it again once it can be.");
-    });
-  }, [author, draft.slug]);
+  // the hole's id: the author's alias's next version, as the editor read it (v1 if it cannot be read), the one the stepper
+  // and Publish go by; a try's its own
+  const id = !author ? TRY_HOLE : next?.id ?? null, unread = !!author && next?.read === false;
+  useEffect(() => void (unread && setAside("The chain could not be read: played as a new hole (v1). If it has versions already, play it again once it can be.")), [unread]);
 
   // the round holed in the weather played (its strokes; 0 not yet), until a play again or the next weather
   const [holed, setHoled] = useState(0);

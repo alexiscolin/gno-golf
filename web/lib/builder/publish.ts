@@ -4,8 +4,8 @@
 // warm-up hole, then the one measured; their Storage and Gas less the
 // warm-up's), the bill shown before any signature, and the command for
 // gnokey, whose every argument reaches the realm as the page shows it.
-import { depositFor, feeFor, gnokeyCall, gnokeyOn, MAX_GAS, PER_CALL, publishArgs, upToHundredth } from "../adena";
-import { isAddress, utf8Bytes as utf8 } from "../chain";
+import { aboutGnot, depositFor, feeFor, gnokeyCall, gnokeyOn, MAX_GAS, PER_CALL, publishArgs, shortOf, upToHundredth } from "../adena";
+import { isAddress, shortAddr, utf8Bytes as utf8 } from "../chain";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
 import { makeLocalChain } from "./localchain";
@@ -105,16 +105,20 @@ export interface Readings {
   hole: string | undefined;
   /** check()'s refusal of the name or the note, explained; "" none */
   name: string;
+  /** what the author's account holds here, ugnot (null: the node can't say; undefined: being read): neither waited on */
+  funds?: number | null;
 }
-export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "paused" | "rules" | "taken" | "unread" | "newer" | "same" | "hole" | "name"; why: string };
+export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "paused" | "rules" | "taken" | "unread" | "newer" | "same" | "hole" | "name" | "funds"; why: string };
 
 /**
  * Where the publish step stands: ready, or the first check that does not
  * hold, said once. The id it publishes under (the alias's next version) is
  * the one the proofs were made under, or the weather was another's; the data
- * may not be the alias's current version's again (golf refuses it).
+ * may not be the alias's current version's again (golf refuses it); an
+ * account that cannot pay what the bill asks (pay: its gas at price, the
+ * deposit; most: the bill's total) is told before the wallet opens.
  */
-export function publishSteps(r: Readings, { author, slug, proved, sha, realm }: { author: string; slug: string; proved: string; sha: string; realm: string }): Step {
+export function publishSteps(r: Readings, { author, slug, proved, sha, realm, pay }: { author: string; slug: string; proved: string; sha: string; realm: string; pay?: { gas: number; price: number; deposit: number; most: number } }): Step {
   if (r.publishing === false) return { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." };
   if (r.rules === false) return { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." };
   if (r.writer === "") return { at: "paused", why: "Saves are paused on gno.land for now. Your draft is kept." };
@@ -123,10 +127,11 @@ export function publishSteps(r: Readings, { author, slug, proved, sha, realm }: 
   if (r.publishing === null || r.rules === null || r.writer === null || r.taken === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
   if (r.publishing === undefined || r.rules === undefined || r.writer === undefined || r.taken === undefined || r.versions === undefined || r.hole === undefined) return { at: "reading", why: "" };
   const id = holeId(author, slug, r.versions);
-  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: play it again.` }; // (another address typed: the form offers the one its rounds were played at)
+  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: play it again.` }; // (a version published since the editor read it)
   if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };
   if (r.hole) return { at: "hole", why: r.hole };
   if (r.name) return { at: "name", why: r.name };
+  if (pay && r.funds != null && shortOf(pay.gas, pay.price, pay.deposit, r.funds)) return { at: "funds", why: `${shortAddr(author)} holds ${aboutGnot(r.funds)} GNOT here; publishing takes up to ${aboutGnot(pay.most)}. Add GNOT to it, then publish.` };
   return { at: "ready", why: "" };
 }
 

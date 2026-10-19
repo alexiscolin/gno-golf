@@ -6,8 +6,7 @@
 // without). With the author's address known, every round played is a try at
 // the next weather not holed; without it, a round in calm weather (a try,
 // under an id of its own: TRY_HOLE), the address asked once one is holed.
-import { makeChain, type Chain } from "../chain";
-import { endpoints } from "./holes";
+import type { Chain } from "../chain";
 import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
@@ -16,21 +15,19 @@ import { required, weatherName, weathersSaid } from "./rules";
 import { calmPeriod } from "./quickshot";
 import type { BuilderHost } from "./wasm";
 
-/** The id the draft will be published under: the alias's next version (Versions), the first for a new alias. */
 /** A hole id's address part (author/slug/vN: its slug). */
 export const slugOf = (id: string) => id.split("/").at(-2) ?? "";
 
+/** The id the draft will be published under: the alias's next version (Versions), the first for a new alias. */
 export function holeId(author: string, slug: string, versions: Versions | null): string {
   const last = versions?.versions.at(-1)?.v ?? 0;
   return `${author}/${slug}/v${last + 1}`;
 }
 
 /** The id a hole of author's at slug is played and published under: the alias's next version as the chain says (read:
- *  false, unread: v1, as a new hole). The one rule Play, the stepper and Publish go by. */
-export function nextId(author: string, slug: string): Promise<{ id: string; read: boolean }> {
-  const { rpc, web } = endpoints(window.location.search);
-  return makeChain({ rpc, web }).versions(`${author}/${slug}`).then((v) => ({ id: holeId(author, slug, v), read: true }), () => ({ id: holeId(author, slug, null), read: false }));
-}
+ *  false, unread: v1, as a new hole). The one rule Play, the stepper and Publish go by (read once, by the editor). */
+export const nextId = (chain: Pick<Chain, "versions">, author: string, slug: string): Promise<{ id: string; read: boolean }> =>
+  chain.versions(`${author}/${slug}`).then((v) => ({ id: holeId(author, slug, v), read: true }), () => ({ id: holeId(author, slug, null), read: false }));
 
 /** The weathers to beat in order (required), each with the period it is played in (periodFor). */
 export function plan(host: BuilderHost, id: string, world: string, now: number): { kind: string; period: number }[] {
@@ -97,7 +94,7 @@ export const toGo = (of: number, done: number) => `Sink it in each${!done ? "" :
 
 /** The weathers in a sentence: "Clear, Wind and Rain". */
 
-/** Why Publish is shut: the world's weathers named, or the ones still to sink once some are (left: proofs.ts leftAs). */
+/** Why Publish is shut: the world's weathers named, or the ones still to sink once some are (left: proof.ts unproven under the next id). */
 export function publishTip(world: string, left: readonly string[]): string {
   const all = required(world);
   return left.length < all.length ? `Still to sink: ${weathersSaid(left)}.` : `Sink it once in each weather: ${weathersSaid(all)}. Players meet them all.`;
