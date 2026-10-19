@@ -66,6 +66,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
   const [why, setWhy] = useState("");
   const [copied, copy] = useCopied();
   const live = useRef(true);
+  // what the author's account holds here (null: the node can't say), read again after a try: one that can't pay is told before Adena
+  const [funds, setFunds] = useState<number | null>(null);
   const capture = useRef<(() => HTMLCanvasElement | null) | null>(null);
   const gnokey = useRef<HTMLDetailsElement>(null);
   useEffect(() => ((live.current = true), () => void (live.current = false)), []); // (true again on a remount: dev's StrictMode mounts twice)
@@ -98,9 +100,10 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
       chain.versions(alias).catch(() => null),
     ]).then(([publishing, rules, writer, taken, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, writer, taken, versions })));
     void chain.gasPrice().then((gas) => live.current && setPrices((p) => ({ ...p, gas })), () => {});
+    if (author) void chain.balance(author).then((f) => live.current && setFunds(f), () => {});
     void chain.storagePrice().then((byte) => live.current && setPrices((p) => ({ ...p, byte })), () => {});
     void chain.chainId().then((c) => live.current && setChainId(c), () => {});
-  }, [chain, alias, host, tries]);
+  }, [chain, alias, host, tries, author]);
   useEffect(() => void proofKey(draft, host).then((k) => live.current && setKey(k)), [draft, host]);
   useEffect(() => {
     // (another address: its rounds were played under the one before, its weather another)
@@ -179,7 +182,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
       </main>
     );
   }
-  const off = step.at !== "ready" || !cost;
+  const short = funds != null && step.at === "ready" && funds < b.most;
+  const off = step.at !== "ready" || !cost || short;
   // no Adena: the footer's way to gnokey, its section (above it, in the form's scroll) opened and brought into view
   const toGnokey = () => {
     const d = gnokey.current;
@@ -202,20 +206,22 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
           </label>
           {/* what is read, not typed: its world, the par explained by the rounds that proved it */}
           <div className="pub__field">
-            <span className="h-sub">Set in Build</span>
+            <span className="h-sub">Already set</span>
             <dl className="review pub__review">
               <dt>World</dt><dd><b>{worldName(draft.world)}</b></dd>
               <dt>Par</dt><dd><b>{draft.par || "–"}</b>{par && <small>{par}</small>}</dd>
+              {/* its address: the one its rounds were played at, read, not typed (another would have weathers not played:
+                  never a Publish locked by a change here); a version after the first says it is one */}
+              {fixed && <><dt>Address</dt><dd><b className="pub__link"><span title={author}>{shortAddr(author)}/</span>{draft.slug}<span>/v{id ? v : "…"}</span></b>
+                <small>{v > 1 ? "A new version of your hole at this address." : "Its link on gno.land, set as you played it: it stays for good."}</small></dd></>}
             </dl>
           </div>
-          {/* its address: the one its rounds were played at, read only (another would have weathers not played: never a
-              Publish locked by a change here); yours and its version the field's own ends; a version after the first says it is one */}
-          <label className="pub__field">
+          {!fixed && <label className="pub__field">
             <span className="h-sub">Address</span>
-            <small>{v > 1 ? "A new version of your hole at this address." : fixed ? "Your hole's link on gno.land, the one you played it at: it can't change once published." : "Your hole's link on gno.land: it can't change once published."}</small>
+            <small>{v > 1 ? "A new version of your hole at this address." : "Your hole's link on gno.land: it can't change once published."}</small>
             <span className="pub__addr"><span title={author}>{shortAddr(author)}/</span><input value={draft.slug} maxLength={32} spellCheck={false} autoCapitalize="off" aria-label="The hole's address, after yours" aria-invalid={!isSlug(draft.slug)}
-              readOnly={fixed} disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
-          </label>
+              disabled={!!sent} onChange={(e) => onDraft({ ...draft, slug: typedSlug(e.target.value) })} /><span>/v{id ? v : "…"}</span></span>
+          </label>}
           <div className="pub__field">
             <span className="h-sub"><label htmlFor="pub-note">A line for players</label> <small>· optional</small> <InfoTip label="What is a line for players?" note="A tip or a dare from you, in a sentence: players read it under your hole's name in the community holes and on its card as they play it." /></span>
             <textarea id="pub-note" value={draft.note} rows={2} placeholder="Bank it off the left wall." aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
@@ -249,6 +255,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
             ) : <p className="pub__small">Once the checks pass.</p>}
           </details>
           {why && <p className="pub__bad" role="alert">{why}</p>}
+          {short && <p className="pub__bad" role="status">{shortAddr(author)} holds {aboutGnot(funds ?? 0)} GNOT here; publishing takes up to {aboutGnot(b.most)}. Add GNOT to it, then publish.</p>}
         </div>
         <div className="pub__foot">
           {step.at === "newer" || step.at === "hole" ? (step.at === "hole" && !/^The rounds/.test(step.why) ? <Button variant="gold" className="btn--wide" onClick={onBuild}>Back to Build</Button>

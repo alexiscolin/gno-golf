@@ -416,7 +416,7 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__foot { padding: var(--sp-3) var(--sp-4); border-top: var(--rule); background: var(--paper); }
 .pub__foot .btn { margin: 0; width: 100%; }
 .pub__foot > .linkish { display: block; width: 100%; font-size: 14px; text-align: center; } /* (no Adena: the way to gnokey, above) */
-.pub__foot .pub__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (the footer one line, holding the action) */
+.pub__foot .pub__note { text-wrap: balance; } /* (the footer holding the action: its line wraps, never cut) */
 .pub__forever a { color: var(--green); font-weight: 700; }
 .pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
 /* what is read, not typed: the shop's review rows at the column's width, each value its helper under it */
@@ -434,7 +434,8 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__addr > span { white-space: nowrap; }
 .pub__addr > span:last-child { padding: 0 12px 0 2px; color: var(--ink-soft); }
 /* the part typed: inked, underlined as the header's name is (what can be changed), yours and the version soft around it */
-.pub__addr input:read-only { text-decoration: none; } /* (kept: the rounds' address) */
+.pub__link { font-family: var(--mono, ui-monospace, monospace); overflow-wrap: anywhere; } /* the address read: yours and its version soft round the hole's own */
+.pub__link > span { font-weight: 600; color: var(--ink-soft); }
 .pub__addr input { font-weight: 700; color: var(--ink); text-decoration: underline dashed rgba(var(--ink-rgb), .45); text-underline-offset: 5px; }
 .pub__field .h-sub small { font-weight: 600; color: var(--ink-soft); }
 .pub__help { display: flex; justify-content: space-between; gap: var(--sp-3); }
