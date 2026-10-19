@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { menuLink, menuReached, onMenuLink } from "@/lib/menu";
+import { CAMS, CamButton } from "@/components/CamButton";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
 import { NOT_BUILDER } from "@/lib/community";
 import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, BYTE_PRICE, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
-import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
+import { HOT, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Ghost, HoleRow, Mode } from "@/lib/types";
@@ -41,7 +42,7 @@ import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, nameOnce, useNameCheck, useRankNudge, useSavedPlace, type BoardProps, type NameCheck } from "@/components/Leaderboard";
 import { ADENA_URL, FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
 import { register, track, trackLeaving, trackError, once, failure, saveBlock, cardHoles, WALLET_STEPS, type Events, type Play, type RivalKind, type ShareKind, type WalletFrom } from "@/lib/analytics";
-import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
+import { savedCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
 import { darkGallery, minesOrder } from "@/lib/scene/data";
 import { SHOP, SHOP_LINE, pick, pickOf } from "@/lib/gnomes/door";
 import type { Worn } from "@/lib/gnomes/shop";
@@ -1881,24 +1882,7 @@ export default function Golf() {
           </Button>
           <footer className="hud hud--bottom">
             <Button variant={theyWon ? "primary" : "secondary"} disabled={!s.strokes} onClick={() => game.current?.reset()}>{theyWon ? "Rematch" : "Restart"}</Button>
-            <Button
-              className="cam-btn"
-              aria-label={`View: ${CAMS[s.cam] || "Classic"} — click for the next view`}
-              title={`View: ${CAMS[s.cam] || "Classic"} — click for the next view`}
-              onClick={() => {
-                const next = CAM_ORDER[(CAM_ORDER.indexOf(s.cam || "classic") + 1) % CAM_ORDER.length];
-                saveCam(next);
-                sound("blip");
-                game.current?.setCam(next);
-                setCamNote(`${CAMS[next]} view`);
-              }}
-            >
-              {/* an eye, the view */}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></svg>
-              <span className="cam-btn__name">{CAMS[s.cam] || "Classic"}</span>
-              {/* which of the three views, the current one filled: a click goes to the next */}
-              <span className="cam-btn__dots" aria-hidden="true">{CAM_ORDER.map((c) => <i key={c} data-on={c === (s.cam || "classic") ? "" : undefined} />)}</span>
-            </Button>
+            <CamButton cam={s.cam} onCam={(next) => (game.current?.setCam(next), setCamNote(`${CAMS[next]} view`))} />
           </footer>
         </>
       )}
@@ -2516,7 +2500,6 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
 }
 
 /** The camera modes' names, on the camera button. */
-const CAMS: Record<CamMode, string> = { classic: "Classic", far: "Far", third: "Third person" };
 
 
 interface PickerProps {

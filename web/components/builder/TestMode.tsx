@@ -26,6 +26,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button, Dialog } from "@/components/ui";
 import { useFlash } from "@/components/common";
+import { CamButton } from "@/components/CamButton";
 import Weather, { SkyIcon } from "@/components/Weather";
 import { connect, hasAdena } from "@/lib/adena";
 import { isAddress, makeChain, RULES } from "@/lib/chain";
@@ -363,6 +364,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
         <footer className="hud hud--bottom">
           {/* (nothing to play again before a first shot; holed on a try, the card's) */}
           {(!!snap?.strokes || holed > 0) && !asking && <Button title="R or Backspace" keycap="R" onClick={again}>Try again</Button>}
+          {/* the game's view button: classic, third person, far (V swaps to the overview) */}
+          {snap && <CamButton cam={snap.cam} onCam={(next) => game.current?.setCam(next)} />}
         </footer>
       )}
       {now && !card && asking && <AddressLine strokes={holed} title={draft.title || "Your hole"} onAddress={sign} onAgain={again} />}
