@@ -199,10 +199,13 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onBuil
             <small>{name !== draft.title ? `Kept as: ${name || "–"}` : "Shown on the course and in the holes' lists."}</small>
           </label>
           {/* what is read, not typed: its world, the par explained by the rounds that proved it */}
-          <dl className="review pub__review">
-            <dt>World</dt><dd><b>{worldName(draft.world)}</b></dd>
-            <dt>Par</dt><dd><b>{draft.par || "–"}</b>{par && <small>{par}</small>}</dd>
-          </dl>
+          <div className="pub__field">
+            <span className="h-sub">Set in Build</span>
+            <dl className="review pub__review">
+              <dt>World</dt><dd><b>{worldName(draft.world)}</b></dd>
+              <dt>Par</dt><dd><b>{draft.par || "–"}</b>{par && <small>{par}</small>}</dd>
+            </dl>
+          </div>
           {/* its address: the name's own until it is proved, set by hand here (another address, another weather: played again);
               yours and its version the field's own ends; a version after the first says it is one */}
           <label className="pub__field">

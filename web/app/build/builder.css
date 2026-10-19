@@ -177,6 +177,8 @@ button.issue__why:hover { text-decoration-style: solid; }
 
 /* ------------------------------------------------------------ the right: the 3D, then the selected piece */
 .preview { position: relative; flex: none; aspect-ratio: 16 / 10; border: var(--edge); border-radius: 14px; background: #3f9a72; overflow: hidden; }
+.preview:not(.preview--off) { cursor: grab; touch-action: none; }
+.preview:active { cursor: grabbing; }
 .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .preview .pill { position: absolute; left: var(--sp-2); top: var(--sp-2); display: inline-flex; align-items: center; height: 26px; padding: 0 var(--sp-3); border-radius: var(--pill); background: rgba(var(--paper-rgb), .95); border: var(--info-edge); font-size: 12px; font-weight: 700; }
 .insp { display: grid; gap: var(--sp-4); }
@@ -418,7 +420,7 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .pub__forever a { color: var(--green); font-weight: 700; }
 .pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
 /* what is read, not typed: the shop's review rows at the column's width, each value its helper under it */
-.pub__review { grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.pub__review { grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-2) var(--sp-3); align-items: baseline; padding: var(--sp-3) var(--sp-4); }
 .pub__review dd { display: grid; gap: 2px; }
 .pub__review b { font-size: 15px; }
 /* a field: its label (.h-sub), its box (the game's 48, its ring its own frame: globals.css), one line why under it */

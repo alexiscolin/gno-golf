@@ -58,7 +58,7 @@ void test("the course's own snow cannon and seracs (mountain/10, mountain/15) dr
     if (!(slot in golden)) continue;
     host.load(slot, hex);
     host.setperiod(5967997);
-    const s = JSON.parse(host.state(slot)) as Hole, g = pieces(s);
+    const s: Hole = { ...(JSON.parse(host.state(slot)) as Hole), official: true }, g = pieces(s); // (the course's, as the chain lists it)
     assert.equal(createHash("sha256").update(keysOf(pieces(s)).join("\n")).digest("hex").slice(0, 16), golden[slot], `${slot}: drawn as before`);
     for (const name of Object.keys(HELD)) for (const pts of seen(g, name, HELD[name])) assert.deepEqual(onLane(g, pts), [], `${slot}: its ${name} off the lane`);
   }
