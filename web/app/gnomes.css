@@ -233,12 +233,13 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet__meta { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-2); }
 .gsheet .more { text-align: center; }
 .gsheet .more .review { text-align: left; }
+.gsheet__pic { display: grid; justify-items: center; gap: var(--sp-3); }
 .gsheet__head .gtile { width: min(220px, 60vw); }
 .gsheet__head--small .gtile { width: 64px; border-radius: 14px; }
 .gsheet__head h2 { margin: 0; padding-inline: 40px; overflow-wrap: anywhere; }
 /* his first view, wide enough: his picture at the left, who he is beside it, read from its left, clear of the X */
 @media (min-width: 601px) {
-  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) { grid-template-columns: 180px minmax(0, 1fr); align-items: center; justify-items: stretch; gap: var(--sp-4); margin-top: var(--sp-3); text-align: left; }
+  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) { grid-template-columns: 180px minmax(0, 1fr); align-items: start; justify-items: stretch; gap: var(--sp-4); margin-top: var(--sp-3); text-align: left; }
   .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gtile { width: 180px; }
   .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gsheet__id { justify-items: start; text-align: left; padding-right: 56px; } /* (the X: 48, and a gap) */
   .gsheet__head:not(.gsheet__head--small, .gsheet__hop) :is(h2, .gsheet__line) { padding-inline: 0; text-align: left; }

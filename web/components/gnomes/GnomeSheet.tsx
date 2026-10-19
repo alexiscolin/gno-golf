@@ -185,12 +185,15 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   // series), his name (the sheet's title), what is said of him (say), the look switch (in his first view alone)
   const head = (small = false, title: ReactNode = g.name, swap = false, meta: ReactNode = <>#{g.id} · {worldName(g.home)}</>, say: ReactNode = null) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
-      <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
+      {/* his picture, and how it is drawn under it (the switch acts on it) */}
+      <div className="gsheet__pic">
+        <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
+        {swap && <LookSwitch look={look} onLook={onLook} />}
+      </div>
       <div className="gsheet__id">
         {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /><span>{meta}</span></span>}
         <h2>{title}</h2>
         {say && <p className="gsheet__line">{say}</p>}
-        {swap && <LookSwitch look={look} onLook={onLook} />}
       </div>
     </div>
   );
