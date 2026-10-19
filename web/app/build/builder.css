@@ -270,7 +270,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__mine { display: grid; gap: var(--sp-4); }
 .bholes__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-4); width: 100%; text-align: left; }
 .bholes__draft--open { position: relative; }
-.bholes__pick { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; max-width: 100%; }
+.bholes__pick { display: block; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; max-width: 100%; min-width: 0; }
 .bholes__pick::after { content: ""; position: absolute; inset: 0; border-radius: var(--r-card); }
 .bholes__pick:focus-visible { outline: none; }
 .bholes__pick:focus-visible::after { box-shadow: var(--ring-shadow); }
@@ -280,7 +280,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__map--s { grid-row: 1 / 3; align-self: start; padding: 6px; border: var(--edge); border-radius: 14px; }
 .bholes__map--s .bholes__svg { width: 60px; }
 .bholes__name { display: grid; justify-items: start; gap: 2px; min-width: 0; line-height: 1.2; }
-.bholes__name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; }
+.bholes__name b { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; }
 .bholes__name small { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .bholes__state { margin-top: 2px; padding: 1px 10px; border-radius: var(--pill); border: 2px dashed rgba(var(--ink-rgb), .45); font-size: 12px; font-weight: 800; }
 .bholes__state--testing { border-style: solid; border-color: var(--sunny); background: var(--lamp); }

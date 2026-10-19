@@ -137,7 +137,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                 <span className="bholes__map bholes__map--s"><HoleMap hole={draftMap(d)} className="bholes__svg" /></span>
                 <span className="bholes__name">
                   {/* the whole card opens it (this button's area covers it: its other links over it) */}
-                  <button type="button" className="bholes__pick" onClick={() => onOpen(i)}><b>{d.title || "A hole with no name yet"}</b></button>
+                  <button type="button" className="bholes__pick" title={d.title || undefined} onClick={() => onOpen(i)}><b>{d.title || "A hole with no name yet"}</b></button>
                   <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
                   {/* its weathers, ticked as holed (published and none holed here since: its line on the chain says it all) */}
                   {!(h && st.stage === "new") && (
