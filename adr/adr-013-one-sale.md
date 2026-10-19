@@ -24,8 +24,9 @@ of all 720; the waves left were words on the screens ("Wave 1 · Garden",
   the sale. `CancelSale(series)` withdraws it before it starts only, no
   gnome of it sold; the series may then open again. Events `SaleOpened`,
   `SaleCancelled`.
-- **Every guard stays.** The genesis's sale is refused before its closing
-  date is set, from a start at or after it, and once it has closed;
+- **Every guard stays.** The genesis's sale is refused, once a closing
+  date is set (optional since 2026-10-19, ADR-007), from a start at or
+  after it, and once it has closed;
   `SetCloseAt` never comes at or before a sale yet to start. Exact payment,
   direct user calls, five ids a Buy, the lifetime caps, one Legendary a
   wallet, the switch (`SetMintOpen`), as before. The player window's caps

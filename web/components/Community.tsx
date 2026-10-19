@@ -149,7 +149,7 @@ export default function Community({ community, chain, onPlay }: {
   return (
     <section className="community" aria-label="Community holes">
       <div className="community__head">
-        <h3>Community holes <small>not ranked</small></h3>
+        <h3 className="h-section">Community holes <small>not ranked</small></h3>
         <Segmented options={SORTS} value={by} onChange={(v) => (sound("blip"), setBy(v))} label="Order the community holes" className="community__sort" />
       </div>
       {day && (

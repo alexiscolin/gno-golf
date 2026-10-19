@@ -21,7 +21,9 @@
 
 /* a gnome's tile: his thumbnail on his tier's stage, framed in his tier's rim */
 .gtile { position: relative; display: block; aspect-ratio: 1; border-radius: 18px; border: var(--edge-bold); background: #f6ead2; overflow: hidden; }
-.gtile img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.gtile img { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .2s; }
+.gtile img.on { opacity: 1; } /* (shown once decoded, faded in: parts.tsx Tile) */
+@media (prefers-reduced-motion: reduce) { .gtile img { transition: none; } }
 .gtile::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none; }
 .gtile--rare::before { box-shadow: inset 0 0 0 5px var(--tier-rare), inset 0 0 0 7px var(--ink); }
 .gtile--epic::before { box-shadow: inset 0 0 0 6px var(--tier-epic), inset 0 0 0 8px var(--ink); }
@@ -54,6 +56,8 @@
 /* Buy on a card on sale: a small button's look in the blue of what leads to a signature, the card's width at its foot (the
    card itself opens the order) */
 .gcard__buy { align-self: stretch; margin-top: var(--sp-2); }
+.gcard__state { justify-content: center; min-width: 0; color: var(--ink-soft); }
+.gcard__state > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (Buy's place, flat: what he is) */
 .sale__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
 
 /* the shop's head: the game's front head (its pill, its title at the rival's size, its line), level with the corner
@@ -189,13 +193,13 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .gcard__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 2.3em; margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; }
 .gcard__name small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
 /* his tier over his fact, always (fixed rows: every card the same) */
-.gcard__foot { display: grid; grid-template-rows: 24px 18px; align-items: center; justify-items: start; gap: var(--sp-1); margin: 0 2px; }
+.gcard__foot { display: grid; grid-template-rows: 24px; grid-auto-rows: 18px; align-items: center; justify-items: start; gap: var(--sp-1); margin: 0 2px; }
 .gcard__foot:not(:last-child) { margin-bottom: var(--sp-2); } /* (8 more over Buy) */
-.gcard > .btn:last-child { margin-top: auto; } /* (Buy at the card's foot; the tier under the name on every card, in line row to row) */
+.gcard > .gcard__buy:last-child { margin-top: auto; } /* (Buy at the card's foot; the tier under the name on every card, in line row to row) */
 @media (max-width: 600px) { .gcard { padding: var(--sp-2); } } /* (with its 3 px edge, 11 round a phone's card) */
 .gcard__fact { max-width: 100%; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard--mine { background: var(--ink); color: var(--paper); }
-.gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
+.gcard--mine .gcard__name small { color: rgba(var(--paper-rgb), .8); }
 .gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
 .gcard--skel { pointer-events: none; }
 .gcard--skel .gtile { background: rgba(var(--ink-rgb), .06); }
@@ -231,7 +235,17 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet .more .review { text-align: left; }
 .gsheet__head .gtile { width: min(220px, 60vw); }
 .gsheet__head--small .gtile { width: 64px; border-radius: 14px; }
-.gsheet__head h2 { padding-inline: 40px; overflow-wrap: anywhere; }
+.gsheet__head h2 { margin: 0; padding-inline: 40px; overflow-wrap: anywhere; }
+/* his first view, wide enough: his picture at the left, who he is beside it, read from its left, clear of the X */
+@media (min-width: 601px) {
+  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) { grid-template-columns: 180px minmax(0, 1fr); align-items: center; justify-items: stretch; gap: var(--sp-4); margin-top: var(--sp-3); text-align: left; }
+  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gtile { width: 180px; }
+  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) .gsheet__id { justify-items: start; text-align: left; padding-right: 32px; }
+  .gsheet__head:not(.gsheet__head--small, .gsheet__hop) :is(h2, .gsheet__line) { padding-inline: 0; text-align: left; }
+}
+/* Share beside the one action: a third of its width, its height */
+.gsheet__act { display: grid; grid-template-columns: 1fr 3fr; gap: var(--sp-2); }
+.gsheet__act > .btn { height: 100%; min-height: 52px; margin: 0; width: 100%; }
 .gsheet__meta { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
 .gsheet__line { margin: 0; color: var(--ink) !important; text-align: center; text-wrap: pretty; }
 /* the price block: his price, the trust lines under it, 8 apart; the price stronger than the small print */

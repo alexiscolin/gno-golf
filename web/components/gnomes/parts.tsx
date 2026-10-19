@@ -6,7 +6,7 @@
 // switch between the two looks, the closing date, the one share button. On
 // the game's own tokens (app/gnomes.css).
 import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
-import { Button, Segmented } from "@/components/ui";
+import { Button, Chip, Segmented } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import { useCopied } from "@/components/common";
 import { retryIn } from "@/lib/retry";
@@ -75,7 +75,9 @@ export function Tile({ id, tier, never = false, lazy = true, onChain = null }: {
   };
   return (
     <span ref={ref} className={`gtile gtile--${tier}${never ? " gtile--never" : ""}`}>
-      {src && !gone && <img key={tries} src={src} alt="" width={256} height={256} loading={lazy ? "lazy" : "eager"} decoding="async" onError={failed} />}
+      {/* shown once decoded, faded in: never drawn half-way down the stage (one already in the cache, at once) */}
+      {src && !gone && <img key={`${src} ${tries}`} src={src} alt="" width={256} height={256} loading={lazy ? "lazy" : "eager"} decoding="async" onError={failed}
+        ref={(img) => void (img && img.complete && img.naturalWidth && img.classList.add("on"))} onLoad={(e) => e.currentTarget.classList.add("on")} />}
     </span>
   );
 }
@@ -91,15 +93,16 @@ export const LookSwitch = ({ look, onLook }: { look: Look; onLook: (l: Look) => 
 );
 
 /** A gnome in the grid: his tile, name and number, his tier and one fact (his price when on sale), and Buy when he
- *  can be bought; a button that opens his sheet (where the order is reviewed: the card itself never buys). */
+ *  can be bought, else that fact in Buy's place; a button that opens his sheet (where the order is reviewed: the card itself never buys). */
 export function GnomeCard({ g, fact, mine, never, buy = false, onChain = null, onOpen }: { g: Listed; fact: string; mine: boolean; never: boolean; buy?: boolean; onChain?: Portraits | null; onOpen: () => void }) {
   return (
     <button type="button" className={`gcard${mine ? " gcard--mine" : ""}${never ? " gcard--never" : ""}`} onClick={onOpen}
       aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${fact}${buy ? ". Buy" : ""}`}>
       <Tile id={g.id} tier={g.tier} never={never} onChain={onChain} />
       <span className="gcard__name"><span>{g.name}</span><small>#{g.id}</small></span>
-      <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{fact}</span></span>
-      {buy && <span className={buttonClass({ variant: "chain", size: "s" }, "gcard__buy")} aria-hidden="true">Buy</span>}
+      <span className="gcard__foot"><TierChip tier={g.tier} />{buy && <span className="gcard__fact">{fact}</span>}</span>
+      {/* the foot: Buy, or what he is (found a player, yours, never made) in its place, flat: every card ends alike */}
+      {buy ? <span className={buttonClass({ variant: "chain", size: "s" }, "gcard__buy")} aria-hidden="true">Buy</span> : <Chip size="s" className="gcard__buy gcard__state"><span>{fact}</span></Chip>}
     </button>
   );
 }

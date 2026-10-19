@@ -19,8 +19,8 @@ var (
 )
 
 // `gno test` runs init with no signer: each test starts from a fresh
-// collection owned by the deployer, the placeholder genesis published, its
-// close a year off, its sale under way from now with no player window, the
+// collection owned by the deployer, the placeholder genesis published, no
+// closing date, its sale under way from now with no player window, the
 // mint open.
 func fresh(t *testing.T, rlm realm) {
 	noSale(t, rlm)

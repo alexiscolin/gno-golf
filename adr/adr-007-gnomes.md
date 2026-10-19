@@ -8,7 +8,7 @@ as `gno.land/r/gnogolf/gnomes`, with the user's decisions: 720 gnomes, the
 research brief's player window and prices
 (`docs/superpowers/research/2026-10-06-nft-best-practices.md`), every tier
 at a fixed price, the Legendaries too (no auction: the user's decision of
-2026-10-06), a hard closing date for the genesis sale, a treasury apart
+2026-10-06), an optional closing date for the genesis sale, a treasury apart
 from the owner's key, and a site link the owner sets. golf/v2 and store do
 not change. Nothing is deployed. One point stays open for the user:
 `Renounce`. The portrait drawn from the traits is built (`svg.gno`,
@@ -81,14 +81,17 @@ realm. A Legendary is bought as any
 gnome, at its sale's price, by the first who buys it: there is no auction,
 no escrow, no bid to refund.
 
-**The genesis sale closes on a date.** None is set at deploy, and the
-genesis is not sold until the owner sets one (the audit's L1, 2026-10-18;
-the user's decision of 2026-10-07 had left it optional): `SetMintOpen(true)`
-and `OpenSale` of the genesis are refused before it, so a buyer always
-knows when the sale ends. `SetCloseAt(at)`, owner only, once the genesis is
-published. A date in the
-future, which can later be brought forward, never pushed back, by this
-owner or the next; once one is set, the genesis's sale may not start at or
+**The genesis sale may close on a date.** The date is optional (the
+owner's decision of 2026-10-19, back to the user's of 2026-10-07; the
+audit's L1 of 2026-10-18 had made it mandatory, `errNoClose`, now gone):
+none is set at deploy, the genesis may be put on sale without one
+(`SetMintOpen(true)`, `OpenSale`), and it then sells until sold out
+(`closeAt` 0: never closes). `SetCloseAt(at)`, owner only, once the genesis
+is published, sets one at any time, before or after the sale opens. A date
+at least 7 days ahead (`closeNotice`: a buyer of a sale with no date, or a
+later one, is never surprised by a close), after the start of the genesis's
+sale, which can later be brought forward (7 days ahead still), never pushed back nor removed, by this owner or the next:
+the date a buyer reads is the latest the sale can run. Once one is set, the genesis's sale may not start at or
 after it, which nobody could buy from, from either side: `OpenSale` refuses
 such a start, and `SetCloseAt` a date at or before the genesis's sale yet to
 start (a close cannot come before a sale the owner has announced;
@@ -290,8 +293,8 @@ while on sale, an earned kind, a player).
 | SetPrice | an announced sale discounted or raised | a sale keeps its prices | `TestASaleKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, OpenSale | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
-| SetMintOpen, OpenSale | the genesis sold with no closing date | refused until one is set | `TestTheGenesisSellsOnlyOnceItsCloseIsSet` |
-| OpenSale, SetCloseAt | the genesis's sale starting at or after the close, which nobody could buy from | once a date is set, the sale starts before it, and the date never comes to or before the sale yet to start | `TestTheGenesisSellsOnlyOnceItsCloseIsSet`, `TestTheCloseNeverComesBeforeTheGenesisSaleOpens` |
+| SetMintOpen, OpenSale, SetCloseAt | the genesis with no closing date held, or closed; a date set later removed or pushed back | none needed: it sells until sold out, never closed; a date set later only comes forward, and closes the unsold from it | `TestTheGenesisSellsWithNoCloseSet` |
+| OpenSale, SetCloseAt | the genesis's sale starting at or after the close, which nobody could buy from | once a date is set, the sale starts before it, and the date never comes to or before the sale yet to start | `TestTheGenesisSaleStartsBeforeAClose`, `TestTheCloseNeverComesBeforeTheGenesisSaleOpens` |
 | OpenSale | a start in milliseconds or far off, holding every close after it; the window's end overflowing | a day back to a year ahead | `TestASaleStartsWithinADayBackAndAYearAhead` |
 | CancelSale | a sale under way or with a gnome sold withdrawn; by another; another sale's window reset by the shift | before its start only, owner only; windows under the series | `TestASaleYetToStartCanBeCancelled`, `TestAWindowSurvivesASaleCancelledBeforeIt` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |

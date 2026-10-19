@@ -230,6 +230,8 @@ button.issue__why:hover { text-decoration-style: solid; }
 
 /* a new hole: its world as the game's choices (Segmented, each its emblem), its starters as cards */
 .bholes__new { display: grid; gap: var(--sp-4); }
+/* your holes and a new one apart: the dashed rule of a sheet's parts */
+:is(.bholes__mine, .bholes__new) + :is(.bholes__mine, .bholes__new) { padding-top: var(--sp-5); border-top: var(--rule); }
 .bholes__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .bholes__worlds button { flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 4px var(--sp-4) 4px var(--sp-2); white-space: nowrap; }
 .bholes__worlds svg { width: 32px; height: 32px; }
@@ -477,7 +479,8 @@ button.issue__why:hover { text-decoration-style: solid; }
 :is(.bgloss__keys, .board__keys, .pview__say) kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
 .bgloss__keys kbd { font-weight: 800; }
 .board--pan, .board--pan * { cursor: grab !important; }
-.bgloss h2 { margin: var(--sp-2) 0 0; font-size: var(--fs-sub); } /* (a group's title in the sheet: .h-sub's size) */
+.bgloss h2 { padding-right: 40px; } /* (clear of the X) */
+.bgloss h3 { margin: var(--sp-2) 0 0; } /* (its pieces' group, .h-sub) */
 .bgloss ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--sp-2) var(--sp-3); }
 .bgloss__piece { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .bgloss__piece img { flex: none; border-radius: 10px; background: #4f8a6b; }

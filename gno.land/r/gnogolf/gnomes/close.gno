@@ -6,17 +6,20 @@ import (
 	"time"
 )
 
-// The genesis sale's closing date (ADR-007): none at deploy, and the
-// genesis is not sold until the owner sets one, once it is published: the
-// sale does not open (SetMintOpen) and the genesis's sale is not opened
-// (OpenSale) before it, so a buyer always knows when the sale ends. Once set it comes
-// forward, never back: a buyer can count on the date
+// The genesis sale's closing date (ADR-007): optional. None at deploy, and
+// the genesis may be sold without one: it then sells until sold out. The
+// owner may set one later, once the genesis is published; once set it comes
+// forward, never back, and is never removed: a buyer can count on the date
 // announced, and on no gnome of the genesis being sold after it. The
 // genesis's sale starts before it. From that block on, its unsold gnomes are
 // closed for good: Buy and OpenSale refuse them, and the genesis's final
 // supply is what was sold (Collection's "sold"). A later series is not closed by
-// it, and earned gnomes never are. 0 is no date set.
+// it, and earned gnomes never are. 0 is no date set: never closes.
 var closeAt int64
+
+// closeNotice is the least notice of a close (or of one brought forward):
+// a buyer of a sale with no date, or with a later one, is never surprised.
+const closeNotice int64 = 7 * 24 * 3600
 
 // CloseAt is the genesis sale's closing date (unix seconds, block time), 0
 // before one is set.
@@ -35,8 +38,8 @@ func SetCloseAt(cur realm, at int64) {
 	if genesisClosed() {
 		panic("gnomes: the genesis sale closed on " + dateOf(closeAt))
 	}
-	if at <= now() {
-		panic("gnomes: a closing date is in the future")
+	if at < now()+closeNotice {
+		panic("gnomes: a closing date is announced at least 7 days ahead")
 	}
 	if closeAt != 0 && at > closeAt {
 		panic("gnomes: the closing date comes forward, never later than " + dateOf(closeAt))
@@ -57,24 +60,19 @@ func isClosed(id int64) bool {
 	return genesisClosed() && seriesAt(id) == 0 && !isSold(id)
 }
 
-// errNoClose refuses the genesis's sale before its closing date is set.
-const errNoClose = "gnomes: the genesis sells only once its closing date is set (SetCloseAt)"
-
 func errClosedOn() string { return "gnomes: the genesis sale closed on " + dateOf(closeAt) }
 
 // checkCloseFor checks a sale of series si from start against the close:
-// for the genesis (the first series), none before a date is set, none once
-// it has closed, nor one starting at or after it, which nobody could buy
-// from.
+// for the genesis (the first series), none once it has closed, nor one
+// starting at or after a date set, which nobody could buy from. No date set
+// holds nothing: the genesis then sells until sold out.
 func checkCloseFor(si int, start int64) error {
 	switch {
 	case si != 0:
 		return nil
-	case closeAt == 0:
-		return errors.New(errNoClose)
 	case genesisClosed():
 		return errors.New(errClosedOn())
-	case start >= closeAt:
+	case closeAt != 0 && start >= closeAt:
 		return errors.New("gnomes: the genesis sale starts before it closes, on " + dateOf(closeAt))
 	}
 	return nil

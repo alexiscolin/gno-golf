@@ -8,21 +8,23 @@ import (
 	"gno.land/p/nt/urequire/v0"
 )
 
-// The genesis sale has a hard closing date: the owner sets it once the
-// genesis is published, and may bring it forward, never push it back. From
-// then on its unsold gnomes are closed for good.
+// The genesis sale's closing date is optional: the owner may set one once
+// the genesis is published, and may bring it forward, never push it back nor
+// remove it. From then on its unsold gnomes are closed for good.
 
 func TestOnlyTheOwnerSetsTheCloseOncePublished(cur realm, t *testing.T) {
 	setUp(0, cur, deployer)
 	testing.SetRealm(asUser(deployer, nil))
-	urequire.AbortsContains(t, cur, "genesis", func() { SetCloseAt(cross(cur), now()+3600) })
+	urequire.AbortsContains(t, cur, "genesis", func() { SetCloseAt(cross(cur), now()+closeNotice) })
 	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
 	testing.SetRealm(asUser(alice, nil))
-	urequire.AbortsContains(t, cur, "only the owner", func() { SetCloseAt(cross(cur), now()+3600) })
+	urequire.AbortsContains(t, cur, "only the owner", func() { SetCloseAt(cross(cur), now()+closeNotice) })
 	testing.SetRealm(asUser(deployer, nil))
-	urequire.AbortsContains(t, cur, "future", func() { SetCloseAt(cross(cur), now()) })
-	SetCloseAt(cross(cur), now()+3600)
-	uassert.Equal(t, now()+3600, CloseAt())
+	// a week's notice at least: never a close sprung on the buyers
+	urequire.AbortsContains(t, cur, "7 days ahead", func() { SetCloseAt(cross(cur), now()) })
+	urequire.AbortsContains(t, cur, "7 days ahead", func() { SetCloseAt(cross(cur), now()+closeNotice-1) })
+	SetCloseAt(cross(cur), now()+closeNotice)
+	uassert.Equal(t, now()+closeNotice, CloseAt())
 }
 
 // Monotonic: earlier, never later; the next owner is held to it too.
@@ -47,15 +49,14 @@ func TestAnEmptyOwnerCannotSetTheClose(cur realm, t *testing.T) {
 	fresh(t, cur)
 	owner = ""
 	testing.SetRealm(asUser("", nil))
-	urequire.AbortsContains(t, cur, "only the owner", func() { SetCloseAt(cross(cur), now()+3600) })
+	urequire.AbortsContains(t, cur, "only the owner", func() { SetCloseAt(cross(cur), now()+closeNotice) })
 }
 
 // The boundary: open in the block before the date, closed in the block at it.
 func TestTheSaleClosesAtItsDateToTheBlock(cur realm, t *testing.T) {
 	fresh(t, cur)
 	at := now() + 5 // the next block
-	testing.SetRealm(asUser(deployer, nil))
-	SetCloseAt(cross(cur), at)
+	closeAt = at // (set as stored: the block's boundary here, not the notice SetCloseAt asks)
 	testing.SetRealm(asUser(alice, ugnot(priceOf(1))))
 	Buy(cross(cur), "1") // the block before: open
 
@@ -72,8 +73,8 @@ func TestAClosedGnomeIsNeverSold(cur realm, t *testing.T) {
 	testing.SetRealm(asUser(alice, ugnot(priceOf(1))))
 	Buy(cross(cur), "1")
 	testing.SetRealm(asUser(deployer, nil))
-	SetCloseAt(cross(cur), now()+5)
-	skip(5)
+	SetCloseAt(cross(cur), now()+closeNotice)
+	skip(closeNotice)
 	uassert.True(t, strings.Contains(Gnome("1"), `"sold":true,"closed":false`), "a sold gnome is not closed")
 	uassert.True(t, strings.Contains(Gnome("2"), `"sold":false,"closed":true`))
 	uassert.True(t, strings.Contains(Collection(), `"series":[{"name":"genesis","first":1,"last":720,"sold":1,"closed":true,"sale":{`))
@@ -92,8 +93,8 @@ func TestTheCloseIsTheGenesissOnly(cur realm, t *testing.T) {
 	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
 	urequire.NoError(t, openSale("winter-2027", now(), 0))
 	testing.SetRealm(asUser(deployer, nil))
-	SetCloseAt(cross(cur), now()+5)
-	skip(5)
+	SetCloseAt(cross(cur), now()+closeNotice)
+	skip(closeNotice)
 	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
 	uassert.Equal(t, "721", Buy(cross(cur), "721"))
 	testing.SetRealm(asUser(alice, nil))
@@ -104,25 +105,52 @@ func TestTheCloseDateReads(t *testing.T) {
 	uassert.Equal(t, "2026-11-30 18:00 UTC", dateOf(1796061600))
 }
 
-// The genesis is sold only once its closing date is set: before it, the
-// sale does not open and the genesis's is not opened (a buyer always knows
-// when its sale ends). A later series is not held to it. Once one is set,
-// the genesis's sale does not start at or after it, which nobody could buy
-// from.
-func TestTheGenesisSellsOnlyOnceItsCloseIsSet(cur realm, t *testing.T) {
+// The genesis may sell with no closing date: the sale opens, the genesis's
+// sale opens and sells, and nothing closes it (it sells until sold out).
+// The owner may set a date later, after its start, only bringing it
+// forward; from that date its unsold gnomes are closed. Once one is set, the
+// genesis's sale does not start at or after it, which nobody could buy from.
+func TestTheGenesisSellsWithNoCloseSet(cur realm, t *testing.T) {
 	setUp(0, cur, deployer)
 	testing.SetRealm(asUser(deployer, nil))
-	urequire.AbortsContains(t, cur, errNoClose, func() { SetMintOpen(cross(cur), true) }, "nothing published")
+	SetMintOpen(cross(cur), true)
+	uassert.True(t, MintOpen(), "nothing published, no date: the switch is the owner's")
+	SetMintOpen(cross(cur), false)
 	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
-	urequire.AbortsContains(t, cur, errNoClose, func() { SetMintOpen(cross(cur), true) })
-	urequire.AbortsContains(t, cur, errNoClose, func() { OpenSale(cross(cur), genesisName, now(), 0) })
-	uassert.False(t, MintOpen())
-	uassert.Equal(t, 0, len(sales))
-	SetMintOpen(cross(cur), false) // closing it is always taken
-	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
-	urequire.NoError(t, openSale("winter-2027", now(), 0), "a later series is not the genesis's")
+	SetMintOpen(cross(cur), true)
+	OpenSale(cross(cur), genesisName, now(), 0)
+	uassert.Equal(t, int64(0), CloseAt())
+	testing.SetRealm(asUser(alice, ugnot(priceOf(1))))
+	Buy(cross(cur), "1")
+	skip(400 * 24 * 3600) // over a year on: no date, never closed
+	uassert.False(t, genesisClosed())
+	uassert.False(t, isClosed(2))
+	uassert.True(t, strings.Contains(Collection(), `"closesAt":0,`))
+	uassert.True(t, strings.Contains(Gnome("2"), `"sold":false,"closed":false`))
+	testing.SetRealm(asUser(alice, ugnot(priceOf(2))))
+	Buy(cross(cur), "2")
 
-	at := now() + 3600
+	// a date set later: in the future, forward only, never removed
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "7 days ahead", func() { SetCloseAt(cross(cur), 0) }, "never removed")
+	at := now() + closeNotice
+	SetCloseAt(cross(cur), at)
+	urequire.AbortsContains(t, cur, "never later", func() { SetCloseAt(cross(cur), at+1) })
+	urequire.AbortsContains(t, cur, "7 days ahead", func() { SetCloseAt(cross(cur), 0) })
+	uassert.Equal(t, at, CloseAt())
+	skip(closeNotice)
+	uassert.True(t, isClosed(3), "an unsold genesis gnome is closed from the date on")
+	uassert.False(t, isClosed(1), "a sold one is not")
+	testing.SetRealm(asUser(alice, ugnot(priceOf(3))))
+	urequire.AbortsContains(t, cur, "gnomes: the genesis sale closed on "+dateOf(at), func() { Buy(cross(cur), "3") })
+}
+
+// With a date set, the genesis's sale does not start at or after it.
+func TestTheGenesisSaleStartsBeforeAClose(cur realm, t *testing.T) {
+	setUp(0, cur, deployer)
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
+	at := now() + closeNotice
 	SetCloseAt(cross(cur), at)
 	SetMintOpen(cross(cur), true)
 	uassert.True(t, MintOpen())
@@ -136,11 +164,11 @@ func TestTheGenesisSellsOnlyOnceItsCloseIsSet(cur realm, t *testing.T) {
 // then buy from.
 func TestTheCloseNeverComesBeforeTheGenesisSaleOpens(cur realm, t *testing.T) {
 	noSale(t, cur)
-	start := now() + 2*24*3600
+	start := now() + closeNotice + 2*24*3600 // (past the notice a close asks)
 	urequire.NoError(t, openSale(genesisName, start, 0))
 	testing.SetRealm(asUser(deployer, nil))
 	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start) })
-	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), now()+3600) })
+	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), now()+closeNotice) })
 	SetCloseAt(cross(cur), start+3600)
 	urequire.AbortsContains(t, cur, "gnomes: the genesis sale starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start-5) })
 	uassert.Equal(t, start+3600, CloseAt())

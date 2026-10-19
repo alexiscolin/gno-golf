@@ -10,11 +10,10 @@ import (
 	"gno.land/r/gnogolf/store"
 )
 
-// noSale is a fresh collection with no sale yet: the genesis's close a
-// year off (it sells only once one is set), the mint open.
+// noSale is a fresh collection with no sale yet: no closing date (the
+// default: the genesis sells until sold out), the mint open.
 func noSale(t *testing.T, rlm realm) {
 	published(t, rlm)
-	closeAt = now() + 365*24*3600
 	mintOpen = true
 }
 
@@ -132,7 +131,7 @@ func TestASaleStartsWithinADayBackAndAYearAhead(cur realm, t *testing.T) {
 	testing.SetRealm(asUser(deployer, nil))
 	urequire.AbortsContains(t, cur, "gnomes: a sale starts from a day before now to a year after (unix seconds)",
 		func() { OpenSale(cross(cur), genesisName, now()*1000, 0) }, "milliseconds")
-	SetCloseAt(cross(cur), now()+3600) // the close is the owner's still
+	SetCloseAt(cross(cur), now()+closeNotice) // the close is the owner's still
 	for name, w := range map[string][2]int64{
 		"a day and a second back": {now() - maxSaleBehind - 1, 0},
 		"a year and a second on":  {now() + maxSaleAhead + 1, 0},

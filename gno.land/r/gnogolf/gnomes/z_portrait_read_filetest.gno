@@ -28,7 +28,6 @@ import (
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
-	gnomes.SetCloseAt(cross(cur), 4102444800) // (2100: the genesis sells only once its close is set)
 	gnomes.OpenSale(cross(cur), "genesis", time.Now().Unix(), 0)
 	gnomes.SetMintOpen(cross(cur), true)
 
@@ -79,4 +78,4 @@ func genesis() string {
 // 199 true 8170
 
 // Gas:
-// 1473251255
+// 1472992495

@@ -2,7 +2,7 @@
 
 ```sh
 scripts/try-local.sh          # start (Ctrl+C stops it all)
-scripts/try-local.sh close 30 # bring the genesis sale's closing date forward, to 30 days (then only earlier)
+scripts/try-local.sh close 30 # set the genesis sale's closing date, 30 days off (or bring it forward; then only earlier)
 scripts/try-local.sh rebuild  # build the site again, served without a break
 scripts/try-local.sh down     # clean up after a crash
 ```
@@ -38,9 +38,9 @@ atop the gnome picker and on the cups screen). `p1` has a
 record (the players' window lets it buy) and a few gnomes; `p0` has
 neither. All 720 gnomes are on sale at once, in the genesis's one sale, its
 players' window one hour, and the
-genesis sale closes in a year (the realm sells none of the genesis without
-a closing date; `close [days]` brings it forward, to 30 days by default,
-and only ever earlier). `rebuild` builds the site anew with the
+genesis sale has no closing date (it is optional: the genesis sells until
+sold out; `close [days]` sets one, 30 days off by default, and after that
+only ever brings it earlier). `rebuild` builds the site anew with the
 code as it is now, beside the one served, then swaps them in one step:
 the chain and the links never stop, and a failed build leaves the site as
 it was. The

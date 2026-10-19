@@ -5,8 +5,8 @@
 # server. Ctrl+C stops everything. docs/try-local.md says what to try.
 #
 #   scripts/try-local.sh          start it all (a new chain each time)
-#   scripts/try-local.sh close [days]  bring the genesis's closing date forward, to days from now (30);
-#                                 it is a year off at start
+#   scripts/try-local.sh close [days]  set the genesis's closing date, or bring it forward, to days
+#                                 from now (30); there is none at start (the genesis sells until sold out)
 #   scripts/try-local.sh rebuild  build the site again from this checkout and swap it in, the chain and the
 #                                 links running all along (the old site serves until the new one is in)
 #   scripts/try-local.sh down     clean up after a crash: its processes and its Serve entries
@@ -14,8 +14,8 @@
 # What it does: scripts/e2e-gnomes.sh SEED=1 starts gnodev (the onyx
 # toolchain's) and deploys physics, course, weblink, jsonq, store, golf/v2 and
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
-# genesis series, its closing date a year off (the realm sells none of the
-# genesis without one: "close" brings it forward), the whole genesis on sale
+# genesis series, with no closing date (it is optional: "close" sets one,
+# then only brings it forward), the whole genesis on sale
 # in its one sale (its players' window an hour); community publishing open; the treasury moved to a test key; p1 and
 # b1 with a record and a few gnomes; all the course, the four classic cups
 # and the Crystal Mines. Then the site built as the real one is (next build:
@@ -188,7 +188,7 @@ MNEMONIC_p1=$("$GNOKEY" generate 2>/dev/null | tail -1) MNEMONIC_p0=$("$GNOKEY" 
 [ "$(printf %s "$MNEMONIC_p1" | wc -w)" -ge 12 ] && [ "$(printf %s "$MNEMONIC_p0" | wc -w)" -ge 12 ] || die "gnokey generate made no seed phrase"
 log "try-local: a local chain ($CHAINID), the realms under $NS and the course's 90 holes (a few minutes; its log: $WORK/seed.log)"
 MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
-	SEED=1 SEED_CLOSE=365 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
+	SEED=1 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
 	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT \
 	bash "$root/scripts/e2e-gnomes.sh" >"$WORK/seed.out" 2>"$WORK/seed.log" ||
 	{ DEV_PID=$(sed -n 's/^DEV_PID=//p' "$WORK/seed.env" 2>/dev/null); tail -5 "$WORK/seed.log" >&2; die "the seed failed (its steps: $WORK/e2e.md)"; }
@@ -281,7 +281,7 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
        community holes to play): the three hints (again with "?"), make a hole,
        Play it (hole it in each weather), Publish.
     6. Find it: Solo, the cups screen's "Community holes", under the cups.
-  The genesis's closing date nearer:  scripts/try-local.sh close [days]
+  A closing date for the genesis (or a nearer one):  scripts/try-local.sh close [days]
   This checkout's changes in, the site running all along:  scripts/try-local.sh rebuild
   Logs: $WORK   Ctrl+C stops everything (after a crash: scripts/try-local.sh down).
 ================================================================================

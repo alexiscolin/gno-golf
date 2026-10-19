@@ -33,8 +33,9 @@ export default function Hints({ onDone, glossary = null }: {
   const tiles = allTiles(glossary.palette);
   return (
     <Sheet label={`How it works, and ${theWorld(glossary.world)}'s pieces`} className="bgloss" onClose={onDone}>
+      <h2>How it works</h2>
       <div className="bgloss__hints">{hints(true)}</div>
-      <h2>{cap(theWorld(glossary.world))}&apos;s pieces</h2>
+      <h3 className="h-sub">{cap(theWorld(glossary.world))}&apos;s pieces</h3>
       <ul>
         {tiles.map((t) => (
           <li key={t.key} className="bgloss__piece" title={t.looks.length > 1 ? t.looks.map(entryName).join(", ") : undefined}>

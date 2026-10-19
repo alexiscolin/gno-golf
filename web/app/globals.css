@@ -2030,7 +2030,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: var(--chip-room); } /* the
 /* community holes: a small list under the cups */
 .community { margin: var(--sp-5) auto 0; max-width: 640px; text-align: left; }
 /* a front section's heading: the records to beat', the community holes' */
-.podium__head h3, .community h3 { margin: 0; font-size: 14px; color: var(--ink); }
+.podium__head h3, .community h3 { margin: 0; } /* (.h-section: a section's title, as the rival's) */
 /* the course's records to beat: a slim strip under the cups' title, seen without scrolling */
 .podium { margin: 4px auto 32px; width: 100%; max-width: 980px; text-align: left; }
 .podium__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }

@@ -51,6 +51,8 @@ func renderHome() string {
 			verb = "closed"
 		}
 		b.WriteString("The genesis sale " + verb + " on " + dateOf(closeAt) + ".\n\n")
+	} else if saleOf(genesisName) >= 0 {
+		b.WriteString("The genesis sale has no closing date: it runs until sold out, unless one is announced later (at least 7 days ahead).\n\n")
 	}
 	b.WriteString("## Sale\n\n| series | gnomes | opens | common / rare / epic / legendary | found a player |\n|---|---|---|---|---|\n")
 	for _, s := range sales {

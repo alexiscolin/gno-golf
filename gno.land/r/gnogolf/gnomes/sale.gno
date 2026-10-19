@@ -44,9 +44,9 @@ func SetPrice(cur realm, tierName string, ugnot int64) {
 // OpenSale puts every gnome of series name on sale from start (unix
 // seconds, block time, from a day before now to a year after), to wallets
 // with a record only for its first playerHours (0 for none), at today's
-// prices. Owner only, once a series; for the genesis, refused before its
-// closing date is set, once its sale has closed, or from a start at or
-// after its closing date (close.gno).
+// prices. Owner only, once a series; for the genesis, refused once its sale
+// has closed, or from a start at or after its closing date if one is set
+// (close.gno).
 func OpenSale(cur realm, name string, start, playerHours int64) {
 	assertOwner(0, cur)
 	if err := openSale(name, start, playerHours); err != nil {

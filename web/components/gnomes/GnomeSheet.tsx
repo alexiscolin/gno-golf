@@ -181,18 +181,20 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   }
 
   const onChain = look === "chain" ? portraitsOf(chain) : null;
-  // his picture, the look switch under it (in his first view alone), then who he is on the same axis: his tier and
-  // number on one line (or his place in the series), his name (the sheet's title)
-  const head = (small = false, title: ReactNode = g.name, swap = false, meta: ReactNode = <>#{g.id} · {worldName(g.home)}</>) => (
+  // his picture, and beside it (stacked on a phone) who he is: his tier and number on one line (or his place in the
+  // series), his name (the sheet's title), what is said of him (say), the look switch (in his first view alone)
+  const head = (small = false, title: ReactNode = g.name, swap = false, meta: ReactNode = <>#{g.id} · {worldName(g.home)}</>, say: ReactNode = null) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
       <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
-      {swap && <LookSwitch look={look} onLook={onLook} />}
       <div className="gsheet__id">
         {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /><span>{meta}</span></span>}
         <h2>{title}</h2>
+        {say && <p className="gsheet__line">{say}</p>}
+        {swap && <LookSwitch look={look} onLook={onLook} />}
       </div>
     </div>
   );
+  const share = <ShareOne text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} />;
   const theirs = (who: string) => <button className="linkish" onClick={() => onTheirs(who)}>Their gnomes →</button>;
   const close = step.at === "sign" || step.at === "read" ? () => {} : onClose; // (no closing while Adena is open)
 
@@ -202,8 +204,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       const traits = decode(g.traits);
       body = (
         <>
-          {head(false, g.name, true)}
-          <p className="gsheet__line">{g.line}</p>
+          {head(false, g.name, true, undefined, g.line)}
           {/* what is said of him (above), his traits and his share, then his one action in the footer, last */}
           {row && row.closed ? (
             <p className="gsheet__fine"><b>Never made.</b> The sale closed before this gnome found a player.</p>
@@ -223,10 +224,11 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
               <dl className="review">{traitRows(traits).map((r, i) => <Term key={`${r.trait}-${i}`} k={r.trait} v={r.value} />)}</dl>
             </details>
           )}
-          <ShareOne text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} />
+          {/* Share beside the one action (a third of its width, its height), alone where there is none */}
+          {(row && row.closed) || !(mine || (!owner && (unread || region))) ? share : null}
           {row && row.closed ? null : mine ? (
             <div className="gsheet__foot">
-              <Button variant="gold" className="btn--wide" onClick={() => (onPlay(skin.id), onClose())}>{playing === skin.id ? `Playing ${g.name}` : `Play with ${g.name}`}</Button>
+              <div className="gsheet__act">{share}<Button variant="gold" className="btn--wide" onClick={() => (onPlay(skin.id), onClose())}>{playing === skin.id ? `Playing ${g.name}` : `Play with ${g.name}`}</Button></div>
               {worn !== skin.id && region && (
                 <button className="linkish" disabled={equip === "busy"} onClick={() => void showEveryone()}>
                   {equip === "done" ? "Everyone sees this gnome now" : equip === "busy" ? "Sign in Adena…" : `Show ${g.name} to everyone · about ${(Math.ceil((GNOME_TX.equip.gas * PRICE * 1.5) / 1e4) / 100).toFixed(2)} GNOT`}
@@ -237,15 +239,15 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
               <p className="gsheet__fine">Playing any gnome you hold is free. {worn === skin.id ? "Everyone sees this one on your ball." : ""}</p>
             </div>
           ) : owner ? null : unread ? (
-            <div className="gsheet__foot"><p className="note note--bad" role="alert">The chain did not answer.</p><Button variant="primary" className="btn--wide" onClick={read}>Try again</Button></div>
+            <div className="gsheet__foot"><p className="note note--bad" role="alert">The chain did not answer.</p><div className="gsheet__act">{share}<Button variant="primary" className="btn--wide" onClick={read}>Try again</Button></div></div>
           ) : region && !account && hasAdena() ? (
             <div className="gsheet__foot">
               {want && wallet.error && <p className="note note--bad" role="alert">{wallet.error}</p>}
-              <Button variant="chain" className="btn--wide" disabled={!row || wallet.busy} onClick={() => (setWant(true), onConnect())}>{wallet.busy ? "Waiting for Adena…" : "Connect Adena to buy"}</Button>
+              <div className="gsheet__act">{share}<Button variant="chain" className="btn--wide" disabled={!row || wallet.busy} onClick={() => (setWant(true), onConnect())}>{wallet.busy ? "Waiting for Adena…" : "Connect Adena to buy"}</Button></div>
             </div>
           ) : region ? (
             <div className="gsheet__foot">
-              <Button variant="chain" className="btn--wide" disabled={!row || !!why || want} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
+              <div className="gsheet__act">{share}<Button variant="chain" className="btn--wide" disabled={!row || !!why || want} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button></div>
               {why && why.note && <p className="gsheet__fine">{why.note}</p>}
               {why && why.play && <Button variant="gold" className="btn--wide" onClick={() => (onClose(), onRound())}>Play a round →</Button>}
             </div>

@@ -1028,7 +1028,7 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra, holes = 
   return (
     <section className="podium" aria-label="Records to beat today">
       <header className="podium__head">
-        <h3>Records to beat <small>{AIM_NAMES[mode]} · today</small></h3>
+        <h3 className="h-section">Records to beat <small>{AIM_NAMES[mode]} · today</small></h3>
         <span className="podium__links">
           {extra}
           <button className="linkish podium__open" onClick={() => (sound("blip"), onOpen())}>All players →</button>

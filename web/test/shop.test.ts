@@ -229,6 +229,16 @@ test("shop: the closing line's room: the line with a date, none without, kept wh
   assert.equal(closingSlot(collection({ closesAt: 0 })), "none");
   assert.equal(closingSlot(null), "room", "unknown: the room kept, the line may come");
 });
+test("shop: a genesis with no closing date (closesAt 0) sells on: no closing, nothing never made, years on", () => {
+  const c = collection({ closesAt: 0 }), later = T0 + 400 * 86400, seen = { c, sold: isSold([]), mine: new Set<number>(), now: later };
+  assert.equal(nowRow(c, isSold([1]), entries, later).at, "open");
+  const line = saleLine(nowRow(c, isSold([1]), entries, later), c, entries, isSold([1]), later);
+  assert.ok(line && line.at === "open" && !/never|close/i.test(JSON.stringify(line)), "the card says no closing");
+  assert.match(cardFact(entries[1], seen), / GNOT$/, "its price, not \"Never made\"");
+  assert.ok(canBuyCard(entries[1], seen));
+  const unlisted = whyNot(can({ reason: "unlisted" }), collection({ closesAt: 0, series: [genesis({ sale: null })] }), { id: 94, tier: "epic", home: "garden" }, T0);
+  assert.deepEqual(unlisted, { button: "Not on sale yet", note: "From the Garden." }, "no date: no \"or never\"");
+});
 
 // ------------------------------------------------------------ a player's gnomes
 test("shop: a player's gnomes titled by their name, else their short address, never \"Their's\"", () => {

@@ -37,8 +37,8 @@
 # and its row says so. The players are other accounts, so they call with gnokey.
 #
 # SEED=1 plays no scenario: it deploys, then seeds what the shop's screens
-# show (the genesis published; the close in 30 days, set first: the realm
-# sells none of the genesis without one; its sale, every gnome of it, open
+# show (the genesis published, with no closing date unless SEED_CLOSE sets
+# one; its sale, every gnome of it, open
 # since a minute, its player window an hour; p1 and b1 with a record, p1 holding two Commons and a Rare, one
 # worn, b1 a Common; the Legendaries on sale at their price; p0 and b2 with
 # their balance alone), in a few minutes. The chain
@@ -53,8 +53,8 @@
 # new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
 # end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WORLDS publishes every course hole of those worlds too
 # ("garden island": garden/3 alone by default), SEED_CLOSE sets the closing
-# date that many days off (30; never none: the genesis is not sold without
-# one), SEED_PUBLISHING=1 opens
+# date that many days off (none by default: the genesis then sells until
+# sold out; the owner may set one later), SEED_PUBLISHING=1 opens
 # community publishing, SEED_TREASURY=1 moves the treasury to the treas key.
 set -u
 
@@ -352,12 +352,14 @@ if [ "${SEED:-}" = 1 ]; then
 	C1=$(pl 0 "['tiers']['common']['first']") R1=$(pl 0 "['tiers']['rare']['first']") L1=$(pl 0 "['tiers']['legendary']['first']")
 	price() { qg "Gnome(\"$1\")" | jf 'd["price"]'; }
 	recorded() { q "$STORE" "Has(\"totals\",\"assisted $1\")"; }
-	days=${SEED_CLOSE:-30}
-	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ] || die "seed: SEED_CLOSE is a number of days, 1 or more"
+	days=${SEED_CLOSE:-}
+	[ -z "$days" ] || { [[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ]; } || die "seed: SEED_CLOSE is a number of days, 1 or more (unset: no closing date)"
 	GASW=3000000000 ok "seed: publish the genesis" "published" test1 "$GN" AddSeries genesis "$(cat "$ROWS")"; must
-	# the close first: the realm opens no sale of the genesis before one is set
-	CLOSE=$(($(chaintime) + days * 86400))
-	ok "seed: close in $days days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
+	CLOSE=0 # (optional: none unless SEED_CLOSE; "try-local.sh close" sets one later)
+	if [ -n "$days" ]; then
+		CLOSE=$(($(chaintime) + days * 86400))
+		ok "seed: close in $days days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
+	fi
 	ok "seed: open the sale" "open" test1 "$GN" SetMintOpen true; must
 	# the records first (finding a holing shot may wait out a period), so
 	# that the player window starts when the rest is quick
@@ -438,10 +440,9 @@ is "catalogue: Gnome(104)" "Gnome(\"104\").tier,name" "legendary The Miller" "$(
 REALM_ADDR=$(py realm "$GN")
 SEND=36000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
 NOW=$(chaintime)
-no "sale: not before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" SetMintOpen true
-no "sale: no series opened before the genesis's close is set" "the genesis sells only once its closing date is set" test1 "$GN" OpenSale genesis "$NOW" 1
+ok "sale: open, no closing date set (it is optional)" "open" test1 "$GN" SetMintOpen true
+is "close: none set" "CloseAt()" "0" "$(qg 'CloseAt()')"
 ok "close: set a year off, before any sale" "set" test1 "$GN" SetCloseAt "$((NOW + 365 * 86400))"
-ok "sale: open" "open" test1 "$GN" SetMintOpen true
 is "sale: MintOpen()" "MintOpen()" "true" "$(qg 'MintOpen()')"
 
 # -------------------------------------------------- the genesis's one sale

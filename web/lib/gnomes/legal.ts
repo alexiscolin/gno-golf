@@ -35,10 +35,10 @@ export const SIGN_NOTE = "Your wallet will open and ask you to sign. Signing is 
 export const TRUST = ["Cosmetic only: same ball, same physics.", "You pick the exact gnome; nothing is random.", "Not an investment. No promise of value or resale."];
 /** What each tier's price stands for on the course, said under a sheet's price when it is the tier's own. */
 export const PAR: Record<string, readonly [ugnot: number, words: string]> = {
-  common: [36e6, "the par of nine holes"], rare: [72e6, "the par of a course"], epic: [336e6, "the dimples on a ball"], legendary: [1296e6, "eighteen holes times par 72"],
+  common: [36e6, "It's the par of nine holes."], rare: [72e6, "It's the par of a full course."], epic: [336e6, "A golf ball has 336 dimples."], legendary: [1296e6, "Eighteen holes times par 72."],
 };
-/** A price's golf number ("36: the par of nine holes"), "" for a price not its tier's own. */
-export const parLine = (tier: string, price: number) => (Object.hasOwn(PAR, tier) && PAR[tier][0] === price ? `${gnot(price)}: ${PAR[tier][1]}` : "");
+/** Why a price is that number, in golf ("Why 36 GNOT? It's the par of nine holes."), "" for a price not its tier's own. */
+export const parLine = (tier: string, price: number) => (Object.hasOwn(PAR, tier) && PAR[tier][0] === price ? `Why ${gnot(price)} GNOT? ${PAR[tier][1]}` : "");
 /** Words the shop never uses (§5), lower case. */
 export const BANNED = ["invest ", "investment opportunity", "floor", "returns on", "roi", "profit", "appreciate", "will go up", "last chance", "only "];
 
@@ -55,9 +55,9 @@ const stamp = (unix: number) => {
 };
 
 /** The sale period (申込期間), on the confirmation and the receipt: the genesis's closing date, or plainly that none
- *  is set (the realm sells none of the genesis until the owner sets it: only a later series' gnome then). */
+ *  is set (it is optional: the sale then runs until sold out; the owner may still set one, never later once set). */
 const salePeriod = (closesAt: number, now: number) =>
-  closesAt ? `The genesis sale closes on ${utcDate(closesAt, now)} (${jstDate(closesAt)}).` : "The genesis sale has no closing date set yet: the Contract sells none of the genesis until one is set.";
+  closesAt ? `The genesis sale closes on ${utcDate(closesAt, now)} (${jstDate(closesAt)}).` : "The genesis sale has no closing date: it runs until sold out, unless one is announced later.";
 
 /** An order: the gnome, the address, the sale's closing, and its bill's figures (shop.ts bill: its total the one the button says too). */
 interface Order extends Pick<Bill, "price" | "deposit" | "fee" | "total"> { name: string; id: number; tier: string; n: number; address: string; closesAt: number; now: number }
