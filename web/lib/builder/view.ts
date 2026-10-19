@@ -22,12 +22,43 @@ const DOCK = 56;
  * as it always was, on a board no bigger than FRAME_REF; on a bigger one the
  * room past what FRAME_REF would give shows the world round it, up to ROOM
  * a side, the hole never drawn smaller than FRAME_REF draws it (nor larger
- * than it filling the board).
+ * than it filling the board). Given the island (islandIn), the sight is moved,
+ * the hole kept in it, to lie inside the island where it can, or to have the
+ * island in its middle along an axis the island is shorter than it on.
  */
-export function frameView(lo: P, hi: P, size: { w: number; h: number }): View {
+export function frameView(lo: P, hi: P, size: { w: number; h: number }, island?: readonly [P, P]): View {
   const fit = (w: number, h: number, m: number) => Math.min(w / (hi[0] - lo[0] + 2 * m), (h - DOCK) / (hi[1] - lo[1] + 2 * m));
   const now = fit(size.w, size.h, 0), k = clamp(Math.max(Math.min(fit(FRAME_REF.w, FRAME_REF.h, 0), now), fit(size.w, size.h, ROOM)));
-  return { x: (lo[0] + hi[0]) / 2 - size.w / 2 / k, y: (lo[1] + hi[1]) / 2 - (size.h - DOCK) / 2 / k, k };
+  const half = [size.w / 2 / k, (size.h - DOCK) / 2 / k];
+  // each axis: the sight inside the island where it fits in it, else the island in its middle; the hole in sight first
+  const mid = (i: 0 | 1) => {
+    let c = (lo[i] + hi[i]) / 2;
+    if (island) {
+      const [a, b] = [island[0][i], island[1][i]];
+      c = b - a <= 2 * half[i] ? (a + b) / 2 : Math.max(a + half[i], Math.min(b - half[i], c));
+      c = Math.max(hi[i] - half[i], Math.min(lo[i] + half[i], c));
+    }
+    return c - half[i];
+  };
+  return { x: mid(0), y: mid(1), k };
+}
+
+/**
+ * The island the 3D board's world is set on (lib/scene/camera.ts islandBox:
+ * ISLAND round the hole's board, 0..board, more of it behind the tee's side,
+ * less in front), as a box in the view's plane (turned, tilted): what F keeps
+ * the sight inside, so no bare ground shows past one edge while the scenery
+ * is cut at the other.
+ */
+export function islandIn(board: { w: number; h: number }, look: Look, around: { x: number; front: number; back: number }): [P, P] {
+  const lo: P = [-around.x, -around.back], hi: P = [board.w + around.x, board.h + around.front];
+  return boxIn([lo, hi, [lo[0], hi[1]], [hi[0], lo[1]]], look);
+}
+
+/** The box round board points in the view's plane. */
+export function boxIn(ps: readonly P[], look: Look): [P, P] {
+  const cs = ps.map((c) => toPlane(c, look)), xs = cs.map((c) => c[0]), ys = cs.map((c) => c[1]);
+  return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]];
 }
 
 /** The view at scale k (clamped), the board point under p where it was. */

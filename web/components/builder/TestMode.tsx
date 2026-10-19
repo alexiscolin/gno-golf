@@ -23,7 +23,7 @@
 // weather card, the weathers to hole beside them. In play R or Backspace
 // plays again from the tee, V swaps the overview camera, Escape goes back
 // to Build.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button, Dialog } from "@/components/ui";
 import { useFlash } from "@/components/common";
 import Weather, { SkyIcon } from "@/components/Weather";
@@ -73,8 +73,22 @@ function Weathers({ world, list }: { world: string; list: readonly { kind: strin
   );
 }
 
-/** The address, asked in a line of the HUD once a try is holed: Adena's account, or one pasted (kept in this browser); nothing signed. */
-function AddressLine({ strokes, onAddress }: { strokes: number; onAddress: (a: string) => void }) {
+/** The game's hole-finished card (Golf.tsx's banner--win): the hole's name in its pill, what happened its title, then what is given. */
+const WonCard = ({ title, head, label, className = "", children }: { title: string; head: string; label: string; className?: string; children: ReactNode }) => (
+  <div className="banner banner--win tmode__won">
+    <Dialog className={`banner__in ${className}`.trim()} role="dialog" aria-modal="true" aria-label={label}>
+      <span className="eyebrow">In the hole! · {title}</span>
+      <h2>{head}</h2>
+      {children}
+    </Dialog>
+  </div>
+);
+
+/** The round's time, each digit in a box of one width (the font's own are not): it ticks in place, nothing beside it moves. */
+const Clock = ({ text }: { text: string }) => <span className="tmode__clock">{[...text].map((c, i) => /\d/.test(c) ? <i key={i}>{c}</i> : c)}</span>;
+
+/** The address, asked on the hole-finished card once a try is holed: Adena's account, or one pasted (kept in this browser); nothing signed. */
+function AddressLine({ strokes, title, onAddress, onAgain }: { strokes: number; title: string; onAddress: (a: string) => void; onAgain: () => void }) {
   const [typed, setTyped] = useState("");
   const [paste, setPaste] = useState(false);
   const [why, setWhy] = useState("");
@@ -87,25 +101,23 @@ function AddressLine({ strokes, onAddress }: { strokes: number; onAddress: (a: s
       setWhy(e instanceof Error ? e.message : String(e));
     }
   };
+  // the game's hole-finished card (as the end's): what comes next said plainly, nothing signed nor published here
   return (
-    <section className="card tmode__sign" aria-label="Sign your hole">
-      <p title="Your address is part of the hole's name and sets its weather, so your rounds count when you publish. Nothing is signed now.">
-        <b>Holed in {strokes}!</b> Add your address: this round is replayed as yours, then each weather in turn.
-      </p>
-      {paste ? (
-        <span className="tmode__addr">
-          <input value={typed} placeholder="g1…" aria-label="Your address" spellCheck={false} autoCapitalize="off" autoFocus aria-invalid={!!typed && !ok} onChange={(e) => setTyped(e.target.value)} />
-          <Button size="s" variant="gold" disabled={!ok} onClick={() => onAddress(typed.trim())}>Use this address</Button>
-        </span>
-      ) : (
-        <span className="tmode__addr">
-          {hasAdena() ? <Button size="s" variant="primary" onClick={() => void adena()}>Use my Adena address</Button>
-            : <span className="tmode__small">No Adena here (<a href={ADENA_URL} target="_blank" rel="noopener noreferrer">get it</a>)</span>}
-          <button type="button" className="linkish" onClick={() => setPaste(true)}>or paste an address</button>
-        </span>
-      )}
-      {why && <p role="alert" className="tmode__why">{why}</p>}
-    </section>
+    <WonCard title={title} head={`Holed in ${strokes}!`} label="Holed: your address next" className="tmode__sign">
+        <p>Next, each weather. Your address names the hole and sets its weather, so this round and the next count as yours. Nothing is signed or published.</p>
+        {paste ? (
+          <span className="tmode__addr">
+            <input value={typed} placeholder="g1…" aria-label="Your address" spellCheck={false} autoCapitalize="off" autoFocus aria-invalid={!!typed && !ok} onChange={(e) => setTyped(e.target.value)} />
+            <Button variant="primary" disabled={!ok} onClick={() => onAddress(typed.trim())}>Use this address</Button>
+          </span>
+        ) : !hasAdena() && <p className="tmode__small">No Adena here (<a href={ADENA_URL} target="_blank" rel="noopener noreferrer">get it</a>), or paste an address.</p>}
+        {why && <p role="alert" className="tmode__why">{why}</p>}
+        <div className="banner__row">
+          <Button keycap="R" title="R or Backspace" onClick={onAgain}>Try again</Button>
+          {!paste && <Button onClick={() => setPaste(true)}>Paste an address</Button>}
+          {!paste && hasAdena() && <Button variant="primary" onClick={() => void adena()}>Use my Adena address</Button>}
+        </div>
+    </WonCard>
   );
 }
 
@@ -314,6 +326,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     : finished({ strokes: holed, kind: now.kind, why: why[now.kind] });
   const act: Record<Act, () => void> = { again, edit: onLeave, publish: onPublish };
   const sign = (a: string) => (keepAuthor(a), onAuthor(a));
+  const said_ = parSaid(par, guess), asking = trying && holed > 0; // (the score card's par; a try holed: its address asked)
   return (
     <main className={`tmode${party ? " tmode--party" : ""}`}>
       {party && <div className="bconfetti" aria-hidden="true">{BITS.map((b, i) => <i key={i} style={{ left: `${b.x}%`, background: b.color, animationDelay: `${b.delay}ms`, ["--drift" as string]: `${b.drift}px`, ["--turn" as string]: `${b.turn}deg` }} />)}</div>}
@@ -323,7 +336,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
         <div className="card card--score tmode__score" aria-live="polite" aria-atomic="true">
           <span className="eyebrow">Strokes</span>
           <strong>{snap ? snap.strokes : 0}</strong>
-          <span className="card__par">{[parSaid(par, guess), time != null ? clock(time) : ""].filter(Boolean).join(" · ") || "\u00a0"}</span>
+          <span className="card__par">{said_ || (time == null && "\u00a0")}{said_ && time != null && " · "}{time != null && <Clock text={clock(time)} />}</span>
         </div>
         <Weather w={snap?.weather ?? CALM} flash={snap?.flash ?? 0} night={snap?.time === "night"} world={snap?.look ?? draft.world} />
         <Weathers world={draft.world} list={(trying ? required(draft.world) : kinds.map((k) => k.kind)).map((kind) => ({ kind, done: !trying && !left.includes(kind), playing: now?.kind === kind, bad: !!why[kind] && left.includes(kind),
@@ -348,17 +361,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       {said && <p key={said} className="tmode__now" role="status">{said}</p>}
       {now && !card && (
         <footer className="hud hud--bottom">
-          {trying && holed > 0 && <AddressLine strokes={holed} onAddress={sign} />}
-          {/* (nothing to play again before a first shot) */}
-          {(!!snap?.strokes || holed > 0) && <Button title="R or Backspace" keycap="R" onClick={again}>Try again</Button>}
+          {/* (nothing to play again before a first shot; holed on a try, the card's) */}
+          {(!!snap?.strokes || holed > 0) && !asking && <Button title="R or Backspace" keycap="R" onClick={again}>Try again</Button>}
         </footer>
       )}
+      {now && !card && asking && <AddressLine strokes={holed} title={draft.title || "Your hole"} onAddress={sign} onAgain={again} />}
       {/* holed: the game's hole-finished card (Golf.tsx's banner--win), its ways on */}
       {card && (
-        <div className="banner banner--win tmode__won">
-          <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label={card.rows ? "Holed in every weather" : "Hole finished"}>
-            <span className="eyebrow">In the hole! · {draft.title || "Your hole"}</span>
-            <h2>{card.title}</h2>
+        <WonCard title={draft.title || "Your hole"} head={card.title} label={card.rows ? "Holed in every weather" : "Hole finished"}>
             {card.line && <p aria-live="polite">{card.line}</p>}
             {card.rows && (
               <table className="tmode__sum">
@@ -375,8 +385,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
                 ))}
               </div>
             )}
-          </Dialog>
-        </div>
+        </WonCard>
       )}
     </main>
   );

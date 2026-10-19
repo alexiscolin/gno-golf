@@ -41,12 +41,12 @@
 /* the steps: Edit, Test, Publish; done green, the current gold, the next open or locked with its reason */
 .stepper { justify-self: center; display: flex; align-items: center; gap: var(--sp-1); height: 40px; margin: 0; padding: 2px; list-style: none; border: var(--edge); border-radius: var(--pill); background: var(--paper); }
 .step button { display: inline-flex; align-items: center; gap: var(--sp-2); height: 32px; padding: 0 var(--sp-4) 0 var(--sp-1); border: 0; border-radius: var(--pill); background: none; font: inherit; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; cursor: pointer; }
-.step button:disabled { cursor: not-allowed; }
+.step .tip { display: flex; align-items: center; line-height: 1; } /* (a locked step: InfoTip, its why under it) */
 .step i { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: var(--edge); background: var(--white); font-style: normal; font-size: 14px; font-weight: 800; }
 .step--now button { background: var(--ink); color: var(--paper); }
 .step--now i { background: var(--gold); color: var(--ink); }
 .step--done i { background: var(--green); color: var(--paper); }
-.step--locked button { color: var(--ink-soft); }
+.step--locked button { color: var(--ink-soft); cursor: help; }
 .step--locked i { background: transparent; border-style: dashed; }
 /* Publish open, not yet visited: the way on, lit gold (a soft beat, none with reduced motion) */
 .step--go i { background: var(--gold); }
@@ -325,6 +325,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode .hud--top { padding-top: var(--sp-4); }
 .tmode .hud--bottom { padding-bottom: var(--sp-4); }
 .tmode__score { min-width: 104px; font-variant-numeric: tabular-nums; }
+.tmode__clock i { display: inline-block; width: .62em; font-style: normal; text-align: center; }
 .tmode .card--weather { min-width: 132px; justify-content: center; } /* (its width kept as the weather changes: the weathers to prove stay put) */
 /* the weathers to prove, as the weather card pictures a sky: one each, the one played gold, ticked once proved */
 .tmode__weathers { display: flex; align-items: stretch; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); }
@@ -370,14 +371,10 @@ button.issue__why:hover { text-decoration-style: solid; }
 .tmode__strip { align-self: flex-start; margin-left: var(--sp-4); display: grid; gap: var(--sp-1); width: min(560px, calc(100% - 2 * var(--sp-4))); padding: var(--sp-2) var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: rgba(var(--paper-rgb), .96); color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.35; pointer-events: none; transition: opacity .6s ease, visibility 0s linear .6s; }
 .tmode__strip p { margin: 0; }
 .tmode__strip--gone { position: absolute; opacity: 0; visibility: hidden; }
-/* a try holed (no address yet): one line of the HUD's foot asks for it, Adena first, an address pasted behind a tap */
-.hud--bottom:has(.tmode__sign) { align-items: center; gap: var(--sp-3); }
-.tmode__sign { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); max-width: min(760px, calc(100vw - 200px)); padding: var(--sp-2) var(--sp-3); }
-.tmode__sign p { margin: 0; font-size: 15px; font-weight: 600; }
-.tmode__sign .tmode__why { flex-basis: 100%; }
-.tmode__addr { display: flex; align-items: center; gap: var(--sp-2); }
+/* a try holed (no address yet): the hole-finished card asks for it (TestMode.tsx AddressLine), Adena first, an address pasted behind a tap */
+.tmode__addr { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--sp-2); margin-top: var(--sp-3); }
 .tmode__addr .btn { margin: 0; }
-.tmode__addr input { width: 26ch; min-height: 36px; padding: 0 var(--sp-2); border: var(--edge); border-radius: 10px; font: inherit; font-size: 14px; font-family: var(--mono); }
+.tmode__addr input { width: 26ch; min-height: 48px; padding: 0 var(--sp-2); border: var(--edge); border-radius: 10px; font: inherit; font-size: 14px; font-family: var(--mono); }
 @media (prefers-reduced-motion: reduce) { .tmode__strip { transition: none; } }
 
 /* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */

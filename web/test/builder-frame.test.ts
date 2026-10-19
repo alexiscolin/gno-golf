@@ -4,7 +4,7 @@
 // drawn smaller than a 1440 by 900 window draws it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FRAME_REF, frameView } from "../lib/builder/view.ts";
+import { boxIn, FLAT, FRAME_REF, frameView, islandIn } from "../lib/builder/view.ts";
 
 type P = readonly [number, number];
 // the dogleg starter's extent (its tee, cup and pieces, 3 round: Board.tsx extent), and a long straight one
@@ -32,5 +32,25 @@ void test("frameView: on a bigger window, the lane no smaller than on a 1440 by 
       const room = Math.min((s.w / v.k - (ext[1][0] - ext[0][0])) / 2, ((s.h - 56) / v.k - (ext[1][1] - ext[0][1])) / 2);
       assert.ok(room >= 2, `${s.w}x${s.h}: ${room.toFixed(2)} units of the world round the hole`);
       assert.ok(v.k <= before(ext, s) + 1e-9, "never closer than the hole filling the board");
+    }
+});
+
+// F on the 3D board's island (islandIn: ISLAND round the board, lib/scene/camera.ts islandBox): the sight inside it
+// where it fits, the island in its middle where the sight is the larger, the hole always in sight, each quarter turn.
+void test("frameView: the sight kept on the island, never bare ground past one edge with the scenery cut at the other", () => {
+  const AROUND = { x: 7, front: 4, back: 10 }, board = { w: 26, h: 44 }; // a tall hole: the owner's
+  const ext: [P, P] = [[0, 0], [26, 44]];
+  for (const s of [BOARDS.w1440, BOARDS.w1920, BOARDS.w2560])
+    for (const turns of [0, 1, 2, 3]) {
+      const look = { ...FLAT, turns }, [lo, hi] = boxIn([ext[0], ext[1], [0, 44], [26, 0]], look), isl = islandIn(board, look, AROUND);
+      const v = frameView(lo, hi, s, isl), plain = frameView(lo, hi, s);
+      assert.equal(v.k, plain.k, "the same scale as without the island");
+      const sight = [[v.x, v.y], [v.x + s.w / v.k, v.y + (s.h - 56) / v.k]];
+      for (const i of [0, 1]) {
+        assert.ok(sight[0][i] <= lo[i] + 1e-9 && sight[1][i] >= hi[i] - 1e-9, `${s.w} turn ${turns}: the hole in sight`);
+        const span = sight[1][i] - sight[0][i], room = isl[1][i] - isl[0][i];
+        if (span <= room) assert.ok(sight[0][i] >= isl[0][i] - 1e-9 && sight[1][i] <= isl[1][i] + 1e-9, `${s.w} turn ${turns} axis ${i}: inside the island`);
+        else assert.ok(Math.abs(sight[0][i] + sight[1][i] - isl[0][i] - isl[1][i]) < 1e-9, `${s.w} turn ${turns} axis ${i}: the island in the middle`);
+      }
     }
 });

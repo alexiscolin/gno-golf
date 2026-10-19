@@ -353,7 +353,7 @@ if [ "${SEED:-}" = 1 ]; then
 	price() { qg "Gnome(\"$1\")" | jf 'd["price"]'; }
 	recorded() { q "$STORE" "Has(\"totals\",\"assisted $1\")"; }
 	days=${SEED_CLOSE:-}
-	[ -z "$days" ] || { [[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ]; } || die "seed: SEED_CLOSE is a number of days, 1 or more (unset: no closing date)"
+	[ -z "$days" ] || { [[ $days =~ ^[0-9]+$ ]] && [ "$days" -ge 7 ]; } || die "seed: SEED_CLOSE is a number of days, 7 or more (close.gno closeNotice; unset: no closing date)"
 	GASW=3000000000 ok "seed: publish the genesis" "published" test1 "$GN" AddSeries genesis "$(cat "$ROWS")"; must
 	CLOSE=0 # (optional: none unless SEED_CLOSE; "try-local.sh close" sets one later)
 	if [ -n "$days" ]; then
@@ -674,24 +674,20 @@ is "earned: TokenURI SVG" "TokenURI(\"1000001\") parsed as XML" "svg" "$(qg 'Tok
 within "portrait: TokenURI gas, an earned gnome" "MsgRun TokenURI(\"1000001\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 1000001)"
 
 # ------------------------------------------------------------------- close
+# A close is announced 7 days ahead at least (close.gno closeNotice): a live run
+# sets and moves one but cannot wait it out; the close itself (buys refused, the
+# unsold closed, the final supply) is the realm's tests' (close_test.gno)
 NOW=$(chaintime)
-no "close: owner only" "only the owner" p0 "$GN" SetCloseAt "$((NOW + 600))"
-no "close: in the future" "a closing date is in the future" test1 "$GN" SetCloseAt "$((NOW - 10))"
-ok "close: brought forward, to 10 minutes" "set" test1 "$GN" SetCloseAt "$((NOW + 600))"
-no "close: never later" "never later than" test1 "$GN" SetCloseAt "$((NOW + 900))"
+WEEK=$((7 * 86400))
+no "close: owner only" "only the owner" p0 "$GN" SetCloseAt "$((NOW + WEEK + 3600))"
+no "close: a week's notice" "at least 7 days ahead" test1 "$GN" SetCloseAt "$((NOW + 600))"
+ok "close: set, a week and a day off" "set" test1 "$GN" SetCloseAt "$((NOW + WEEK + 86400))"
+no "close: never later" "never later than" test1 "$GN" SetCloseAt "$((NOW + WEEK + 2 * 86400))"
 NOW=$(chaintime)
-CLOSE=$((NOW + 60))
+CLOSE=$((NOW + WEEK + 3600))
 ok "close: brought forward" "set" test1 "$GN" SetCloseAt "$CLOSE"
 is "close: CloseAt()" "CloseAt()" "$CLOSE" "$(qg 'CloseAt()')"
-wait_until "$CLOSE" "the close"
-SEND=36000000ugnot no "close: buys refused" "the genesis sale closed on" p1 "$GN" Buy 1
-no "close: no sale of it again" "the genesis sale closed on" test1 "$GN" OpenSale genesis "$CLOSE" 0
-no "close: no date after" "the genesis sale closed on" test1 "$GN" SetCloseAt "$((CLOSE + 600))"
-is "close: Collection genesis closed, sold" "Collection().series[0] closed,sold" "True $sold" "$(qg 'Collection()' | jf 'str(d["series"][0]["closed"]) + " " + str(d["series"][0]["sold"])')"
-is "close: an unsold gnome closed" "Gnome(\"1\").closed" "True" "$(qg 'Gnome("1")' | jf 'd["closed"]')"
-is "close: a sold Legendary is not closed" "Gnome(\"104\").closed" "False" "$(qg 'Gnome("104")' | jf 'd["closed"]')"
-is "close: an unsold Legendary is" "Gnome(\"311\").closed" "True" "$(qg 'Gnome("311")' | jf 'd["closed"]')"
-is "close: final supply" "Collection().series[0].sold, tiers sold" "$sold $c,$r,$e,$l" "$(qg 'Collection()' | jf 'str(d["series"][0]["sold"]) + " " + ",".join(str(t["sold"]) for t in d["tiers"])')"
+is "close: Collection closesAt, not closed yet" "Collection() closesAt,closed" "$CLOSE False" "$(qg 'Collection()' | jf 'str(d["closesAt"]) + " " + str(d["series"][0]["closed"])')"
 SEND=40000000ugnot ok "close: a later series sells on" "sold" b2 "$GN" Buy 721
 
 # ------------------------------------------------------------- the owner

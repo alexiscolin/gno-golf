@@ -111,7 +111,7 @@ case "${1:-}" in
 close)
 	running
 	days=${2:-30}
-	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ] || die "usage: scripts/try-local.sh close [days]"
+	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -ge 7 ] || die "usage: scripts/try-local.sh close [days] (7 or more: a close is announced a week ahead)"
 	chainnow
 	at=$((NOW + days * 86400))
 	owner SetCloseAt "$at" || die "SetCloseAt was refused: $REFUSED"

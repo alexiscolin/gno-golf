@@ -21,8 +21,8 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { centreOn, FLAT, frameView, gridLines, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
-import { BOARD } from "@/lib/builder/gg1";
+import { boxIn, centreOn, FLAT, frameView, islandIn, gridLines, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
+import { BOARD, MARGIN } from "@/lib/builder/gg1";
 import { handlesOf, type HandleKey } from "@/lib/builder/handles";
 import { type PaletteEntry } from "@/lib/builder/palette";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
@@ -30,6 +30,7 @@ import type { Draft, Piece, V } from "@/lib/builder/draft";
 import { makeGesture, type Env, type Target } from "@/lib/builder/gesture";
 import { onStage, stageRenderer, stageUp } from "@/lib/builder/stage";
 import type { Hole } from "@/lib/scene/data";
+import { ISLAND } from "@/lib/scene/common";
 import Scene, { type Eye } from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
@@ -113,6 +114,14 @@ function extent(d: Draft): [V, V] {
   return [[lo[0] - 3, lo[1] - 3], [hi[0] + 3, hi[1] + 3]];
 }
 
+/** The scene's board (its island round 0..w, 0..h): the checked hole's, else the draft's pieces with Fit's margin. */
+function boardOf(d: Draft, s: Hole | null | undefined): { w: number; h: number } {
+  if (s) return s.board;
+  let w = Math.max(d.tee[0], d.pin[0]), h = Math.max(d.tee[1], d.pin[1]);
+  for (const p of d.pieces) for (const q of handlesOf(p)) (w = Math.max(w, q.at[0])), (h = Math.max(h, q.at[1]));
+  return { w: w + MARGIN, h: h + MARGIN };
+}
+
 export default function Board(props: BoardProps) {
   const { draft, quick, full, selected, armed, step, bad } = props, look = props.look ?? FLAT;
   // in 3D where this browser has WebGL (the Builder's one context: stage.ts), else the 2D board as it was;
@@ -194,9 +203,9 @@ export default function Board(props: BoardProps) {
     return () => ro.disconnect();
   }, []);
   const framed = (): View => {
-    // the extent's corners in the view's plane (turned, tilted), and their box
-    const [a, b] = extent(draft), cs = [a, b, [a[0], b[1]] as V, [b[0], a[1]] as V].map((c) => toPlane(c, look));
-    return frameView([Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1]))], [Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))], size);
+    // the extent's corners in the view's plane (turned, tilted), and their box; the sight kept on the 3D world's island
+    const [a, b] = extent(draft), [lo, hi] = boxIn([a, b, [a[0], b[1]], [b[0], a[1]]], look);
+    return frameView(lo, hi, size, in3d ? islandIn(boardOf(draft, props.scene?.state), look, ISLAND) : undefined);
   };
   useEffect(() => {
     if (view || !size.w) return;

@@ -93,8 +93,8 @@ void test("summary: Play's one card at the end, each weather proved with its str
   assert.equal(summary([{ kind: "", strokes: 2 }], 0).line, "", "no par yet: nothing said");
 });
 
-void test("the address, asked in a line of the HUD once a try is holed: Adena first, an address pasted behind a tap, where to get Adena", () => {
+void test("the address, asked on the hole-finished card once a try is holed: Adena first, an address pasted behind a tap, where to get Adena", () => {
   const src = fs.readFileSync(new URL("../components/builder/TestMode.tsx", import.meta.url), "utf8");
-  assert.ok(src.includes(">Use my Adena address<") && src.includes("or paste an address") && src.includes("ADENA_URL"));
+  assert.ok(src.includes(">Use my Adena address<") && src.includes(">Paste an address<") && src.includes("ADENA_URL") && src.includes("Nothing is signed or published"));
   assert.match(src, /function AddressLine/);
 });

@@ -18,7 +18,10 @@ export function keyAction(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" |
 export const KEYS: readonly { key: string; short: string; long: string; line?: true }[] = [
   { key: "1–5", short: "Pieces", long: "pick one of the first five pieces", line: true },
   { key: "R", short: "Turn", long: "turns the selected piece", line: true },
-  { key: "⌫", short: "Delete", long: "deletes it" },
+  { key: "Enter", short: "Drop", long: "drops the piece in hand between the tee and the cup" },
+  { key: "⌫", short: "Delete", long: "deletes it (Delete too)" },
+  { key: "modD", short: "Copy", long: "duplicates the selected piece" },
+  { key: "←↑→↓", short: "Nudge", long: "move the selected piece, the tee or the cup half a cell (with ⇧, two)" },
   { key: "modZ", short: "Undo", long: "undoes (with ⇧, redoes)", line: true },
   { key: "Space", short: "Pan", long: "held, a drag pans the board" },
   { key: "F", short: "Frame", long: "frames the whole hole" },
@@ -27,7 +30,7 @@ export const KEYS: readonly { key: string; short: string; long: string; line?: t
   { key: "P", short: "View", long: "shows the player's view large, the hole from its tee" },
   { key: "T", short: "Play", long: "plays the hole: each round you sink is a try at the next weather, until every one is holed", line: true },
   { key: "⇧ drag", short: "Quick shot", long: "on the board (or a drag from the ball by the tee), pulls back a quick shot from the tee, or from where the last one stopped (calm weather; just to try)" },
-  { key: "Esc", short: "Back", long: "drops the piece in hand and the quick shots; in play, back to Build (R plays again, V swaps the view)" },
+  { key: "Esc", short: "Back", long: "drops the piece in hand, the selection and the quick shots; in play, back to Build (R or ⌫ plays again, V swaps the view)" },
   { key: "?", short: "All keys", long: "the hints again, the world's pieces and every key", line: true },
 ];
 /** The board's key line: the few keys most used, and ? for every one. Shown for a browser's first visit to the editor only (seen). */

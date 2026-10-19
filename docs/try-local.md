@@ -39,7 +39,7 @@ record (the players' window lets it buy) and a few gnomes; `p0` has
 neither. All 720 gnomes are on sale at once, in the genesis's one sale, its
 players' window one hour, and the
 genesis sale has no closing date (it is optional: the genesis sells until
-sold out; `close [days]` sets one, 30 days off by default, and after that
+sold out; `close [days]` sets one, 30 days off by default (7 at least: a close is announced a week ahead), and after that
 only ever brings it earlier). `rebuild` builds the site anew with the
 code as it is now, beside the one served, then swaps them in one step:
 the chain and the links never stop, and a failed build leaves the site as

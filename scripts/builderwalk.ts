@@ -126,13 +126,13 @@ try {
   if (await c.js<number>(`document.querySelectorAll(".bhint").length`)) throw new Error("the first run's hints still up after a drag");
   said("drag: a Bumper onto the board (the hints gone with it)");
 
-  // Play: no address known, a try in calm weather, then the address in the HUD's line
+  // Play: no address known, a try in calm weather, then the address on the hole-finished card
   await until(`!document.querySelector(".bhead__act[aria-disabled]")`, "Play on");
   await click(`document.querySelector(".bhead__act")`, "Play");
   const kind0 = await holeOne();
   said(`${kind0}: a try holed`);
-  await until(`!!document.querySelector(".tmode__sign")`, "the address asked in the HUD, once a try is holed");
-  await click(button(/^or paste an address/i), "or paste an address");
+  await until(`!!document.querySelector(".tmode__sign")`, "the address asked on the card, once a try is holed");
+  await click(button(/^Paste an address/i), "Paste an address");
   await until(`!!document.querySelector(".tmode__addr input")`, "the address field");
   await c.js(`(() => { const el = document.querySelector(".tmode__addr input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(AUTHOR)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   count.typed++;

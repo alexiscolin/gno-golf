@@ -379,7 +379,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} world={draft.world} worlds={WORLDS} step="edit"
-        steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Sink it in every weather first", done: false } }}
+        steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Play it first and sink it in every weather: the chain only takes a hole that can be holed", done: false } }}
         action={{ text: "Play", key: "T", off: playOff, onClick: play }}
         meter={meterFace(clean, est, shape)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}

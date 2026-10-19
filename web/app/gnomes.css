@@ -195,7 +195,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 /* his tier over his fact, always (fixed rows: every card the same) */
 .gcard__foot { display: grid; grid-template-rows: 24px; grid-auto-rows: 18px; align-items: center; justify-items: start; gap: var(--sp-1); margin: 0 2px; }
 .gcard__foot:not(:last-child) { margin-bottom: var(--sp-2); } /* (8 more over Buy) */
-.gcard > .gcard__buy:last-child { margin-top: auto; } /* (Buy at the card's foot; the tier under the name on every card, in line row to row) */
+.gcard > .gcard__buy { margin-top: auto; } /* (Buy at the card's foot; the tier under the name on every card, in line row to row) */
 @media (max-width: 600px) { .gcard { padding: var(--sp-2); } } /* (with its 3 px edge, 11 round a phone's card) */
 .gcard__fact { max-width: 100%; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard--mine { background: var(--ink); color: var(--paper); }
@@ -245,7 +245,7 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 }
 /* Share beside the one action: a third of its width, its height */
 .gsheet__act { display: grid; grid-template-columns: 1fr 3fr; gap: var(--sp-2); }
-.gsheet__act > .btn { height: 100%; min-height: 52px; margin: 0; width: 100%; }
+.gsheet__act > .btn { height: 100%; min-height: 52px; }
 .gsheet__meta { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
 .gsheet__line { margin: 0; color: var(--ink) !important; text-align: center; text-wrap: pretty; }
 /* the price block: his price, the trust lines under it, 8 apart; the price stronger than the small print */

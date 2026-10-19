@@ -12,7 +12,7 @@ import { MOD } from "./Inspector";
 import { worldName } from "@/lib/builder/rules";
 import { CHECKING, shortWhy } from "@/lib/builder/editor";
 import type { Level } from "@/lib/builder/difficulty";
-import { Button, Dice } from "@/components/ui";
+import { Button, Dice, InfoTip } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 
 export type Step = "edit" | "play" | "publish";
@@ -121,9 +121,14 @@ export default function Header({ title, world, worlds = [], step, steps, action,
           const st = steps[s], now = s === step, go = s === "publish" && !now && !st.locked && !st.done;
           return (
             <li key={s} className={`step${now ? " step--now" : st.done ? " step--done" : st.locked ? " step--locked" : go ? " step--go" : ""}`}>
-              <button type="button" disabled={!!st.locked && !now} title={st.locked || names[s]} aria-label={st.locked ? `${names[s]}: ${st.locked}` : names[s]} aria-current={now ? "step" : undefined} onClick={() => onStep(s)}>
-                <i>{st.done && !now ? "✓" : st.locked ? "🔒" : i + 1}</i><span>{names[s]}</span>
-              </button>
+              {/* locked: a press says why, under it (a tooltip never shows on touch nor on a disabled button) */}
+              {st.locked && !now ? (
+                <InfoTip label={`${names[s]}, locked: why`} note={st.locked} className=""><i>🔒</i><span>{names[s]}</span></InfoTip>
+              ) : (
+                <button type="button" title={names[s]} aria-label={names[s]} aria-current={now ? "step" : undefined} onClick={() => onStep(s)}>
+                  <i>{st.done && !now ? "✓" : i + 1}</i><span>{names[s]}</span>
+                </button>
+              )}
             </li>
           );
         })}
