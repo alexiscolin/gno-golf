@@ -78,8 +78,11 @@ function More({ world, worlds, onWorld }: { world: string; worlds: readonly stri
   );
 }
 
-export default function Header({ title, world, worlds = [], step, steps, action, history, meter, lineOn = false, bump, onLine, onTitle, onWorld, onStep, onBack, onHelp, onRoll }: {
+export default function Header({ title, address, world, worlds = [], step, steps, action, history, meter, lineOn = false, bump, onLine, onTitle, onWorld, onStep, onBack, onHelp, onRoll }: {
   title: string;
+  /** its address under the author's (its slug) and whether the rounds have fixed it: said on the name (a new name never moves
+   *  a fixed one) */
+  address?: { slug: string; fixed: boolean };
   world: string;
   /** the worlds the hole may move to (the world menu, in Build only) */
   worlds?: readonly string[];
@@ -113,7 +116,8 @@ export default function Header({ title, world, worlds = [], step, steps, action,
           <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </Button>
         <span className="bhead__name">
-          <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
+          <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)}
+            title={address && (address.fixed ? `Its address: ${address.slug}, kept since its first round (a new name changes the name only)` : `Its address follows its name: ${address.slug}`)} />
           {onRoll && <Button variant="icon" size="m" type="button" className="bhead__roll" aria-label="Suggest a name" title="Suggest a name (again: another)" onClick={onRoll}><Dice /></Button>}
         </span>
         {onWorld && worlds.length > 1 && <More world={world} worlds={worlds} onWorld={onWorld} />}

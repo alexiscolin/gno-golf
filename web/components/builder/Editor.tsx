@@ -23,7 +23,7 @@ import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, fixOf, gate, movePiece, placeNear, placePiece, removePiece, roomFor, whereOf, clampMove } from "@/lib/builder/edit";
 import { brokenLine, CHECKING, gauges, meterFace, NO_GL, offAtLimit, pieceGauges, playWhenAsked, sameShape, testGate } from "@/lib/builder/editor";
 import { stageRenderer } from "@/lib/builder/stage";
-import { retitle } from "@/lib/builder/templates";
+import { retitle, slugOf as slugOfTitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
 import { notTurned, QUARTER, snap, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
@@ -435,6 +435,13 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   // the address changed before round 1 (Play's start card): one step, the rounds under another dropped (they count only there)
   // (asked from Publish: once, until it is changed)
   const [askSlug, setAskSlug] = useState(readdress);
+  // a hole played renamed: its address said kept, once an editor (the rounds were played under it)
+  const told = useRef(false);
+  const addressKept = (t: string) => {
+    if (told.current || !draft.proofs.length || slugOfTitle(t) === draft.slug) return;
+    told.current = true;
+    say(`Renamed. Its address stays ${draft.slug}: your rounds were played under it`);
+  };
   const toSlug = (slug: string) => (setAskSlug(false), session.edit((k) => ({ ...k, slug, proofs: k.proofs.filter((p) => slugOf(p.id) === slug) })), refresh());
   const prove = (p: Proof) => amend((k) => ({ ...k, proofs: [...k.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }));
   const setPar = (par: number) => playing && amend((k) => (parAllowed(k.proofs.filter((q) => q.key === playing.key), k.par) ? k : { ...k, par }));
@@ -442,12 +449,12 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   useEffect(() => void (hints && (tool || binShown) && onHinted()), [hints, tool, binShown, onHinted]);
   return (
     <main className={`bench tint--${draft.world}`}>
-      <Header title={draft.title} world={draft.world} worlds={WORLDS} step="edit"
+      <Header title={draft.title} address={{ slug: draft.slug, fixed: !!draft.proofs.length }} world={draft.world} worlds={WORLDS} step="edit"
         steps={{ edit: { locked: "", done: false }, play: { locked: playOff && playOff !== CHECKING ? (gl ? playOff : NO_GL) : "", done: proved }, publish: { locked: shut, done: false } }}
         action={proved ? { text: "Publish", onClick: publish } : { text: "Play", key: "T", off: playOff, onClick: play }}
         meter={meterFace(clean, est, shape)} lineOn={lineOn} onLine={guess || lineOn ? () => setLineOn((on) => !on) : undefined} bump={parBump}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
-        onTitle={(t) => (session.edit((k) => frame(retitle(k, t, others))), refresh())} onWorld={world} onStep={(s) => (s === "play" ? play() : s === "publish" && proved && publish())} onBack={onBack} onHelp={() => setAgain(true)}
+        onTitle={(t) => (session.edit((k) => frame(retitle(k, t, others))), refresh(), addressKept(t))} onWorld={world} onStep={(s) => (s === "play" ? play() : s === "publish" && proved && publish())} onBack={onBack} onHelp={() => setAgain(true)}
         onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, dice), others))), setDice((n) => n + 1), refresh())} />
       {palette && quick && full ? (
         <>
