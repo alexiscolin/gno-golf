@@ -10,7 +10,7 @@ export const gnoweb = (path = "") => (process.env.NEXT_PUBLIC_WEB ? `${process.e
 
 const CARD: CSSProperties = { position: "fixed", zIndex: 10, left: 16, right: 16, bottom: 16, maxWidth: 560, margin: "0 auto", padding: "12px 16px", borderRadius: 12, background: "#fdf6e9", color: "#144134", lineHeight: 1.4 };
 
-export default function Intro({ title, text, web, links = [], ld }: { title: string; text: string; web: string; links?: { href: string; label: string }[]; ld: object }) {
+export default function Intro({ title, text, web, links = [], ld }: { title: string; text: string; web: string; links?: { href: string; label: string }[]; ld?: object }) {
   return (
     <>
       <h1 className="sr-only">{title}</h1>
@@ -29,8 +29,8 @@ export default function Intro({ title, text, web, links = [], ld }: { title: str
           )}
         </div>
       </noscript>
-      {/* "<" escaped: a name can't close the script */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", ...ld }).replace(/</g, "\\u003c") }} />
+      {/* none without its data; "<" escaped: a name can't close the script */}
+      {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", ...ld }).replace(/</g, "\\u003c") }} />}
     </>
   );
 }

@@ -4,7 +4,7 @@
 import type { Metadata } from "next";
 import Game from "@/app/game";
 import Intro from "@/app/intro";
-import { SITE } from "@/lib/site";
+import { DESCRIPTION, SITE, TITLE } from "@/lib/site";
 import { SHOP } from "@/lib/gnomes/shop";
 
 const title = "The Gnogolf gnome shop: who's on the ball?";
@@ -15,11 +15,12 @@ export const metadata: Metadata = SHOP
   : { robots: { index: false }, alternates: { canonical: "/" } };
 
 export default function Gallery() {
-  const ld = { "@type": "CollectionPage", name: title, url: `${SITE}/g/`, description };
+  // off, the home's words: nothing of the shop in the page
+  const ld = SHOP ? { "@type": "CollectionPage", name: title, url: `${SITE}/g/`, description } : undefined;
   return (
     <>
       <base href="/" />
-      <Intro title={title} text={description} web="" ld={ld} />
+      <Intro title={SHOP ? title : TITLE} text={SHOP ? description : DESCRIPTION} web="" ld={ld} />
       <Game />
     </>
   );
