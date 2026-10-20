@@ -18,10 +18,11 @@
 // header's difficulty chip asks; after a drop that held, a ghost ball runs
 // it once (a second, never with reduced motion). The keys most used are
 // said at its foot on a browser's first visit. The green is painted too
-// (surface.ts, gesture.ts; its tools the palette's, B): Grow, a drag paints
-// cells in under the brush (surface.ts BRUSH, three cells a side), Shrink paints them out (Shift: along one
-// axis), a side of its outline dragged moves the whole side, a side clicked
-// opens or shuts it; the stroke drawn at once as one ghost, judged once a
+// (surface.ts, gesture.ts; its tools the palette's, B): Add, a drag
+// adds the box from the press to the pointer (surface.ts boxCells: a click,
+// the brush's BRUSH cells a side), Erase takes it away, a side of its
+// outline dragged moves the whole side, a side clicked opens or shuts it;
+// the box drawn at once as one ghost, judged once a
 // frame at most (green, or red with why), let go one step, judged by the
 // editor's gate (refused: said at the board's foot). A side hovered says
 // what it does, or why it stays as it is (locked). The tee and the cup are
@@ -352,7 +353,7 @@ export default function Board(props: BoardProps) {
     }
     const at = unit(e), hit = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end],[data-shot]");
     if (props.pan) return void (drag.current = { t: "pan", from: [e.clientX, e.clientY], view: shown }); // (Space held: whatever is under it)
-    if (((e.shiftKey && !mode) || hit?.dataset.shot) && props.ball && !armed) { // (painting, Shift keeps a stroke straight)
+    if (((e.shiftKey && !mode) || hit?.dataset.shot) && props.ball && !armed) { // (Shift's quick shot not while painting)
       // a quick shot pulled: from where the last one stopped when pressed on its ball, else from the tee (its ball beside it)
       const last = props.ball.last, rest = props.ball.played.at(-1);
       const on = last && rest && !rest.holed && (hit?.dataset.shot === "rest" || (!hit?.dataset.shot && Math.hypot(at[0] - rest.rest[0], at[1] - rest.rest[1]) <= Math.max(1, 14 / shown.k))) ? { from: rest.rest, stroke: last.stroke + 1 } : null;
@@ -364,7 +365,7 @@ export default function Board(props: BoardProps) {
       gesture.down(env, at, side !== undefined ? { t: "side", i: Number(side) } : { t: "brush" });
       drag.current = { t: "paint", press: [e.clientX, e.clientY], side: side !== undefined };
       // (its first place the step's: a place left over from the last stroke never hides this one's first ghost)
-      const first = gesture.move(env, at, { line: e.shiftKey });
+      const first = gesture.move(env, at);
       cell.current = first?.cell ?? "";
       return washed(first?.wash);
     }
@@ -400,7 +401,7 @@ export default function Board(props: BoardProps) {
     }
     if (d?.t === "pan") return void setView({ ...d.view, x: d.view.x - (e.clientX - d.from[0]) / d.view.k, y: d.view.y - (e.clientY - d.from[1]) / d.view.k });
     if (d?.t === "paint") {
-      const shown = env.paint && gesture.move(env, at, { line: e.shiftKey });
+      const shown = env.paint && gesture.move(env, at);
       if (!shown) return (gesture.cancel(), (drag.current = null), setWash(null)); // (the paint put down mid-stroke)
       if (shown.cell !== cell.current) (stepped(shown.cell), washed(shown.wash));
       return;
@@ -460,7 +461,7 @@ export default function Board(props: BoardProps) {
   // the tee's and the cup's badges: where they are, upright and at the board's scale whatever the look
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
-    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why || wash?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}${mode ? " board--paint" : ""}`} ref={box} tabIndex={-1} aria-label={mode ? `The board, painting the green: a drag ${mode === "grow" ? "grows" : "shrinks"} it, a side dragged moves it (or Tab to a side: the arrows move it, Enter opens it), Space and a drag pans, the wheel zooms` : "The board: the wheel or a pinch zooms, a drag on empty space pans"}>
+    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why || wash?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}${mode ? " board--paint" : ""}`} ref={box} tabIndex={-1} aria-label={mode ? `The board, painting the green: a box dragged ${mode === "grow" ? "adds" : "erases"} green, a side dragged moves it (or Tab to a side: the arrows move it, Enter opens it), Space and a drag pans, the wheel zooms` : "The board: the wheel or a pinch zooms, a drag on empty space pans"}>
       {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} eye={props.scene.eye} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), setWash(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
@@ -556,7 +557,7 @@ export default function Board(props: BoardProps) {
       {(flash || ghost || live || (mode && wash) || side || end || (aiming && ball?.aimed)) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why || wash?.why || side?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role={(mode || end) && !flash ? undefined : "status"}>
           {flash ? flash.text : ghost ? ghost.why || `${armed ? entryName(armed) : ""} · ${xy(whereOf(ghost.p.geometry))}` : live ? live.why || "Let go to place it"
-            : wash ? wash.why || `Let go to ${drag.current?.t === "paint" && drag.current.side ? "move the side" : mode === "shrink" ? "shrink the green" : "grow the green"}`
+            : wash ? wash.why || `Let go to ${drag.current?.t === "paint" && drag.current.side ? "move the side" : mode === "shrink" ? "erase this green" : "add this green"}`
               : side ? side.why || `Drag to move · click to ${side.open ? "shut" : "open"}` : end ? `Drag to move the ${end === "tee" ? "tee" : "cup"}` : "Let go to play it"}
         </span>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
-// The palette (the GUI spec's B3): the green's two tools on top (Grow,
-// Shrink: Board's paint, B; the one on pressed again puts it down), then the
+// The palette (the GUI spec's B3): the green's two tools on top (Add,
+// Erase: Board's paint, a box dragged, B; the one on pressed again puts it down), then the
 // pieces by what they do (tiles.ts),
 // the four a first hole needs first (Bumper, Sand, Water, Slope: its walls
 // are the green's own, painted on the board), the world's others by group
@@ -33,8 +33,8 @@ const Picture = ({ world, e, px }: { world: string; e: PaletteEntry; px: number 
 
 /** The green's tools, side by side (the pieces kept in sight unscrolled): each its icon (a green patch, + or −), its name, what a drag does (its tip). */
 const TOOLS: readonly { mode: PaintMode; name: string; does: string; sign: string }[] = [
-  { mode: "grow", name: "Grow", does: "a drag makes it bigger", sign: "M12 8v8M8 12h8" },
-  { mode: "shrink", name: "Shrink", does: "a drag makes it smaller", sign: "M8 12h8" },
+  { mode: "grow", name: "Add", does: "drag a box on the board: it becomes green", sign: "M12 8v8M8 12h8" },
+  { mode: "shrink", name: "Erase", does: "drag a box on the board: its green goes", sign: "M8 12h8" },
 ];
 const ToolIcon = ({ sign }: { sign: string }) => (
   <svg className="piece__icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -76,13 +76,15 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
             {TOOLS.map((t) => (
               <div key={t.mode} className="ptile">
                 <button type="button" className={`piece piece--tool${paint.mode === t.mode ? " piece--on" : ""}`} data-tool={t.mode} aria-pressed={paint.mode === t.mode} disabled={!!paint.off}
-                  title={paint.off || `${t.name} the green (B): ${t.does}, its walls following; drag a side to move it, click one to open it`} onClick={() => paint.onMode(paint.mode === t.mode ? null : t.mode)}>
+                  title={paint.off || `${t.name} green (B): ${t.does}, its walls following; drag a side to move it, click one to open it`} onClick={() => paint.onMode(paint.mode === t.mode ? null : t.mode)}>
                   <ToolIcon sign={t.sign} />
                   <span className="piece__name">{t.name}</span>
                 </button>
               </div>
             ))}
           </div>
+          {/* what the tools do, said where they are (the walls set round the green by themselves) */}
+          <p className="palette__does">{paint.off || "Drag a box on the board"}</p>
         </section>
       )}
       {tiles(first)}

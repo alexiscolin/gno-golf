@@ -673,8 +673,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 
-// the green painted: its tools atop the palette under Green (Grow, Shrink), B takes up Grow, a drag below the dogleg's lower
-// wall grows the green and walls it (one step), the panel says how it goes; Shrink paints it back out (the same walls
+// the green painted: its tools atop the palette under Green (Add, Erase, what a drag does said under them), B
+// takes up Add, a box dragged below the dogleg's lower wall adds green and walls it (one step), the panel says how it goes;
+// Erase takes it back out (the same walls
 // again), each an undo away; a stroke over the tee is refused, said at the board's foot; B again puts it down
 {
   const c = await editor(1280, 800);
@@ -702,25 +703,26 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const tool = () => c.js<string>(`document.querySelector(".palette [data-tool][aria-pressed=true]")?.dataset.tool ?? ""`);
   await c.js(`document.querySelector(".board").focus()`);
   assert.equal(await c.js(`document.querySelector(".palette__tools h3")?.textContent`), "Green", "the tools named");
-  assert.equal(await c.js(`document.querySelectorAll(".palette [data-tool]").length`), 2, "Grow and Shrink");
+  assert.equal(await c.js(`document.querySelectorAll(".palette [data-tool]").length`), 2, "Add and Erase");
+  assert.match(await c.js<string>(`document.querySelector(".palette__does")?.textContent ?? ""`), /Drag a box on the board/, "what a drag does, said under the tools");
   assert.equal(await tool(), "", "the paint off at first");
   await key("b", "KeyB");
-  assert.equal(await tool(), "grow", "B: Grow");
-  assert.match(await c.js<string>(`document.querySelector(".bside .nothing")?.textContent ?? ""`), /Drag to grow \(or shrink\) the green/, "the panel: how the paint goes");
+  assert.equal(await tool(), "grow", "B: Add green");
+  assert.match(await c.js<string>(`document.querySelector(".bside .nothing")?.textContent ?? ""`), /Drag a box to add green \(or erase it\)/, "the panel: how the paint goes");
   const n0 = await cells(), w0 = await walls();
   assert.ok(n0 > 0, "the dogleg's green drawn");
   await stroke([5, 12.5], [14, 12.5], async () => {
-    assert.equal(await c.js(`!!document.querySelector(".board__wash:not(.board__wash--no) path")`), true, "Grow: one green ghost as it is dragged");
+    assert.equal(await c.js(`!!document.querySelector(".board__wash:not(.board__wash--no) path")`), true, "Add: one green ghost as it is dragged");
   });
   const n1 = await cells(), w1 = await walls();
-  assert.ok(n1 > n0, `Grow: the green grew (${n0} → ${n1} cells)`);
-  assert.notEqual(w1, w0, "Grow: its walls followed");
+  assert.ok(n1 > n0, `Add: the green grew (${n0} → ${n1} cells)`);
+  assert.notEqual(w1, w0, "Add: its walls followed");
   await c.js(`document.querySelector(".palette [data-tool=shrink]").click()`);
   await sleep(200);
-  assert.equal(await tool(), "shrink", "Shrink pressed");
+  assert.equal(await tool(), "shrink", "Erase pressed");
   await stroke([5, 12.5], [14, 12.5]);
-  assert.equal(await cells(), n0, "Shrink: the green back as it was");
-  assert.equal(await walls(), w0, "Shrink: its walls as they were");
+  assert.equal(await cells(), n0, "Erase: the green back as it was");
+  assert.equal(await walls(), w0, "Erase: its walls as they were");
   await key("z", "KeyZ", 4);
   assert.deepEqual([await cells(), await walls()], [n1, w1], "⌘Z: the shrink undone, one step");
   await key("z", "KeyZ", 4);
