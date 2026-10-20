@@ -79,6 +79,8 @@ interface ChainError extends Error {
 }
 /** The kind a thrown value was tagged with, if any. */
 export const errorKind = (e: unknown): ChainError["kind"] => (e instanceof Error ? (e as ChainError).kind : undefined);
+/** Whether the chain refused a read because the realm has no such function (a realm deployed before it, as onyx's v2 before DayCandidates). */
+export const undeclared = (e: unknown, name: string) => errorKind(e) === "chain" && String((e as ChainError).log ?? "").includes(`name ${name} not declared`);
 
 // Gno wants a float where the signature says float64; an integer literal would
 // be an untyped int, so every number goes out with a decimal point.

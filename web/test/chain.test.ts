@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC, BYTE_PRICE,
+  makeChain, errorKind, undeclared, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC, BYTE_PRICE,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -92,6 +92,14 @@ test("errorKind reads a ChainError's tag, undefined for anything else", () => {
   assert.equal(errorKind(tagged), "down");
   assert.equal(errorKind(new Error("plain")), undefined);
   assert.equal(errorKind("not an error"), undefined);
+});
+
+test("undeclared: the chain refusing a read for a function its realm lacks, nothing else", () => {
+  const log = "gno.land/r/x/golf/v2:0:0: name DayCandidates not declared:\n--- preprocess stack ---";
+  assert.equal(undeclared(Object.assign(new Error("x"), { kind: "chain" as const, log }), "DayCandidates"), true);
+  assert.equal(undeclared(Object.assign(new Error("x"), { kind: "chain" as const, log }), "Holes"), false);
+  assert.equal(undeclared(Object.assign(new Error("x"), { kind: "down" as const, log }), "DayCandidates"), false); // (the network: tried again)
+  assert.equal(undeclared(new Error(log), "DayCandidates"), false);
 });
 
 test("isAddress accepts only a lowercase g1-bech32 address", () => {

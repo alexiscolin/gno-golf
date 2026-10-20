@@ -25,7 +25,7 @@ import type { Meter } from "@/lib/builder/meter";
 import { savedOnMore, statsOf, type SavedRead } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
 import { inTurn, type MapHole } from "@/lib/duel";
-import type { Chain } from "@/lib/chain";
+import { undeclared, type Chain } from "@/lib/chain";
 import { aliasOf, bornBefore, DAY_TRIES, dayHole, dayRows, dayStart, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
 import { takedownOf } from "@/lib/takedown";
 
@@ -96,7 +96,7 @@ export default function Community({ community, chain, onPlay }: {
           if (!b || (await judge(chain, h))?.ok !== false || ++tried >= DAY_TRIES) return;
         }
       }
-    })().catch(() => live && setDayDown(true));
+    })().catch((e: unknown) => live && !undeclared(e, "DayCandidates") && setDayDown(true)); // (a realm without it: no hole of the day, nothing amiss)
     return () => void (live = false);
   }, [chain, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (born, verdicts: asked once each, not again as they fill)
   // Try again: the holes not read asked anew
