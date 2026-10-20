@@ -20,7 +20,7 @@ import { entry as entryIn, type PaletteEntry } from "./palette";
 import type { ValidateOptions } from "./pipeline";
 import type { Issue } from "./checks";
 import { nextId, type Draft, type Piece, type V } from "./draft";
-import { moveSide, painted, PAINT_OFF, SIDE_HAND, SIDE_LOCKED, boxCells, toggleSide, type Green, type PaintMode, type Side } from "./surface";
+import { moveSide, painted, PAINT_OFF, SIDE_HAND, SIDE_LOCKED, strokeCells, toggleSide, type Green, type PaintMode, type Side } from "./surface";
 
 /** What the pointer pressed on: a piece, a handle of the selected one, the tee or the cup, the green under the brush or one of its sides (painting); null for the board. */
 export type Target = { t: "piece"; id: string } | { t: "handle"; key: HandleKey } | { t: "end"; which: "tee" | "pin" } | { t: "brush" } | { t: "side"; i: number } | null;
@@ -65,11 +65,31 @@ type Grab =
   | { t: "piece"; id: string; start: Draft; grab: V; check: Checker }
   | { t: "handle"; id: string; key: HandleKey; start: Draft; check: Checker }
   | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker }
-  | { t: "paint"; grow: boolean; green: Green; from: V; box: string; now: Painted; wash: Shown["wash"]; check: Checker }
+  | { t: "paint"; grow: boolean; green: Green; from: V; last: V; axis: 0 | 1 | null; brushed: Map<string, V>; now: Painted; wash: Shown["wash"]; check: Checker }
   | { t: "side"; green: Green; side: Side; from: V; by: number; now: Painted | null; wash: Shown["wash"]; check: Checker };
 
-/** A box of cells by its two corners. */
-const boxKey = (box: readonly V[]) => `${box[0].join()} ${box.at(-1)!.join()}`;
+/** How far (cells) a stroke goes before it takes its axis, and goes across it before it turns onto the other. */
+const SETTLE = 1, TURN = 2;
+/**
+ * A stroke kept straight: once it has gone SETTLE cells, along the axis it
+ * went most (the other coordinate held where its leg began); taken TURN cells
+ * across, it turns there onto the other axis, a new leg. A lane drawn in
+ * straight legs, cell-exact, the hand's wobble left out.
+ */
+export function alongAxis(g: { from: V; axis: 0 | 1 | null }, at: V): V {
+  const d = [at[0] - g.from[0], at[1] - g.from[1]];
+  if (g.axis === null) {
+    if (Math.hypot(d[0], d[1]) < SETTLE) return g.from;
+    g.axis = Math.abs(d[0]) >= Math.abs(d[1]) ? 0 : 1;
+  }
+  const a = g.axis, b = a === 0 ? 1 : 0;
+  if (Math.abs(d[b]) > TURN) {
+    const corner: V = a === 0 ? [at[0], g.from[1]] : [g.from[0], at[1]];
+    (g.from = corner), (g.axis = b);
+    return alongAxis(g, at);
+  }
+  return a === 0 ? [at[0], g.from[1]] : [g.from[0], at[1]];
+}
 const firstWhy = (is: readonly Issue[]) => (is[0] ? refusalOf(is[0]) : "");
 
 export function makeGesture(out: Out) {
@@ -93,8 +113,8 @@ export function makeGesture(out: Out) {
     down(e: Env, at: V, target: Target): boolean {
       const p = e.paint;
       if (p && target?.t === "brush") {
-        const box = boxCells(at, at, p.green.cells);
-        const g: Grab = { t: "paint", grow: p.mode === "grow", green: p.green, from: at, box: boxKey(box), now: { cells: painted(p.green.cells, box, p.mode === "grow"), open: p.green.open }, wash: null, check: armedOf(e) };
+        const brushed = new Map(strokeCells(at, at, p.green.cells).map((c) => [c.join(), c]));
+        const g: Grab = { t: "paint", grow: p.mode === "grow", green: p.green, from: at, last: at, axis: null, brushed, now: { cells: painted(p.green.cells, [...brushed.values()], p.mode === "grow"), open: p.green.open }, wash: null, check: armedOf(e) };
         return (g.wash = washOf(g)), (grab = g), true;
       }
       if (p && target?.t === "side") return (grab = { t: "side", green: p.green, side: p.green.sides[target.i], from: at, by: 0, now: null, wash: null, check: armedOf(e) }), true;
@@ -109,14 +129,16 @@ export function makeGesture(out: Out) {
       out.onSelect(null);
       return false;
     },
-    /** The pointer moved to at: what it shows (null: nothing armed or grabbed). */
-    move(e: Env, at: V): Shown | null {
+    /** The pointer moved to at: what it shows (null: nothing armed or grabbed); free: Shift held, a stroke as the hand goes. */
+    move(e: Env, at: V, { free = false } = {}): Shown | null {
       const g = grab;
       if (g?.t === "paint") {
-        // the box from the press to the pointer (a new box only when a corner moves a cell)
-        const box = boxCells(g.from, at, g.green.cells), k = boxKey(box);
-        if (k !== g.box) (g.box = k), (g.now = { cells: painted(g.green.cells, box, g.grow), open: g.green.open }), (g.wash = washOf(g));
-        return { wash: g.wash, cell: k };
+        if (!free) at = alongAxis(g, at);
+        const n = g.brushed.size;
+        for (const c of strokeCells(g.last, at, g.green.cells)) g.brushed.set(c.join(), c);
+        g.last = at;
+        if (g.brushed.size !== n) (g.now = { cells: painted(g.green.cells, [...g.brushed.values()], g.grow), open: g.green.open }), (g.wash = washOf(g));
+        return { wash: g.wash, cell: String(g.brushed.size) };
       }
       if (g?.t === "side") {
         // whole cells along its outward normal; the author's wall on it: it stays
@@ -151,7 +173,7 @@ export function makeGesture(out: Out) {
     up(e: Env, at: V, { keep = false, bin = false, click = false } = {}): Let {
       const d = grab;
       grab = null;
-      // (a box that changed no cell, added inside the green, erased outside it: nothing, no step to undo)
+      // (a stroke that changed no cell, painted inside the green, erased outside it: nothing, no step to undo)
       if (d?.t === "paint") return d.now.cells.length === d.green.cells.length ? null : (out.onPaint(d.now), { painted: true });
       if (d?.t === "side") {
         // a click: opened or shut (the author's wall on it: neither); else the side moved

@@ -14,7 +14,7 @@ import { FIELD } from "../lib/builder/rules.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { errorsOf, gate, removePiece, type Dropped } from "../lib/builder/edit.ts";
 import { BUILDER_LIMITS } from "../lib/builder/limits.ts";
-import { applySurface, brushAt, isPlainRail, moveSide, narrowed, narrowness, outline, owned, painted, railsOf, boxCells, surfaceOf, toggleSide, type Surface } from "../lib/builder/surface.ts";
+import { applySurface, brushAt, isPlainRail, moveSide, narrowed, narrowness, outline, owned, painted, railsOf, strokeCells, surfaceOf, toggleSide, type Surface } from "../lib/builder/surface.ts";
 import type { ValidateOptions } from "../lib/builder/pipeline.ts";
 import { scratch, startsIn } from "../lib/builder/templates.ts";
 import { makeGesture } from "../lib/builder/gesture.ts";
@@ -58,7 +58,7 @@ void test("outline: cells touching at a corner stay apart, a hole in the green h
 void test("paintEdit: a stroke grows the green and walls it; one that leaves the tee outside is refused; every one let through leaves the hole whole", async () => {
   const o = await opts("garden"), d = painted0(STARTERS.garden.straight), cells = d.surface!.cells;
   // grown down by a stroke along the bottom: its rails follow, the old bottom gone
-  const grown = ok(paintEdit(d, { cells: painted(cells, boxCells([10, 14], [20, 14], cells), true), open: [] }, o));
+  const grown = ok(paintEdit(d, { cells: painted(cells, strokeCells([10, 14], [20, 14], cells), true), open: [] }, o));
   assert.deepEqual(await errors(grown), []);
   assert.ok(grown.pieces.filter((p) => p.geometry.t === "rail").length > 4, "the bump walled");
   assert.deepEqual(owned(grown)!.ids, grown.pieces.filter((p) => p.geometry.t === "rail").map((p) => p.id), "every rail its own");
@@ -74,7 +74,7 @@ void test("paintEdit: a stroke grows the green and walls it; one that leaves the
   // a run of strokes: each let through is a whole hole
   let now = d;
   for (const [a, b, grow] of [[[30, 2], [30, 13], false], [[16, 0], [24, 0], true], [[3, 3], [3, 12], false], [[34, 7], [36, 7], true]] as [V, V, boolean][]) {
-    const c = now.surface!.cells, r = paintEdit(now, { cells: painted(c, boxCells(a, b, c), grow), open: now.surface!.open }, o);
+    const c = now.surface!.cells, r = paintEdit(now, { cells: painted(c, strokeCells(a, b, c), grow), open: now.surface!.open }, o);
     if ("why" in r) continue;
     assert.deepEqual(await errors(r), [], JSON.stringify([a, b, grow]));
     now = r;
@@ -110,7 +110,7 @@ void test("owned: a rail taken away or moved by hand is the author's, its side o
   const d = painted0(STARTERS.garden.straight);
   const moved = { ...d, pieces: d.pieces.map((p) => (p.id === "r1" ? { ...p, geometry: { t: "rail" as const, a: [1.5, 1] as V, b: [33.5, 1] as V } } : p)) };
   assert.deepEqual(owned(moved)!.ids, ["r2", "r3", "r4"]);
-  const next = applySurface(moved, { cells: painted(d.surface!.cells, boxCells([10, 14], [12, 14], d.surface!.cells), true), open: owned(moved)!.open });
+  const next = applySurface(moved, { cells: painted(d.surface!.cells, strokeCells([10, 14], [12, 14], d.surface!.cells), true), open: owned(moved)!.open });
   // (framed: the hand's rail is the hole's top now, half a unit above the green)
   const r1 = next.pieces.find((p) => p.id === "r1")!.geometry as { a: V; b: V }, top = r1.a[1] + 0.5;
   assert.deepEqual([r1.a[1] - next.tee[1], r1.b[0] - r1.a[0]], [1 - d.tee[1], 32], "the hand's rail as it is");
@@ -138,7 +138,7 @@ void test("owned: a rail of the author's on a run (timed) is neither open nor sh
   assert.deepEqual(g.ids, ["r2", "r3", "r4"]);
   assert.ok(top.hand && !top.open, "the author's: not drawn open");
   assert.equal(g.open.length, 0);
-  const next = applySurface(timed, { cells: painted(g.cells, boxCells([10, 14], [20, 14], g.cells), true), open: g.open }, g);
+  const next = applySurface(timed, { cells: painted(g.cells, strokeCells([10, 14], [20, 14], g.cells), true), open: g.open }, g);
   assert.equal(next.pieces.filter((p) => p.geometry.t === "rail" && p.geometry.a[1] === p.geometry.b[1] && p.geometry.a[1] === (timed.pieces.find((q) => q.id === "r1")!.geometry as { a: V }).a[1] + next.tee[1] - timed.tee[1]).length, 1, "one rail along the top: the author's");
   assert.ok(!("why" in gate(timed, next, o)), "and the hole holds");
 });
@@ -180,7 +180,7 @@ void test("a hole walled plainly by hand (no green kept) is painted all the same
   delete bare.surface;
   const g = owned(bare)!;
   assert.ok(g && g.cells.length > 0 && g.ids.length === 4, "its green read");
-  const grown = ok(paintEdit(bare, { cells: painted(g.cells, boxCells([10, 14], [20, 14], g.cells), true), open: [] }, o));
+  const grown = ok(paintEdit(bare, { cells: painted(g.cells, strokeCells([10, 14], [20, 14], g.cells), true), open: [] }, o));
   assert.ok(grown.surface && grown.surface.cells.length > g.cells.length, "painted, kept from then on");
   assert.equal(owned({ ...bare, pieces: bare.pieces.map((p) => (p.id === "r2" ? { ...p, entry: "island/rail/rampart" } : p)) }), null, "a wall not plain: no green to paint");
 });
@@ -207,7 +207,7 @@ void test("a green framed off the quarters (a post's rim) keeps its lattice: nei
   assert.equal(applySurface(d, g).pieces.filter(isPlainRail).length, 4, "painted again: the same four");
 });
 
-void test("a stroke that changes no cell (added inside the green, erased off it) is no edit: nothing let go to the gate, no step", async () => {
+void test("a stroke that changes no cell (painted inside the green, erased off it) is no edit: nothing let go to the gate, no step", async () => {
   const o = await opts("garden"), d = painted0(STARTERS.garden.straight), green = owned(d)!;
   let sent = 0;
   const noop = () => {};
@@ -221,12 +221,4 @@ void test("a stroke that changes no cell (added inside the green, erased off it)
   assert.equal(sent, 0);
   assert.deepEqual(stroke("grow", [mid[0], Math.max(...ys) + 1.5]), { painted: true }, "grown at its edge: let go to the gate");
   assert.equal(sent, 1);
-});
-
-void test("boxCells: a drag paints the box from the brush at the press to the brush at the pointer, whichever way it wandered", () => {
-  const cells: [number, number][] = [[0, 0]];
-  const box = boxCells([1.5, 1.5], [6.2, 3.4], cells), xs = box.map((c) => c[0]), ys = box.map((c) => c[1]);
-  assert.deepEqual([Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)], [0, 7, 0, 4], "the box's span (the brush round each end)");
-  assert.equal(box.length, 8 * 5, "every cell of it, once");
-  assert.equal(boxCells([1.5, 1.5], [1.5, 1.5], cells).length, 9, "a click: the brush's own 3 by 3");
 });

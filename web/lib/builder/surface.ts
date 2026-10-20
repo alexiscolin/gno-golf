@@ -1,4 +1,4 @@
-// The green painted (the board's Add and Erase): the ground as unit cells
+// The green painted (the board's Paint and Erase): the ground as unit cells
 // on the hole's own lattice (their corners where its rails meet), kept in
 // the draft beside the pieces (draft.ts surface; never in the bytes), and
 // walled by itself: its outline traced, interior on the right, each straight
@@ -225,13 +225,10 @@ export function brushAt(at: V, cells: readonly V[]): V[] {
   for (let j = 0; j < BRUSH; j++) for (let i = 0; i < BRUSH; i++) out.push([r6(x0 + i), r6(y0 + j)]);
   return out;
 }
-/** The cells a drag from a to b paints: the box from the brush at a to the brush at b (a click: the brush's own), straight
- *  and cell-exact whichever way the pointer wanders. */
-export function boxCells(a: V, b: V, cells: readonly V[]): V[] {
-  const ps = [...brushAt(a, cells), ...brushAt(b, cells)], xs = ps.map((p) => p[0]), ys = ps.map((p) => p[1]);
-  const [x0, y0] = [Math.min(...xs), Math.min(...ys)], out: V[] = [];
-  for (let j = 0; j <= Math.round(Math.max(...ys) - y0); j++) for (let i = 0; i <= Math.round(Math.max(...xs) - x0); i++) out.push([r6(x0 + i), r6(y0 + j)]);
-  return out;
+/** The cells a stroke from a to b passes under the brush (a step of half a cell: a quick stroke leaves no gap). */
+export function strokeCells(a: V, b: V, cells: readonly V[]): V[] {
+  const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) * 2));
+  return uniq(Array.from({ length: n + 1 }, (_, k) => brushAt([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n], cells)).flat());
 }
 /** Cells grown (painted in) or shrunk (painted out). */
 export function painted(cells: readonly V[], brushed: readonly V[], grow: boolean): V[] {

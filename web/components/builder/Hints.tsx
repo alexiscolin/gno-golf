@@ -20,7 +20,7 @@ import { Sheet } from "@/components/ui";
 /** The four, the world's weathers named in Play's. */
 const hintsOf = (world: string) => [
   ["palette", "Drag a piece onto the board"],
-  ["green", "Add green (B): drag a box"],
+  ["green", "Paint or Erase (B): drag the green"],
   ["test", `Press Play (T): sink it in ${weathersSaid(required(world))}`],
   ["steps", "Then Publish it for anyone to play"],
 ] as const;

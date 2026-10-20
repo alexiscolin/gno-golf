@@ -8,7 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { makeGesture, type Target } from "../lib/builder/gesture.ts";
+import { alongAxis, makeGesture, type Target } from "../lib/builder/gesture.ts";
 import { makeSession } from "../lib/builder/session.ts";
 import { frame } from "../lib/builder/gg1.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
@@ -147,4 +147,14 @@ void test("the 3D board's camera shows the ground where the lens puts it: the ov
       assert.ok(near(s, toScreen(v, look, p), 1e-6), `${look.turns}/${look.tilt.toFixed(2)} ${p.join()}: ${s.join()} for ${toScreen(v, look, p).join()}`);
     }
   }
+});
+
+void test("alongAxis: a stroke in straight legs, its wobble left out; it turns once taken two cells across; held until it has gone a cell", () => {
+  const g: { from: [number, number]; axis: 0 | 1 | null } = { from: [10, 10], axis: null };
+  assert.deepEqual(alongAxis(g, [10.4, 10.3]), [10, 10], "under a cell: where it began");
+  assert.deepEqual(alongAxis(g, [14, 11.2]), [14, 10], "along x, its wobble across left out");
+  assert.equal(g.axis, 0);
+  assert.deepEqual(alongAxis(g, [16, 13]), [16, 13], "three across: turned at x 16, now along y");
+  assert.deepEqual([g.from, g.axis], [[16, 10], 1], "the new leg from the corner");
+  assert.deepEqual(alongAxis(g, [17.5, 18]), [16, 18], "down the new leg, straight");
 });

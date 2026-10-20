@@ -90,12 +90,17 @@
 .piece__icon { grid-row: 1 / 3; width: var(--pic); height: var(--pic); padding: 8px; border-radius: 10px; background: rgba(var(--ink-rgb), .06); }
 /* the green's tools, over the pieces: their own small heading */
 .palette__tools { display: grid; gap: var(--sp-2); }
+/* the brush under the pointer, painting: its square of cells, white edged to paint, red dashed to erase */
+.board__brush { fill: rgba(255, 255, 255, .14); stroke: #fff; stroke-width: .12; vector-effect: none; }
+.board__brush--shrink { fill: rgba(225, 75, 59, .12); stroke: #e14b3b; stroke-dasharray: .35 .25; }
+.board__brush--off { display: none; }
 .palette__tools h3 { margin: 0; }
 /* (side by side, "Erase" whole at the narrowest palette: a smaller icon and name there, the pieces kept unscrolled) */
 .palette__tools .ptiles { grid-template-columns: 1fr 1fr; gap: var(--sp-2); --pic: 24px; }
-.palette__does { margin: 0; font-size: 13px; line-height: 1.3; color: var(--ink-soft); } /* (one line at the narrowest palette) */
 .palette__tools .piece { grid-template: auto / var(--pic) minmax(0, 1fr); column-gap: 4px; padding: 3px 4px 3px 3px; }
-.palette__tools .piece__icon { grid-row: auto; padding: 2px; }
+.palette__tools .piece__icon { grid-row: auto; padding: 1px; }
+.palette__does { margin: 0; font-size: 13px; line-height: 1.3; color: var(--ink-soft); } /* (one line at the narrowest palette) */
+@media (max-height: 720px) { .palette__does { display: none; } } /* (a short window: the pieces unscrolled first, the tools' pictures and tips say it) */
 .palette__tools .piece__name { align-self: center; font-size: 14px; } /* (one row: by its icon's middle) */
 @media (min-width: 1280px) {
   .palette__tools .ptiles { --pic: 28px; }

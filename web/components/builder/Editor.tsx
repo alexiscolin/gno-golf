@@ -13,7 +13,7 @@
 // address, each round a try at the next weather not holed, its proof kept
 // in the draft (TestMode); the difficulty's change said as it comes ("par 3
 // → 4"), and a ghost ball runs the meter's line after a drop. The green is
-// painted on the board (B: Add, Erase, a box dragged; surface.ts), each stroke one step
+// painted on the board (B: Paint, Erase; surface.ts), each stroke one step
 // through the same gate as every edit (edit.ts gate), refused with why. One
 // tool in hand at a time: a piece armed, or the paint.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -109,7 +109,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
   const [unloaded, setUnloaded] = useState(false), [tries, setTries] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [show, setShow] = useState<{ id: string; n: number } | null>(null); // Show me: the piece to frame
-  // the tool in hand: a palette piece armed (its ghost on the board), or the green's paint (B: Add or Erase, the last way again)
+  // the tool in hand: a palette piece armed (its ghost on the board), or the green's paint (B: Paint or Erase, the last way again)
   const [tool, setTool] = useState<{ t: "piece"; entry: PaletteEntry } | { t: "paint"; mode: PaintMode } | null>(null);
   const armed = tool?.t === "piece" ? tool.entry : null, paint = tool?.t === "paint" ? tool.mode : null, lastMode = useRef<PaintMode>("grow");
   const arm = (e: PaletteEntry | null) => setTool(e && { t: "piece", entry: e });
@@ -485,7 +485,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
             <aside className="col" aria-label="The selected piece">
               <h2 className="col__head">Piece settings</h2>
               {/* painting with no piece selected: how the paint goes, in its place */}
-              {paint && !piece ? <p className="nothing">Drag a box to add green (or erase it) · drag a side to move it · click a side to open it · dashed: open, no wall</p> : <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={blinking} onPlay={() => setBlinking((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove}
+              {paint && !piece ? <p className="nothing">Drag to paint (or erase) the green · drag a side to move it · click a side to open it · dashed: open, no wall</p> : <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={blinking} onPlay={() => setBlinking((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove}
                 onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />}
             </aside>
           </div>

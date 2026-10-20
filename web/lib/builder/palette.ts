@@ -128,7 +128,7 @@ export function paletteOf(world: string, own: Skins = {}, sea = false): PaletteE
   return out;
 }
 
-/** The pieces a first hole needs, first in the palette and named plainly (the GUI spec's B3); the world's others under "More pieces" (a Bank among them: the green walls itself, Board's Add, so a wall by hand is an inner bank). */
+/** The pieces a first hole needs, first in the palette and named plainly (the GUI spec's B3); the world's others under "More pieces" (a Bank among them: the green walls itself, Board's Paint, so a wall by hand is an inner bank). */
 export const COMMON = [["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]] as const;
 
 /** A palette's common pieces, in that order, each named plainly (those it has). */

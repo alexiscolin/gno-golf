@@ -22,7 +22,7 @@ export function keyAction(e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" |
 /** The keys in words: the key line's few (line: the board's one line, the most used and ?), the glossary's sentence (every one). */
 export const KEYS: readonly { key: string; short: string; long: string; line?: true }[] = [
   { key: `1–${PIECE_KEYS}`, short: "Pieces", long: `pick one of the first ${NUMBERS[PIECE_KEYS]} pieces`, line: true },
-  { key: "B", short: "Green", long: "paints the green (again: the pieces): a box dragged adds green or erases it, its walls following; a side dragged moves it, clicked opens it where water keeps the ball in; Tab to a side: the arrows move it, Enter opens it (painting takes the pointer)", line: true },
+  { key: "B", short: "Green", long: "paints the green (again: the pieces): a drag paints or erases it in straight lines (⇧: freehand), its walls following; a side dragged moves it, clicked opens it where water keeps the ball in; Tab to a side: the arrows move it, Enter opens it (painting takes the pointer)", line: true },
   { key: "R", short: "Turn", long: "turns the selected piece", line: true },
   { key: "Enter", short: "Drop", long: "drops the piece in hand between the tee and the cup" },
   { key: "⌫", short: "Delete", long: "deletes it (Delete too)" },
