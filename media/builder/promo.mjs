@@ -376,8 +376,10 @@ async function overlay(/** @type {any[]} */ cut_) {
   const cut = {
     cards: cut_.filter((s) => s.card).map((s) => s.beats.map((/** @type {number} */ b) => b * BEAT)),
     cuts: [cut_[1].beats[0], cut_.at(-1).beats[0]].map((b) => b * BEAT),
-    titles: cut_.flatMap((s) => s.titles.map((/** @type {any} */ t) => ({ ...t, html: title(t), at: t.at < 0 ? -1 : t.at, base: s.beats[0] * BEAT, end: s.beats[1] * BEAT }))),
+    // (each logo its own ids: two logos, or the page's own, would share their clip paths and gradient)
+    titles: cut_.flatMap((s, i) => s.titles.map((/** @type {any} */ t) => ({ ...t, html: title(t).replace(/(id="|url\(#|href="#)([\w-]+)/g, `$1$2-t${i}`), at: t.at < 0 ? -1 : t.at, base: s.beats[0] * BEAT, end: s.beats[1] * BEAT }))),
   };
+  await c.js(`document.querySelectorAll("body [id]").forEach((e) => e.removeAttribute("id"))`); // (the page's own logo's ids, hidden, not ours)
   await c.js(`(() => { const s = document.createElement("style"); s.textContent = ${JSON.stringify(CSS)}; document.head.appendChild(s); window.__cut = ${JSON.stringify(cut)}; })()`);
   await c.js(LAYER);
   await c.js(`document.fonts.ready.then(() => true)`);
