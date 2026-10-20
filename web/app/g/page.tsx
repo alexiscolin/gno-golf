@@ -15,12 +15,12 @@ export const metadata: Metadata = SHOP
   : { robots: { index: false }, alternates: { canonical: "/" } };
 
 export default function Gallery() {
-  // off, the home's words: nothing of the shop in the page
-  const ld = SHOP ? { "@type": "CollectionPage", name: title, url: `${SITE}/g/`, description } : undefined;
+  // off, the home's words and no data: nothing of the shop in the page
+  const intro = SHOP ? { title, text: description, ld: { "@type": "CollectionPage", name: title, url: `${SITE}/g/`, description } } : { title: TITLE, text: DESCRIPTION };
   return (
     <>
       <base href="/" />
-      <Intro title={SHOP ? title : TITLE} text={SHOP ? description : DESCRIPTION} web="" ld={ld} />
+      <Intro {...intro} web="" />
       <Game />
     </>
   );

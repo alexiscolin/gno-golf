@@ -136,8 +136,9 @@ try {
   said(`the start card: ${await c.js<string>(`document.querySelector(".tmode__sign--start h2").textContent`)}`);
   // (a chain the walk already published on: the key's address holds this slug, the card offers the next free one; not a new
   // player's path, so not counted)
-  if (await c.ev<boolean>(`!!${button(/^Use [a-z0-9-]+-\d+$/)}`)) {
-    await c.js(`${button(/^Use [a-z0-9-]+-\d+$/)}.click()`);
+  const next = button(/^Use [a-z0-9-]+-\d+$/);
+  if (await c.ev<boolean>(`!!${next}`)) {
+    await c.js(`${next}.click()`);
     said("the slug taken by an earlier walk: the next free one used (not counted)");
   } else {
     await click(button(/^Paste an address/i), "Paste an address");
