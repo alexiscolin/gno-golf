@@ -4,18 +4,22 @@
 // the hole as a player's client gets it (HoleState of the canonical bytes,
 // builder.wasm), framed from above as the overview frames it. What it shows
 // is what will be published. Drawn again whenever the checked hole changes.
-// Turned round its middle by a drag, zoomed by the wheel; a double click
-// frames it again.
+// Turning slowly round its middle on its own (not while dragged, nor out of
+// sight, nor for reduced motion); turned by a drag, zoomed by the wheel; a
+// double click frames it again. Said under it.
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { applyRig, laneBox, makeRenderer, makeScene, overviewRig, setLighting } from "@/lib/scene/camera";
 import { buildHole } from "@/lib/scene/course";
 import { disposeCourse } from "@/lib/scene/materials";
 import { loadWorld } from "@/lib/scene/worlds";
+import { reducedMotion } from "@/lib/device";
 import type { Hole } from "@/lib/scene/data";
 
 /** The orbit as it frames: no turn, no tilt, the overview's distance. */
 const FRAMED: Readonly<{ yaw: number; pitch: number; zoom: number }> = { yaw: 0, pitch: 0, zoom: 1 };
+/** Its own turn: radians a millisecond (a round a minute). */
+const SPIN = (2 * Math.PI) / 60_000;
 
 /** capture: set to a function that draws the view now and gives its canvas (read it in the same task: a share card). */
 export default function Preview({ state, fresh, capture }: { state: Hole | null; fresh: boolean; capture?: { current: (() => HTMLCanvasElement | null) | null } }) {
@@ -27,6 +31,24 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
   const orbit = useRef({ ...FRAMED }), redraw = useRef<() => void>(() => {}), frame = useRef(0), drag = useRef<{ x: number; y: number } | null>(null);
   const turned = () => void (frame.current ||= requestAnimationFrame(() => ((frame.current = 0), redraw.current())));
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  // its own slow turn, a frame at a time while in sight
+  useEffect(() => {
+    const el = box.current;
+    if (!el || reducedMotion()) return;
+    let raf = 0, last = 0;
+    const spin = (now: number) => {
+      if (!drag.current && last) (orbit.current.yaw += (now - last) * SPIN), redraw.current();
+      last = now;
+      raf = requestAnimationFrame(spin);
+    };
+    const io = new IntersectionObserver(([e]) => {
+      cancelAnimationFrame(raf);
+      last = 0;
+      if (e.isIntersecting && !document.hidden) raf = requestAnimationFrame(spin);
+    });
+    io.observe(el);
+    return () => (io.disconnect(), cancelAnimationFrame(raf));
+  }, [failed]);
   // the wheel zooms the view, never the page under it (a native listener: React's own wheel is passive, as Board's)
   useEffect(() => {
     const el = box.current;
@@ -109,6 +131,7 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
       onPointerUp={() => void (drag.current = null)} onPointerCancel={() => void (drag.current = null)}
       onDoubleClick={() => ((orbit.current = { ...FRAMED }), turned())}>
       <span className="pill">{state ? (fresh ? "3D · in sync" : "3D · catching up") : "3D · waiting for the checks"}</span>
+      <span className="preview__how" aria-hidden="true">Drag to turn · scroll to zoom</span>
     </div>
   );
 }

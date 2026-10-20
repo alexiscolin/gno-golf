@@ -206,6 +206,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .preview:active { cursor: grabbing; }
 .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .preview .pill { position: absolute; left: var(--sp-2); top: var(--sp-2); display: inline-flex; align-items: center; height: 26px; padding: 0 var(--sp-3); border-radius: var(--pill); background: rgba(var(--paper-rgb), .95); border: var(--info-edge); font-size: 12px; font-weight: 700; }
+.preview__how { position: absolute; left: 50%; bottom: var(--sp-2); transform: translateX(-50%); padding: 2px var(--sp-3); border-radius: var(--pill); background: rgba(var(--ink-rgb), .55); color: var(--white); font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 .insp { display: grid; gap: var(--sp-4); }
 /* a setting: its label, slider and value on one grid (the same columns row after row), its range under the slider in small type */
 .range { display: grid; grid-template-columns: 64px minmax(0, 1fr) 52px; gap: 2px 10px; align-items: center; font-size: 13px; font-weight: 700; }
