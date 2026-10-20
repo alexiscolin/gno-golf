@@ -47,7 +47,7 @@ setTimeout(() => (console.error("cdp: run over CDP_MAX_MS, Chrome killed"), kill
 
 /**
  * A headless Chrome on about:blank, the page's viewport set: { send(method,
- * params), ev(expr) (its value, undefined if it threw), js(expr) (throws),
+ * params), ev(expr) (its value, undefined if it threw), js(expr) (throws), on(method, fn) (an event's params, one listener each),
  * errors (the page's exceptions and console errors), kill() }.
  * dir: its profile (a fresh one by default); args: more Chrome flags.
  * @param {{ width?: number, height?: number, mobile?: boolean, touch?: boolean, dir?: string, args?: string[] }} [opts]
@@ -75,8 +75,11 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   const wait = new Map();
   /** @type {string[]} */
   const errors = [];
+  /** @type {Map<string, (params: any) => void>} */
+  const heard = new Map();
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
+    if (d.method) heard.get(d.method)?.(d.params);
     const w = d.id && wait.get(d.id);
     if (w) (d.error ? w[1](new Error(d.error.message)) : w[0](d.result), wait.delete(d.id));
     if (d.method === "Runtime.exceptionThrown") errors.push(d.params.exceptionDetails.exception?.description?.slice(0, 160) || d.params.exceptionDetails.text);
@@ -98,7 +101,9 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   await send("Runtime.enable");
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
   if (touch) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-  return { send, ev, js, errors, kill: () => { try { ws.close(); } catch {} kill(); } };
+  /** @type {(method: string, fn: (params: any) => void) => void} */
+  const on = (method, fn) => void heard.set(method, fn);
+  return { send, ev, js, on, errors, kill: () => { try { ws.close(); } catch {} kill(); } };
 }
 
 /**
