@@ -15,6 +15,7 @@ media/*
 # promo renders and the music file are rebuilt by media/promo/render.mjs
 media/promo/*.mp4
 media/builder/gnogolf-builder*
+media/promo/shots-builder.json
 media/promo/music/
 media/promo/stills-v4/
 media/promo/stills-check/

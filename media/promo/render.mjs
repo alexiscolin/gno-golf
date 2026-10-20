@@ -154,7 +154,9 @@ async function shoot(c, s, i, out) {
   // a duel: that player's ghost raced (their best here); "champion", the seeded one's address in CHAMPION
   if (s.by) q.set("by", s.by === "champion" ? (process.env.CHAMPION || (() => { throw new Error("a duel cut needs CHAMPION=<the seeded champion's address>"); })()) : s.by);
   if (s.screen) q.set("screen", s.screen); // a screen of the game's (its ui shown), not the course
-  const url = `${APP}/?${s.screen ? "" : "play&"}promo&${q}`;
+  if (s.day) q.set("og", ""); // day: in daylight whatever its id's time (web/lib/scene/camera.ts timeOf)
+  // (camlog: the rig in a production build too, the playground's: web/lib/promo.ts)
+  const url = `${APP}/?${s.screen ? "" : "play&"}promo&camlog&${q}`;
   // a duel's reads, kept from the first render (web/lib/promo.ts attach)
   const reads = s.by && (await c.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__promoReads=${JSON.stringify(paths.reads || {})}` })).identifier;
   await c.send("Page.navigate", { url });
@@ -167,6 +169,25 @@ async function shoot(c, s, i, out) {
   }
   await c.js(`document.fonts.load("700 100px Fredoka").then(() => document.fonts.ready)`);
   await sleep(1200); // the world's pieces settle in
+  // ace: the shot's first stroke a one-stroker found now, in the weather the chain plays (a community hole's is the
+  // chain's, not the shot's): every way within 45 degrees of the tee's line to the cup and every power, the longest ride
+  // that holes (the most to watch), kept in paths.json with the others
+  if (s.ace && s.fire?.[0]) {
+    const k = `${s.hole}|ace`;
+    paths[k] ??= await c.js(`(async () => {
+      const g = __promo, best = { len: 0, shot: null };
+      for (let d = -45; d <= 45; d += 1) for (let p = 1; p <= 10; p += 0.25) {
+        const r = await g.simulate([[d, p, null]]);
+        if (!r || !r.holed) continue;
+        const len = r.path.reduce((n, q, i) => (i ? n + Math.hypot(q[0] - r.path[i - 1][0], q[1] - r.path[i - 1][1]) : 0), 0);
+        if (len > best.len) (best.len = len), (best.shot = [d, p]);
+      }
+      return best.shot;
+    })()`);
+    if (!paths[k]) throw new Error(`shot ${s.name}: no one-stroker in the weather now`);
+    fs.writeFileSync(pathsFile, JSON.stringify(paths));
+    [s.fire[0].deg, s.fire[0].power] = paths[k];
+  }
   // the chain's answers, fetched once and kept
   const key = (f) => `${s.cup}${s.hole}|${f.deg},${f.power}${f.tick != null ? "@" + f.tick : ""}`;
   const cache = {};
@@ -323,7 +344,7 @@ try {
 } finally {
   c.kill();
 }
-if (STILLS) process.exit(0);
+if (STILLS || process.argv.includes("--frames")) process.exit(0); // --frames: the frames (and the shots' sounds) only, for another cut to lay out (media/builder/promo.mjs)
 
 // ------------------------------------------------------------ encode: clean
 //
