@@ -12,6 +12,7 @@ import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
 import { periodFor } from "./proof";
 import { required, weatherName, weathersSaid } from "./rules";
+import { nextSlug } from "./templates";
 import { calmPeriod } from "./quickshot";
 import type { BuilderHost } from "./wasm";
 
@@ -28,6 +29,18 @@ export function holeId(author: string, slug: string, versions: Versions | null):
  *  false, unread: v1, as a new hole). The one rule Play, the stepper and Publish go by (read once, by the editor). */
 export const nextHoleId = (chain: Pick<Chain, "versions">, author: string, slug: string): Promise<{ id: string; read: boolean }> =>
   chain.versions(`${author}/${slug}`).then((v) => ({ id: holeId(author, slug, v), read: true }), () => ({ id: holeId(author, slug, null), read: false }));
+
+/** The address the start card offers for one of author's that slug cannot take: the next none of taken (the other drafts)
+ *  holds and no hole of theirs on the chain either (its next id v1); unread, the next of taken's. */
+export async function freeSlug(chain: Pick<Chain, "versions">, author: string, slug: string, taken: ReadonlySet<string>): Promise<string> {
+  let s = nextSlug(slug, taken);
+  for (let k = 0; k < 20; k++) {
+    const n = await nextHoleId(chain, author, s);
+    if (!n.read || n.id.endsWith("/v1")) break;
+    s = nextSlug(s, taken);
+  }
+  return s;
+}
 
 /** A hole id's version (author/slug/vN: N; 0 for none). */
 const versionOf = (id: string) => Number(/\/v(\d+)$/.exec(id)?.[1] ?? 0);

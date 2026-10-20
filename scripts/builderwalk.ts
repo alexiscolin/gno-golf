@@ -134,14 +134,15 @@ try {
   await click(`document.querySelector(".bhead__act")`, "Play");
   await until(`!!document.querySelector(".tmode__sign--start")`, "the address asked as Play opens, before round 1");
   said(`the start card: ${await c.js<string>(`document.querySelector(".tmode__sign--start h2").textContent`)}`);
-  // (a chain the walk already published on: the key's address holds this slug, the card offers the next free one; not a new
-  // player's path, so not counted)
-  const next = button(/^Use [a-z0-9-]+-\d+$/);
+  // (a chain the walk already published on: the key's address holds this slug, the card offers the next free one; the card
+  // settled first, the address read, as it can turn into that one)
+  const next = button(/^Use [a-z0-9-]+-\d+$/), paste = button(/^Paste an address/i);
+  await until(`!!${next} || !!${paste}`, "the start card's way on (a free address read)");
+  await sleep(1000);
   if (await c.ev<boolean>(`!!${next}`)) {
-    await c.js(`${next}.click()`);
-    said("the slug taken by an earlier walk: the next free one used (not counted)");
+    await click(next, "the next free address (the slug taken by an earlier walk)");
   } else {
-    await click(button(/^Paste an address/i), "Paste an address");
+    await click(paste, "Paste an address");
     await until(`!!document.querySelector(".tmode__addr input")`, "the address field");
     await c.js(`(() => { const el = document.querySelector(".tmode__addr input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(AUTHOR)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
     count.typed++;

@@ -72,7 +72,7 @@ const CONTRAST = `(sel) => {
   return { ratio: (a + 0.05) / (b + 0.05), opacity: op };
 }`;
 
-const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650], [1512, 982], [1920, 1080]];
+const SIZES: [number, number][] = [[900, 800], [960, 720], [1024, 768], [1280, 800], [1440, 900], [1366, 650], [1512, 982], [1920, 1080]];
 for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
@@ -91,10 +91,11 @@ for (const [w, h] of SIZES) {
   const dock = (await box(c, ".checks"))!;
   assert.ok(dock.b - dock.t < 1, `${at}: the dock takes ${dock.b - dock.t} px with nothing to say`);
   assert.equal(await c.js(`document.querySelectorAll(".checks .gauge, .checks__chain").length`), 0, `${at}: a gauge far from its limit, or the chain's limits`);
-  // the three steps in the middle of the header where there is room (from 1000px), else off centre; never over the zones beside them
-  const steps = (await box(c, ".stepper"))!, start = (await box(c, ".bhead__start"))!, end = (await box(c, ".bhead__end"))!;
-  if (w >= 1000) assert.ok(Math.abs((steps.l + steps.r) / 2 - w / 2) <= 2, `${at}: the steps sit at ${(steps.l + steps.r) / 2}, not ${w / 2}`);
-  assert.ok(!overlap(steps, start) && !overlap(steps, end), `${at}: the steps over the name or the action`);
+  // the three steps in the middle of the header where there is room (over 1000px), else off centre; never under a control beside them
+  const steps = (await box(c, ".stepper"))!;
+  if (w > 1000) assert.ok(Math.abs((steps.l + steps.r) / 2 - w / 2) <= 2, `${at}: the steps sit at ${(steps.l + steps.r) / 2}, not ${w / 2}`);
+  const beside = await c.js<(Box & { n: string })[]>(`[...document.querySelectorAll(".bhead__start > *, .bhead__name > input, .bhead__end > *")].map((e) => { const r = e.getBoundingClientRect(); return { n: e.className || e.tagName, l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  for (const b of beside) assert.ok(!overlap(steps, b), `${at}: the steps over ${b.n}`);
   // undo and redo: whole, inside the header, clear of the steps (nothing clipped, nothing under the steps)
   const head = (await box(c, ".bhead"))!, hist = await c.js<Box[]>(`[...document.querySelectorAll(".bhead__hist")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
   assert.equal(hist.length, 2, `${at}: undo and redo in the header`);

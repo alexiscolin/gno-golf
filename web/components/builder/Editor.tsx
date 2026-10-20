@@ -31,7 +31,7 @@ import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/b
 import { canonicalHex, parAllowed, proofKey, unproven, type Proof } from "@/lib/builder/proof";
 import { dropped, toCarry, withCarried } from "@/lib/builder/carry";
 import { FIELD, listed, required, weatherName } from "@/lib/builder/rules";
-import { nextHoleId, publishTip, slugOf } from "@/lib/builder/testmode";
+import { freeSlug, nextHoleId, publishTip, slugOf } from "@/lib/builder/testmode";
 import { endpoints } from "@/lib/builder/holes";
 import { makeChain } from "@/lib/chain";
 import { makeSession } from "@/lib/builder/session";
@@ -497,7 +497,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
           <TestMode key={playing.author ?? ""} host={host} draft={kept} hex={playing.hex} proofKey={playing.key} author={playing.author} guess={guess?.par ?? 0}
             onAuthor={(a) => (setPlaying((p) => p && { ...p, author: a }), onAuthor(a))}
             next={playing.author && next?.of === `${playing.author}/${kept.slug}` ? next : null}
-            onProof={prove} onPar={setPar} tried={tried} onTried={() => setTried(null)} readdress={askSlug} taken={others} onSlug={toSlug}
+            onProof={prove} onPar={setPar} tried={tried} onTried={() => setTried(null)} readdress={askSlug} taken={others} freeOf={(s) => freeSlug(chain, playing.author ?? "", s, others)} onSlug={toSlug}
             onRound={(r) => (setTried(r), setTrail(roundOf(host, kept, r)))} onLeave={() => setPlaying(null)} onPublish={() => (setPlaying(null), publish())} />
         </div>
       )}

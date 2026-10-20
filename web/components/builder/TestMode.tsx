@@ -153,9 +153,16 @@ function AddressLine({ start, title, head, line, note, onAddress, children }: { 
 
 /** The address chosen before round 1 (the author's known): one another hole of theirs holds (clash: the next free one a click
  *  away, or one typed), or one Publish could not use; the rounds played under it said not to count under another. */
-function AddressCard({ title, author, slug, clash, rounds, taken, onSlug, onLeave }: { title: string; author: string; slug: string; clash: boolean; rounds: boolean; taken: ReadonlySet<string>; onSlug: (s: string) => void; onLeave: () => void }) {
-  const offer = nextSlug(slug, taken);
-  const [typed, setTyped] = useState<string | null>(clash ? null : offer);
+function AddressCard({ title, author, slug, clash, rounds, taken, freeOf, onSlug, onLeave }: { title: string; author: string; slug: string; clash: boolean; rounds: boolean; taken: ReadonlySet<string>; freeOf: (slug: string) => Promise<string>; onSlug: (s: string) => void; onLeave: () => void }) {
+  const [typed, setTyped] = useState<string | null>(null);
+  // the offer: one free on the chain too (its button waiting for the read)
+  const [offer, setOffer] = useState<{ of: string; slug: string } | null>(null);
+  useEffect(() => {
+    let stale = false;
+    void freeOf(slug).then((o) => !stale && (setOffer({ of: slug, slug: o }), !clash && setTyped((t) => t ?? o)));
+    return () => void (stale = true);
+  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps -- (freeOf, clash: the render's own)
+  const free = offer?.of === slug ? offer.slug : null;
   const ok = typed !== null && isSlug(typed) && typed !== slug && !taken.has(typed);
   return (
     <WonCard title={title} head={clash ? "This address holds another hole" : "A new address"} kicker="Before you tee off" label="Its address first" className="tmode__sign tmode__sign--start">
@@ -169,14 +176,14 @@ function AddressCard({ title, author, slug, clash, rounds, taken, onSlug, onLeav
       )}
       <div className="banner__row">
         <Button keycap="Esc" onClick={onLeave}>Back to Build</Button>
-        {typed === null && <Button onClick={() => setTyped(offer)}>Another address</Button>}
-        {typed === null && <Button variant="primary" onClick={() => onSlug(offer)}>Use {offer}</Button>}
+        {typed === null && <Button onClick={() => setTyped(free ?? nextSlug(slug, taken))}>Another address</Button>}
+        {typed === null && <Button variant="primary" disabled={!free} onClick={() => free && onSlug(free)}>{free ? `Use ${free}` : "Finding a free address…"}</Button>}
       </div>
     </WonCard>
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, next, guess = 0, tried = null, readdress = false, taken = new Set(), onAuthor, onProof, onPar, onRound, onTried, onSlug, onPublish, onLeave }: {
+export default function TestMode({ host, draft, hex, proofKey, author, next, guess = 0, tried = null, readdress = false, taken = new Set(), freeOf, onAuthor, onProof, onPar, onRound, onTried, onSlug, onPublish, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -197,6 +204,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, next, gue
   readdress?: boolean;
   /** the other drafts' addresses (none of them offered) */
   taken?: ReadonlySet<string>;
+  /** the address offered instead of slug: none of taken's, nor one the author's holes hold on the chain (testmode.ts freeSlug) */
+  freeOf: (slug: string) => Promise<string>;
   /** the address changed on the start card (the editor's step: the rounds under the old one dropped) */
   onSlug: (slug: string) => void;
   /** the address given (a try holed first): kept in this browser, and play goes on as the author's */
@@ -474,7 +483,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, next, gue
       )}
       {/* the address first: another hole of the author's there, or one Publish could not use */}
       {choosing && (
-        <AddressCard title={draft.title || "Your hole"} author={author ?? ""} slug={draft.slug} clash={clash} rounds={draft.proofs.some((p) => slugOf(p.id) === draft.slug)} taken={taken}
+        <AddressCard title={draft.title || "Your hole"} author={author ?? ""} slug={draft.slug} clash={clash} rounds={draft.proofs.some((p) => slugOf(p.id) === draft.slug)} taken={taken} freeOf={freeOf}
           onSlug={(s) => (setAsked(false), onSlug(s))} onLeave={onLeave} />
       )}
       {/* no address yet: asked once as Play opens, before round 1 (or just a try: asked again once it is holed) */}

@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { askSaid, cameFrom, clock, finished, heldSaid, holeId, holeRow, nextHoleId, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
+import { askSaid, cameFrom, clock, finished, freeSlug, heldSaid, holeId, holeRow, nextHoleId, nowSaid, parSaid, plan, publishTip, summary, testChain, toGo, TRY_HOLE, tryPlan, type Finished } from "../lib/builder/testmode.ts";
 import { holdsIn, holdsToo } from "../lib/builder/carry.ts";
 import { provedAt, replay, type Proof } from "../lib/builder/proof.ts";
 import fs from "node:fs";
@@ -170,4 +170,11 @@ void test("cameFrom: played under its alias's next version, a draft is a new ver
   assert.equal(cameFrom({ from: `${A}/mole-run`, proofs: [] }, `${A}/mole-run/v3`), true, "opened by its alias");
   assert.equal(cameFrom({ proofs: [proof(`${A}/mole-run/v1`)] }, `${A}/mole-run/v2`), true, "a draft kept before: played under v1");
   assert.equal(cameFrom({ from: `${A}/other/v1`, proofs: [proof(`${A}/other/v1`)] }, `${A}/mole-run/v2`), false, "of another hole");
+});
+
+test("freeSlug: the start card's offer free of the drafts and of the author's holes on the chain; unread, the drafts' next", async () => {
+  const on = new Set(["a/mole-run", "a/mole-run-2", "a/mole-run-4"]);
+  const versions = (alias: string) => Promise.resolve({ slot: alias, versions: on.has(alias) ? [{ v: 1, id: `${alias}/v1`, by: "a", sha: "", note: "", next: "", height: 1 }] : [] });
+  assert.equal(await freeSlug({ versions }, "a", "mole-run", new Set(["mole-run-3"])), "mole-run-5");
+  assert.equal(await freeSlug({ versions: () => Promise.reject(new Error("down")) }, "a", "mole-run", new Set()), "mole-run-2");
 });
