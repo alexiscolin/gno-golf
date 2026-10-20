@@ -105,7 +105,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
         <ul>
           {starts.map((s) => (
             <li key={s.name}>
-              <button type="button" className="bholes__start" aria-label={`${s.title}: ${s.line}, par ${s.draft.par}. Start it`} onClick={() => onAdd(s.draft)}>
+              <button type="button" className={`bholes__start${s.name === "scratch" ? " bholes__start--scratch" : ""}`} aria-label={`${s.title}: ${s.line}, par ${s.draft.par}. Start it`} onClick={() => onAdd(s.draft)}>
                 <span className="bholes__map"><HoleMap hole={s.map} className="bholes__svg" /></span>
                 <b>{s.title}</b>
                 <span className="bholes__line">{s.line}</span>
