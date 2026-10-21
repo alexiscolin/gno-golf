@@ -276,7 +276,7 @@ const FIND = `(async () => {
 
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 87.5, on the end card's button). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 83.5, on the end card's button). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
@@ -287,54 +287,54 @@ const FIND = `(async () => {
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
 const CUT = [
-  // the hook: the ball fed to the blowhole, spat over the lagoon, holed
-  { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: true, dropAt: 1.8, sink: 2.1, ramp: [1.6, 2.6, 0.45, 0.2],
-    cam: { mode: "follow", deg: 0, back: 5.5, up: 2.4, ahead: 4, fov: 52, lag: 4 }, flash: 0.6 }, beats: [0, 8], titles: [
+  // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
+  { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 2.05,
+    cam: { mode: "follow", deg: 0, back: 5.5, up: 2.4, ahead: 4, fov: 52, lag: 4, stay: 2.05 }, flash: 0.6 }, beats: [0, 8], titles: [
     { big: "BUILD YOUR <b>OWN HOLE.</b>", size: 132, drop: true, kind: "slam", y: 300, sparkle: 4 },
   ] },
   // the Builder in flashes, close up, a word each
   { from: ["paint", 0], to: ["painted", -0.2], beats: [8, 10], crop: [330, 300, 640], titles: [{ big: "PAINT.", size: 150, at: 0.02, y: 300 }] },
   { from: ["drop", 0], to: ["dropped", -0.2], beats: [10, 12], crop: [0, 120, 700], titles: [{ big: "<b>DROP.</b>", size: 150, at: 0.02, y: 300 }] },
   { from: ["tweak", 0], to: ["tweaked", -0.3], beats: [12, 14], crop: [380, 150, 900], titles: [{ big: "<i>TWEAK.</i>", size: 150, at: 0.02, y: 300 }] },
-  { stills: [["board-avalanche", 0], ["board-skate-plaza", 0], ["board-blowhole", 0]], beats: [14, 17], crop: [272, 120, 700], titles: [{ big: "ANY <b>WORLD.</b>", size: 150, at: 0.02, y: 300 }] },
-  { from: ["play", -0.9], to: ["play", -0.05], beats: [17, 19], crop: [880, 0, 400], titles: [{ big: "PLAY IT.", size: 150, at: 0.02, y: 300 }] },
+  { stills: [["board-avalanche", 0], ["board-skate-plaza", 0], ["board-blowhole", 0]], beats: [14, 16], crop: [272, 120, 700], titles: [{ big: "ANY <b>WORLD.</b>", size: 150, at: 0.02, y: 300 }] },
+  { from: ["play", -0.9], to: ["play", -0.05], beats: [16, 18], crop: [880, 0, 400], titles: [{ big: "PLAY IT.", size: 150, at: 0.02, y: 300 }] },
   // then play: three holes, three worlds, three weathers
-  { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: true, dropAt: 4.5, sink: 4.03, ramp: [3.9, 4.9, 0.5, 0.2],
-    cam: { mode: "track", off: [-2, 5.5, 9], lag: 5, lookUp: 0.3, fov: 50 }, flash: 0.5 }, beats: [19, 34], titles: [
+  { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: true, dropAt: 2.62, sink: 2.85, ramp: [2.02, 3.02, 0.5, 0.2],
+    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: 2.9 }, flash: 0.5 }, beats: [18, 31], titles: [
     { big: "SNOW.", size: 170, at: 0.02, to: 1.5, y: 280 },
     { big: "<b>SUNK!</b>", size: 170, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
-  { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 4.2, sink: 3.9, ramp: [3.3, 4.3, 0.5, 0.2],
-    cam: { mode: "follow", deg: 0, back: 9, up: 4.5, ahead: 3, fov: 54 }, punch: 0.1 }, beats: [34, 48], titles: [
+  { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, sink: 2.65, ramp: [2.35, 3.35, 0.5, 0.2],
+    cam: { mode: "follow", deg: 0, back: 9, up: 4.5, ahead: 3, fov: 54, stay: true }, punch: 0.1 }, beats: [31, 44], titles: [
     { big: "<b>RAIN.</b>", size: 170, at: 0.02, to: 1.5, y: 280 },
     { big: "NAILED <i>IT!</i>", size: 160, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
-  { shot: { ...UP, name: "storm", hole: "blowhole", weather: "storm", ace: true, dropAt: 2.3, sink: 2.6, ramp: [2.1, 3.1, 0.5, 0.2],
-    cam: { mode: "orbit", center: "cup", r: 11, h: 5, a0: 200, speed: 24, fov: 46 }, punch: 0.1 }, beats: [48, 58], titles: [
+  { shot: { ...UP, name: "storm", hole: "blowhole", weather: "storm", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 1.85,
+    cam: { mode: "orbit", center: "cup", r: 11, h: 5, a0: 200, speed: 24, fov: 46 }, punch: 0.1 }, beats: [44, 54], titles: [
     { big: "<i>STORMS.</i>", size: 170, at: 0.02, to: 1.4, y: 280 },
     { big: "HOLE <b>IN ONE!</b>", size: 160, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
   // proved in each weather: the test's weathers turning green, one cut each
-  { stills: [["holed1", 0.05], ["holed2", 0.05], ["holed3", 0.05], ["holed4", 0.05]], beats: [58, 62], crop: [0, 0, 640], titles: [
+  { stills: [["holed1", 0.05], ["holed2", 0.05], ["holed3", 0.05], ["holed4", 0.05]], beats: [54, 58], crop: [0, 0, 640], titles: [
     { big: "HOLE IT IN <b>EVERY WEATHER.</b>", size: 110, at: 0.02, y: 330 },
   ] },
   // published: the step's 3D view swung round
-  { from: ["publish", -0.2], to: ["end", 0], beats: [62, 70], crop: [16, 120, 940], titles: [{ big: "PUBLISH IT <b>ON-CHAIN.</b>", size: 132, at: 0.02, y: 320 }] },
+  { from: ["publish", -0.2], to: ["end", 0], beats: [58, 66], crop: [16, 120, 940], titles: [{ big: "PUBLISH IT <b>ON-CHAIN.</b>", size: 132, at: 0.02, y: 320 }] },
   // the dare: a friend's message over the plaza, then why
-  { shot: { ...UP, name: "dare", hole: "skate-plaza", weather: "clear", cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 120, speed: 14, fov: 42 } }, beats: [70, 80], titles: [
+  { shot: { ...UP, name: "dare", hole: "skate-plaza", weather: "clear", cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 120, speed: 14, fov: 42 } }, beats: [66, 76], titles: [
     { raw: "<div class='bubble'><b>alex.gno</b> sank it in 3.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.0, tilt: -2, y: -60 },
     { big: "BUILD IT.", size: 150, at: 1.03, to: 1.6, y: 0 },
     { big: "SHARE IT.", size: 150, at: 1.72, to: 2.3, y: 0 },
     { big: "BEAT YOUR <b>FRIENDS.</b>", size: 140, at: 2.4, y: 0, sparkle: 4 },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [80, 91.5], titles: [
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [76, 87.5], titles: [
     { logo: 520, at: 0, bounce: 3.2, tilt: -3, y: -210, sparkle: 4, tilt3d: true },
     { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 96, at: 1.03, tilt: -2, y: 140 },
     { cta: CTA, size: 76, at: 2.57, kind: "slam", tilt: 0, y: 300 },
   ] },
 ];
-const HIT = 87.5, LEN = 91.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 83.5, LEN = 87.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)
@@ -488,18 +488,15 @@ function base(/** @type {any[]} */ cut, /** @type {[number, string][]} */ frames
 }
 
 /** The 3D shots filmed by the trailer's rig: shots-builder.json written, render.mjs run for its frames and sounds only (--only=a,b:
- *  those shots again, the others' kept), each shot's one-stroker found anew in the chain's weather now (a community hole's
- *  path is played live: one cached under another weather may miss), when its ball sank kept for the titles (sinks.json). */
+ *  those shots again, the others' kept), each shot's one-stroker the one render.mjs found and kept with its path (played as
+ *  kept, whatever the chain's weather now), when its ball sank kept for the titles (sinks.json). */
 function shoot() {
   fs.writeFileSync(SHOTS, JSON.stringify(shotsOf(), null, 1) + "\n");
   const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split(",");
-  const named = (/** @type {string} */ n) => !only || only.includes(n);
-  const pathsFile = path.join(HERE, "..", "promo", "paths.json"), paths = JSON.parse(fs.readFileSync(pathsFile, "utf8"));
-  for (const s of shotsOf()) if (named(s.name)) for (const k of Object.keys(paths)) if (k.includes(s.hole)) delete paths[k];
-  fs.writeFileSync(pathsFile, JSON.stringify(paths));
   const log = execFileSync(process.execPath, [RENDER, "--cut=builder", "--frames", ...(only ? [`--only=${only.join(",")}`] : [])], { env: { ...process.env, APP }, encoding: "utf8" });
   process.stdout.write(log);
   const file = path.join(WORK, "sinks.json"), sinks = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+  for (const s of shotsOf()) if (!only || only.includes(s.name)) delete sinks[s.name]; // (a shot not seen to sink: its sink in the cut)
   for (const [, name, t] of log.matchAll(/^ {2}([\w-]+): the ball sinks at ([\d.]+) s/gm)) sinks[name] = Number(t);
   fs.writeFileSync(file, JSON.stringify(sinks));
 }

@@ -169,27 +169,32 @@ async function shoot(c, s, i, out) {
   }
   await c.js(`document.fonts.load("700 100px Fredoka").then(() => document.fonts.ready)`);
   await sleep(1200); // the world's pieces settle in
+  const key = (f) => `${s.cup}${s.hole}|${f.deg},${f.power}${f.tick != null ? "@" + f.tick : ""}`;
   // ace: the shot's first stroke a one-stroker found now, in the weather the chain plays (a community hole's is the
   // chain's, not the shot's): every way within 45 degrees of the tee's line to the cup and every power, the longest ride
-  // that holes (the most to watch), kept in paths.json with the others
+  // that holes (the most to watch; ace "short": the quickest, for a shot that must be holed fast), kept in paths.json with the others
   if (s.ace && s.fire?.[0]) {
-    const k = `${s.hole}|ace`;
-    paths[k] ??= await c.js(`(async () => {
-      const g = __promo, best = { len: 0, shot: null };
-      for (let d = -45; d <= 45; d += 1) for (let p = 1; p <= 10; p += 0.25) {
-        const r = await g.simulate([[d, p, null]]);
-        if (!r || !r.holed) continue;
-        const len = r.path.reduce((n, q, i) => (i ? n + Math.hypot(q[0] - r.path[i - 1][0], q[1] - r.path[i - 1][1]) : 0), 0);
-        if (len > best.len) (best.len = len), (best.shot = [d, p]);
-      }
-      return best.shot;
-    })()`);
-    if (!paths[k]) throw new Error(`shot ${s.name}: no one-stroker in the weather now`);
-    fs.writeFileSync(pathsFile, JSON.stringify(paths));
+    const k = `${s.hole}|ace${s.ace === "short" ? "-short" : ""}`, at = paths[k] && key({ deg: paths[k][0], power: paths[k][1] });
+    const kept = at && (paths[at] ??= await c.js(`__promo.simulate([[${paths[k][0]}, ${paths[k][1]}, null]])`)); // (one set by hand: its path asked now)
+    if (!kept?.holed) { // (none yet, or kept from another period: its path, played now, would miss)
+      const best = await c.js(`(async () => {
+        const g = __promo, best = { len: 0, shot: null, r: null };
+        for (let d = -45; d <= 45; d += 1) for (let p = 1; p <= 10; p += 0.25) {
+          const r = await g.simulate([[d, p, null]]);
+          if (!r || !r.holed) continue;
+          const len = r.path.reduce((n, q, i) => (i ? n + Math.hypot(q[0] - r.path[i - 1][0], q[1] - r.path[i - 1][1]) : 0), 0);
+          if (!best.shot || (${s.ace === "short"} ? len < best.len : len > best.len)) (best.len = len), (best.shot = [d, p]), (best.r = r);
+        }
+        return best;
+      })()`);
+      if (!best.shot) throw new Error(`shot ${s.name}: no one-stroker in the weather now`);
+      paths[k] = best.shot;
+      paths[key({ deg: best.shot[0], power: best.shot[1] })] = best.r; // the path the search found holed, played as is
+      fs.writeFileSync(pathsFile, JSON.stringify(paths));
+    }
     [s.fire[0].deg, s.fire[0].power] = paths[k];
   }
   // the chain's answers, fetched once and kept
-  const key = (f) => `${s.cup}${s.hole}|${f.deg},${f.power}${f.tick != null ? "@" + f.tick : ""}`;
   const cache = {};
   for (const f of (s.fire || []).slice(0, 1)) { // (a later stroke is played from the ball's rest: a duel's reads keep it)
     if (!paths[key(f)]) {
@@ -211,6 +216,8 @@ async function shoot(c, s, i, out) {
     // in the game's time: a slow-motion ramp before the drop stretches the shot's seconds (the page's own pace, web/lib/promo.ts)
     const G = s.ramp ? await c.js(`__promo.gameTime(${JSON.stringify(s.ramp)}, ${s.dropAt})`) : s.dropAt;
     s.fire[0].at = G - T - (s.dropLag ?? 0.013 * upto); // dropLag: what the frame-stepped replay adds, measured (see the "sinks at" log)
+    if (s.putt != null) s.fire[0].at = s.putt; // putt: the stroke at that second, whenever the ball drops (before 0: in the pre-roll, pre)
+    console.log(`  ${s.name}: the putt at ${s.fire[0].at.toFixed(2)} s (game time)`);
   }
   const frames = s.f1 - s.f0, dur = frames / FPS;
   const cfg = { ...s, paths: cache };
@@ -237,12 +244,16 @@ async function shoot(c, s, i, out) {
     if (process.env.MOVES && s.by && prev && st.ghost) console.log(`  ${s.name} ${f}: player ${moved(st, prev) ? "moves" : "-"}, ghost ${prev.ghost && moved(st.ghost, prev.ghost) ? "moves" : "-"}`);
     prev = st;
     if (st.ghost && !s.ghostIn && (st.ghost.scale < 0.75 || !st.ghost.visible)) (s.ghostIn = true), console.log(`  ${s.name}: the ghost sinks at ${(f / FPS).toFixed(3)} s`);
-    if ((s.dropAt != null || s.eventAt != null || s.by) && !s.sunk && (st.scale < (s.eventAt != null ? 0.97 : 0.75) || !st.visible || (s.eventAt != null && st.y < -0.6))) (s.sunk = true), console.log(`  ${s.name}: the ball sinks at ${(f / FPS).toFixed(3)} s (target ${s.dropAt ?? s.eventAt ?? "-"})`);
+    // in: the ball gone from sight (a splash's: first; the cup's: last, a tunnel hides it on the way)
+    const gone = st.scale < (s.eventAt != null ? 0.97 : 0.75) || !st.visible || (s.eventAt != null && st.y < -0.6);
+    if ((s.dropAt != null || s.eventAt != null || s.by) && gone && !s.was && (s.sunkAt == null || s.eventAt == null)) s.sunkAt = f;
+    s.was = gone;
     if (want && !want.has(f)) continue;
     const { data } = await c.send("Page.captureScreenshot", { format: STILLS ? "png" : "jpeg", quality: STILLS ? undefined : s.cover && !f ? 100 : 94 });
     fs.writeFileSync(STILLS ? path.join(out, `${String(i).padStart(2, "0")}-${s.name}-${f}.png`) : path.join(out, `${String(s.f0 + f).padStart(5, "0")}.jpg`), Buffer.from(data, "base64"));
     if (f % 15 === 0) await sleep(40); // a modest pace: the laptop stays cool
   }
+  if (s.sunkAt != null) console.log(`  ${s.name}: the ball sinks at ${(s.sunkAt / FPS).toFixed(3)} s (target ${s.dropAt ?? s.eventAt ?? "-"})`);
   if (!STILLS && !CLEAN) {
     const wav = await c.js(`__promo.audio(${s.pre || 0}, ${dur})`);
     if (wav) fs.writeFileSync(path.join(WORK, `sfx-${i}.wav`), Buffer.from(wav, "base64"));

@@ -46,6 +46,8 @@ interface Cam {
   deg?: number; turn?: number; back?: number; up?: number; ahead?: number; lookUp?: number; lag?: number;
   // track
   hold?: boolean; off?: readonly number[];
+  // any: the camera still for good once the ball is in (or from that second: a ball the game replays at once)
+  stay?: true | number;
   // orbit
   center?: "ball" | "cup" | Key; a0?: number; speed?: number; r0?: number; r?: number; h0?: number; h?: number;
   // keys
@@ -504,7 +506,7 @@ const STAR = `<svg viewBox="-11 -11 22 22" width="110" height="110"><path d="M0-
 
 const V = () => new THREE.Vector3();
 const pos = V(), look = V(), dir = new THREE.Vector3(1, 0, 0), prevBall = V(), tmp = V();
-let camInit = false;
+let camInit = false, stayed = false;
 const shot = chaseState(); // the follow framing, shared with the game's third-person view
 
 function aim(camera: THREE.PerspectiveCamera, c: Cam) {
@@ -513,7 +515,9 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
   // [u, y, v, dz]: board fractions across and along, height and an extra depth in units
   const u = (p: Key) => tmp.set(p[0] * b.w, p[1], p[2] * b.h + (p[3] || 0));
   const k = Math.min(Math.max(tt / T, 0), 1), sk = smoothstep(k);
-  if (c.mode === "follow") {
+  if (c.stay && camInit && (stayed ||= who.scale.x < 0.97 || !who.visible || (c.stay !== true && tt >= c.stay))) {
+    // stay: once the ball is in, the camera stays for good (the game's replay after it, from the tee, not followed)
+  } else if (c.mode === "follow") {
     // low behind the ball, looking where it goes: the direction follows its motion
     const d = tmp.subVectors(B, prevBall).setY(0);
     if (!camInit) {
