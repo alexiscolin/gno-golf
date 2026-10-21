@@ -240,7 +240,7 @@ const CUT = [
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
     cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [47, 57], titles: [
-    { ...WORD, big: "<b>RAIN.</b>", size: 300, at: 0.02, to: 0.9 },
+    { ...WORD, big: "SHARE<br><b>IT!</b>", size: 260, at: 0.02, to: 0.9 },
     { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
   // shared: a friend's goes at it, the stroke count climbing: off a snowman, into the crevasse and back to the tee; off a
