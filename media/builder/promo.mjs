@@ -4,9 +4,10 @@
 // The trailer's tone (media/promo/render.mjs, v11): its music ("Dizzy Racing", CC0, 175 BPM, its last 30 s), its
 // titles (big rounded words in ink, a word in gold or red, landing on a beat), cut on the beat. Play first: three fun
 // holes built of the Builder's own pieces (holes.ts: checked, proved, published on the local chain under AUTHOR), filmed
-// in 3D by the trailer's own rig, each a one-stroker in its world and weather; the Builder in one-word flashes, close
-// up (paint, drop, tweak, any world, play); the test's weathers turning green; the Publish step's 3D view; the dare
-// between friends; the logo, the slogan and the button on the music's last hit.
+// in 3D by the trailer's own rig, each a one-stroker in its world and weather; the Avalanche's making in the Builder,
+// close up, a word each (its trap dropped and grown, snowmen by the cup, played), then the same hole in 3D; the test's
+// weathers turning green; the Publish step's 3D view; the dare between friends; the logo, the slogan and the button on
+// the music's last hit.
 //
 // --record: the Builder's take (a headless Chrome against a site with the Builder on, APP: the playground's by
 // default; its frames and marks in WORK); --shoot: the 3D shots (render.mjs --cut=builder --frames; --only=name,…
@@ -34,6 +35,8 @@ const MUSIC = path.join(HERE, "..", "promo", "music", "dizzy_racing.flac"), MUSI
 const W = 1280, H = 720, DPR = 1.5;
 // the author the test rounds are proved under: gnodev's test1 (a well-known dev key; nothing is published)
 const AUTHOR = process.env.AUTHOR || "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+// the pieces the Avalanche is built with on camera (holes.ts ids): its crevasse and snowmen
+const LATER = ["p3", "p4", "p5"];
 const CTA = process.env.CTA || "BUILD YOURS ON GNO.LAND";
 
 // ------------------------------------------------------------------ the take
@@ -98,103 +101,80 @@ async function record() {
   const cell = (/** @type {number} */ x, /** @type {number} */ y) => c.js(`(() => { const m = document.querySelector(".board__plane").getScreenCTM(); return [m.a * ${x} + m.c * ${y} + m.e, m.b * ${x} + m.d * ${y} + m.f]; })()`);
   const button = (/** @type {RegExp} */ re, within = "document") => `[...${within}.querySelectorAll("button")].find((b) => ${re}.test(b.textContent.trim()))`;
   const pieces = () => c.js(`document.querySelectorAll("[data-piece]").length`);
-  const drag = async (/** @type {number[]} */ from, /** @type {number[]} */ to, ms = 700) => {
-    await glide(from, 380);
-    await mouse("mousePressed", at, true);
-    await glide(to, ms, true);
-    await mouse("mouseReleased", at);
-  };
   const editor = `!!document.querySelector(".palette [data-tool=grow]") && document.querySelectorAll("[data-end]").length === 2`;
 
   try {
-    // ------------------------------------------- take 1: the flashes, on the Garden's dogleg (the first run)
+    // the Avalanche, built on camera from its file without its trap and its snowmen (the 3D shot's hole, as published)
+    const holes = JSON.parse(fs.readFileSync(path.join(HERE, "holes.json"), "utf8")), draft = holes.avalanche.draft;
+    const file = path.join(WORK, "avalanche.gnogolf.json");
+    // (its rounds played on camera: no proofs)
+    fs.writeFileSync(file, JSON.stringify({ ...draft, slug: "avalanche", proofs: [], pieces: draft.pieces.filter((/** @type {any} */ p) => !LATER.includes(p.id)) }));
     await c.send("Page.navigate", { url: `${APP}/build/?camlog` });
-    await until(editor, "editor");
+    // (the editor, or the holes' list): to the list, where a file is opened
+    const open = button(/^Open a file/);
+    await until(`!!${open} || !!document.querySelector(".bhead button")`, "the Builder", 30_000);
+    await sleep(600);
+    if (!(await c.ev(`!!${open}`))) await c.js(`document.querySelector(".bhead button").click()`);
+    await until(`!!${open}`, "Open a file…");
+    const { root } = await c.send("DOM.getDocument", { depth: -1, pierce: true });
+    const { nodeId } = await c.send("DOM.querySelector", { nodeId: root.nodeId, selector: "input[type=file]" });
+    await c.send("DOM.setFileInputFiles", { nodeId, files: [file] });
+    await until(`${editor} && document.querySelector(".bhead__name input")?.value === ${JSON.stringify(draft.title)}`, "the Avalanche in the editor", 20_000);
+    await c.js(`document.querySelectorAll(".palette details").forEach((d) => (d.open = true))`);
     await sleep(1500);
     await c.send("Page.startScreencast", { format: "jpeg", quality: 90, maxWidth: W * DPR, maxHeight: H * DPR });
     await sleep(600);
     await mouse("mouseMoved");
+    /** a piece carried from its tile's row (scrolled into sight) onto a cell of the board, then given its look (the next of its tile takes it) */
+    const place = async (/** @type {string} */ tile, /** @type {string} */ look, /** @type {number[]} */ to, /** @type {string} */ m) => {
+      const n = await pieces(), row = `document.querySelector('.palette [data-tile="${tile}"]')`;
+      await c.js(`${row}.scrollIntoView({ block: "center" })`);
+      await sleep(250);
+      await glide(await centre(row), 420);
+      if (m) mark(m);
+      await mouse("mousePressed", at, true);
+      await glide(await cell(to[0], to[1]), 600, true);
+      await mouse("mouseReleased", at);
+      await sleep(450);
+      if ((await pieces()) <= n) console.log(`  (${look} not placed: ${await c.ev(`document.querySelector(".board__said")?.textContent || ""`)})`);
+      const pick = `document.querySelector('.insp__looks [data-look="${look}"]')`;
+      if (!(await c.ev(`!!${pick} && ${pick}.getAttribute("aria-pressed") !== "true"`))) return;
+      await glide(await centre(pick), 380);
+      await press();
+      await sleep(350);
+    };
 
-    // paint: a bay off the dogleg's foot, one long straight stroke from inside the green (a press on a side would move it)
-    await glide(await centre(`document.querySelector(".palette [data-tool=grow]")`), 500);
-    await press();
-    await sleep(300);
-    await glide(await cell(29.5, 25.5), 400); // (clear of the cup: a press on it carries the cup)
-    mark("paint");
-    await mouse("mousePressed", at, true);
-    await glide(await cell(6, 25.5), 1300, true);
-    await mouse("mouseReleased", at);
-    await sleep(700);
-    mark("painted");
-    await glide(await centre(`document.querySelector(".palette [data-tool=grow]")`), 400);
-    await press();
-    await sleep(300);
-
-    // drop: a tunnel from More pieces (its fold opened), onto the top lane (its way out 8 along it)
-    await c.js(`document.querySelectorAll(".palette details").forEach((d) => (d.open = true))`);
-    await sleep(400);
-    const n = await pieces(), tunnel = `document.querySelector(".palette [data-tile=tunnel]")`;
-    await c.js(`${tunnel}.scrollIntoView({ block: "center" })`);
-    await sleep(300);
-    const tile = await centre(tunnel);
-    await glide(tile, 450);
-    mark("drop");
-    await mouse("mousePressed", at, true);
-    await glide(await cell(8, 9), 650, true);
-    await mouse("mouseReleased", at);
-    await sleep(700);
+    // drop: the crevasse in the middle of the ice
+    await place("drop", "mountain/hazard/crevasse", [25, 7], "drop");
     mark("dropped");
-    if ((await pieces()) <= n) console.log(`  (the tunnel not placed: ${await c.ev(`document.querySelector(".board__said")?.textContent || ""`)})`);
 
-    // tweak: the piece's size slider dragged up, the tunnel growing on the board
+    // tweak: the piece's width slider dragged up, the crevasse growing on the board
     await c.js(`document.querySelector(".insp__details") && (document.querySelector(".insp__details").open = true)`);
-    const slider = `document.querySelector(".insp__details .range input[type=range]")`; // (its first size: a tunnel's width)
+    const slider = `document.querySelector(".insp__details .range input[type=range]")`;
     await until(`!!${slider}`, "the size slider", 5000);
     const [lo, hi, v0] = await c.js(`[+${slider}.min, +${slider}.max, +${slider}.value]`);
     const sr = await c.js(`(() => { const r = ${slider}.getBoundingClientRect(); return [r.left, r.top + r.height / 2, r.width]; })()`);
     const xOf = (/** @type {number} */ v) => sr[0] + ((v - lo) / (hi - lo)) * sr[2];
-    const v1 = Math.min(hi, v0 + (hi - lo) * 0.35);
+    const v1 = Math.min(hi, v0 + 2.5); // (its width: 2.5 more, clear of the cup)
     await glide([xOf(v0), sr[1]], 450);
     mark("tweak");
     await mouse("mousePressed", at, true);
-    await glide([xOf(v1), sr[1]], 900, true, (e) => c.js(`(() => { const el = ${slider}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${v0} + (${v1} - ${v0}) * ${e}); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); })()`));
+    await glide([xOf(v1), sr[1]], 800, true, (e) => c.js(`(() => { const el = ${slider}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${v0} + (${v1} - ${v0}) * ${e}); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); })()`));
     await mouse("mouseReleased", at);
     await c.js(`${slider}.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }))`);
-    await sleep(500);
+    await sleep(400);
     mark("tweaked");
 
-    // play: the button pressed (the cut leaves on the press)
+    // block: two snowmen by the cup
+    await place("obstacle", "mountain/post/snowman", [37, 3.5], "block");
+    await place("obstacle", "mountain/post/snowman", [37, 10.5], "");
+    mark("blocked");
+
+    // play: the button pressed (the cut leaves on the press), the test's start cards then
     await until(`!document.querySelector(".bhead__act[aria-disabled]")`, "Play on", 10_000);
     await glide(await centre(`document.querySelector(".bhead__act")`), 600);
     mark("play");
     await press();
-    await sleep(800);
-    mark("played");
-
-    // ------------------------------------------- take 2: each video hole opened from its file (any world: the board in
-    // each one's look), the Blowhole last, then holed in each weather and published
-    const holes = JSON.parse(fs.readFileSync(path.join(HERE, "holes.json"), "utf8"));
-    const open = button(/^Open a file/);
-    for (const slug of ["avalanche", "skate-plaza", "blowhole"]) {
-      const file = path.join(WORK, `${slug}.gnogolf.json`);
-      // (its rounds played on camera: no proofs; an address, or Play asks for a name first)
-      fs.writeFileSync(file, JSON.stringify({ ...holes[slug].draft, slug, proofs: [] }));
-      if (slug === "avalanche") await c.send("Page.navigate", { url: `${APP}/build/?camlog` });
-      // (the editor, or the holes' list): to the list, where a file is opened
-      await until(`!!${open} || !!document.querySelector(".bhead button")`, "the Builder again", 30_000);
-      await sleep(600);
-      if (!(await c.ev(`!!${open}`))) await c.js(`document.querySelector(".bhead button").click()`);
-      await until(`!!${open}`, "Open a file…");
-      const { root } = await c.send("DOM.getDocument", { depth: -1, pierce: true });
-      const { nodeId } = await c.send("DOM.querySelector", { nodeId: root.nodeId, selector: "input[type=file]" });
-      await c.send("DOM.setFileInputFiles", { nodeId, files: [file] });
-      await until(`${editor} && document.querySelector(".bhead__name input")?.value === ${JSON.stringify(holes[slug].draft.title)}`, `${slug} in the editor`, 20_000);
-      await sleep(900);
-      mark(`board-${slug}`);
-      await sleep(500);
-    }
-    await until(`!document.querySelector(".bhead__act[aria-disabled]")`, "Play on", 20_000);
-    await c.js(`document.querySelector(".bhead__act").click()`);
     await until(`!!document.querySelector(".tmode__sign--start")`, "the start card");
     // the start cards until round 1: the address pasted (the author's), then the next free one if the slug is taken
     const next = button(/^Use [a-z0-9-]+-\d+$/), paste = button(/^Paste an address/i), field = `document.querySelector(".tmode__addr input")`;
@@ -276,7 +256,7 @@ const FIND = `(async () => {
 
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 83.5, on the end card's button). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 69.5, on the end card's button). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
@@ -289,52 +269,46 @@ const UP = { day: true, cup: "" };
 const CUT = [
   // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
   { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 2.05,
-    cam: { mode: "follow", deg: 0, back: 5.5, up: 2.4, ahead: 4, fov: 52, lag: 4, stay: 2.05 }, flash: 0.6 }, beats: [0, 8], titles: [
+    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
     { big: "BUILD YOUR <b>OWN HOLE.</b>", size: 132, drop: true, kind: "slam", y: 300, sparkle: 4 },
   ] },
-  // the Builder in flashes, close up, a word each
-  { from: ["paint", 0], to: ["painted", -0.2], beats: [8, 10], crop: [330, 300, 640], titles: [{ big: "PAINT.", size: 150, at: 0.02, y: 300 }] },
-  { from: ["drop", 0], to: ["dropped", -0.2], beats: [10, 12], crop: [0, 120, 700], titles: [{ big: "<b>DROP.</b>", size: 150, at: 0.02, y: 300 }] },
-  { from: ["tweak", 0], to: ["tweaked", -0.3], beats: [12, 14], crop: [380, 150, 900], titles: [{ big: "<i>TWEAK.</i>", size: 150, at: 0.02, y: 300 }] },
-  { stills: [["board-avalanche", 0], ["board-skate-plaza", 0], ["board-blowhole", 0]], beats: [14, 16], crop: [272, 120, 700], titles: [{ big: "ANY <b>WORLD.</b>", size: 150, at: 0.02, y: 300 }] },
-  { from: ["play", -0.9], to: ["play", -0.05], beats: [16, 18], crop: [880, 0, 400], titles: [{ big: "PLAY IT.", size: 150, at: 0.02, y: 300 }] },
-  // then play: three holes, three worlds, three weathers
-  { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: true, dropAt: 2.62, sink: 2.85, ramp: [2.02, 3.02, 0.5, 0.2],
-    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: 2.9 }, flash: 0.5 }, beats: [18, 31], titles: [
+  // that hole's making, close up, a word each: the Avalanche built (its trap dropped, grown, snowmen by the cup), played
+  { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 13], crop: [0, 120, 760], titles: [{ big: "DROP A <i>TRAP.</i>", size: 140, at: 0.02, y: 300 }] },
+  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [13, 16], crop: [380, 150, 900], titles: [{ big: "<b>TWEAK.</b>", size: 150, at: 0.02, y: 300 }] },
+  { from: ["block", 0], to: ["blocked", -0.1], beats: [16, 19], crop: [0, 120, 760], titles: [{ big: "BLOCK <b>THE CUP.</b>", size: 140, at: 0.02, y: 300 }] },
+  { from: ["play", -0.7], to: ["play", 0.1], beats: [19, 21], crop: [880, 0, 400], titles: [{ big: "PLAY IT.", size: 150, at: 0.02, y: 300 }] },
+  // the same hole in 3D, then two more worlds
+  { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
+    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [21, 30], titles: [
     { big: "SNOW.", size: 170, at: 0.02, to: 1.5, y: 280 },
     { big: "<b>SUNK!</b>", size: 170, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
-  { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, sink: 2.65, ramp: [2.35, 3.35, 0.5, 0.2],
-    cam: { mode: "follow", deg: 0, back: 9, up: 4.5, ahead: 3, fov: 54, stay: true }, punch: 0.1 }, beats: [31, 44], titles: [
+  { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, sink: 2.65,
+    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [30, 40], titles: [
     { big: "<b>RAIN.</b>", size: 170, at: 0.02, to: 1.5, y: 280 },
     { big: "NAILED <i>IT!</i>", size: 160, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
-  { shot: { ...UP, name: "storm", hole: "blowhole", weather: "storm", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 1.85,
-    cam: { mode: "orbit", center: "cup", r: 11, h: 5, a0: 200, speed: 24, fov: 46 }, punch: 0.1 }, beats: [44, 54], titles: [
-    { big: "<i>STORMS.</i>", size: 170, at: 0.02, to: 1.4, y: 280 },
-    { big: "HOLE <b>IN ONE!</b>", size: 160, drop: true, kind: "slam", y: 260, sparkle: 4 },
-  ] },
-  // proved in each weather: the test's weathers turning green, one cut each
-  { stills: [["holed1", 0.05], ["holed2", 0.05], ["holed3", 0.05], ["holed4", 0.05]], beats: [54, 58], crop: [0, 0, 640], titles: [
+  // proved in each weather: the test's weathers turning green, one cut each (as many as its world has)
+  { stills: [["holed1", 0.05], ["holed2", 0.05], ["holed3", 0.05], ["holed4", 0.05]], beats: [40, 44], crop: [0, 0, 640], titles: [
     { big: "HOLE IT IN <b>EVERY WEATHER.</b>", size: 110, at: 0.02, y: 330 },
   ] },
   // published: the step's 3D view swung round
-  { from: ["publish", -0.2], to: ["end", 0], beats: [58, 66], crop: [16, 120, 940], titles: [{ big: "PUBLISH IT <b>ON-CHAIN.</b>", size: 132, at: 0.02, y: 320 }] },
+  { from: ["publish", -0.2], to: ["end", -1.5], beats: [44, 50], crop: [16, 120, 940], titles: [{ big: "PUBLISH IT <b>ON-CHAIN.</b>", size: 132, at: 0.02, y: 320 }] },
   // the dare: a friend's message over the plaza, then why
-  { shot: { ...UP, name: "dare", hole: "skate-plaza", weather: "clear", cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 120, speed: 14, fov: 42 } }, beats: [66, 76], titles: [
-    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 3.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.0, tilt: -2, y: -60 },
-    { big: "BUILD IT.", size: 150, at: 1.03, to: 1.6, y: 0 },
-    { big: "SHARE IT.", size: 150, at: 1.72, to: 2.3, y: 0 },
-    { big: "BEAT YOUR <b>FRIENDS.</b>", size: 140, at: 2.4, y: 0, sparkle: 4 },
+  { shot: { ...UP, name: "dare", hole: "skate-plaza", weather: "clear", cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 120, speed: 14, fov: 42 } }, beats: [50, 62], titles: [
+    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 3.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.4, tilt: -2, y: -60 },
+    { big: "BUILD IT.", size: 150, at: 1.72, to: 2.24, y: 0 },
+    { big: "SHARE IT.", size: 150, at: 2.4, to: 2.92, y: 0 },
+    { big: "BEAT YOUR <b>FRIENDS.</b>", size: 140, at: 3.09, y: 0, sparkle: 4 },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [76, 87.5], titles: [
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [62, 73.5], titles: [
     { logo: 520, at: 0, bounce: 3.2, tilt: -3, y: -210, sparkle: 4, tilt3d: true },
     { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 96, at: 1.03, tilt: -2, y: 140 },
     { cta: CTA, size: 76, at: 2.57, kind: "slam", tilt: 0, y: 300 },
   ] },
 ];
-const HIT = 83.5, LEN = 87.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 69.5, LEN = 73.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)
@@ -346,7 +320,7 @@ const shotsOf = () => CUT.filter((s) => s.shot).map((s) => ({ ...s.shot, hole: `
 function cutOf(/** @type {Record<string, number>} */ marks, /** @type {Record<string, number>} */ sinks = {}) {
   return CUT.map((s) => {
     const a = s.from && marks[s.from[0]] + s.from[1], b = s.to && marks[s.to[0]] + s.to[1];
-    return { ...s, a, b, titles: (s.titles || []).map((/** @type {any} */ t) => (t.drop ? { ...t, at: (sinks[s.shot.name] ?? s.shot.sink) - 0.04 } : t)) };
+    return { ...s, a, b, stills: s.stills?.filter(([m]) => marks[m] != null), titles: (s.titles || []).map((/** @type {any} */ t) => (t.drop ? { ...t, at: (sinks[s.shot.name] ?? s.shot.sink) - 0.04 } : t)) };
   });
 }
 
@@ -446,14 +420,14 @@ async function overlay(/** @type {any[]} */ cut_) {
     cards: [],
     cuts: cut_.filter((s) => s.shot && s.shot.flash).map((s) => s.beats[0] * BEAT), // (a white flash into a shot that asks for one)
     // (each logo its own ids: two logos, or the page's own, would share their clip paths and gradient)
-    titles: cut_.flatMap((s, i) => s.titles.map((/** @type {any} */ t) => ({ ...t, html: title(t).replace(/(id="|url\(#|href="#)([\w-]+)/g, `$1$2-t${i}`), at: t.at < 0 ? -1 : t.at, base: s.beats[0] * BEAT, end: s.beats[1] * BEAT }))),
+    titles: cut_.flatMap((s, i) => s.titles.map((/** @type {any} */ t) => ({ ...t, html: title(t).replace(/(id="|url\(#|href="#)([\w-]+)/g, `$1$2-t${i}`), at: t.at < 0 ? -1 : t.at, base: s.beats[0] * BEAT, end: F(s.beats[1]) / FPS }))),
   };
   await c.js(`document.querySelectorAll("body [id]").forEach((e) => e.removeAttribute("id"))`); // (the page's own logo's ids, hidden, not ours)
   await c.js(`(() => { const s = document.createElement("style"); s.textContent = ${JSON.stringify(CSS)}; document.head.appendChild(s); window.__cut = ${JSON.stringify(cut)}; })()`);
   await c.js(LAYER);
   await c.js(`document.fonts.ready.then(() => true)`);
   for (let f = 0; f < F(LEN); f++) {
-    await c.js(`window.__at(${f / FPS})`);
+    await c.js(`window.__at(${f / FPS}); new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`); // (painted before it is captured)
     const s = await c.send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(OVER, `${String(f).padStart(5, "0")}.png`), Buffer.from(s.data, "base64"));
   }
@@ -515,7 +489,8 @@ async function edit() {
     : `[2:a]afade=t=in:d=0.25,apad[a]`;
   execFileSync(FFMPEG, ["-y", "-v", "error", "-i", path.join(WORK, "base.mp4"), "-framerate", String(FPS), "-i", path.join(OVER, "%05d.png"),
     "-ss", String(MUSIC_AT), "-i", MUSIC, ...ins,
-    "-filter_complex", `[0:v][1:v]overlay=format=auto,format=yuv420p[v];${mix}`,
+    // (both on one clock, a frame its index: the mp4's rounded times paired a frame with the titles' one before)
+    "-filter_complex", `[0:v]settb=1/${FPS},setpts=N[b];[1:v]settb=1/${FPS},setpts=N[o];[b][o]overlay=format=auto,format=yuv420p[v];${mix}`,
     "-map", "[v]", "-map", "[a]", "-t", len, "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", OUT]);
   execFileSync(FFMPEG, ["-y", "-v", "error", "-i", OUT, "-frames:v", "1", "-q:v", "2", OUT.replace(/\.mp4$/, "-cover.jpg")]);
   console.log(`-> ${OUT} (${len} s)`);
