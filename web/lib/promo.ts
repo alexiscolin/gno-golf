@@ -30,6 +30,7 @@ interface PromoEngine {
     period?: number | null;
   };
   chain: Chain;
+  setGnome: (id: string) => void;
   fire: (deg: number, power: number) => Promise<void>;
   ball: () => Gnome;
   ghost?: () => Gnome | null; // a duel's ghost (engine/rival.ts), once made
@@ -84,6 +85,8 @@ interface Shot {
   burst?: number | null; burstOpacity?: number; hits?: readonly number[]; rays?: boolean;
   ui?: string; // the page's own pieces left in view (a duel's callout, its score card, a screen): a selector list
   cover?: boolean; // the video's first frame, its poster: its titles (those from 0), burst, rays and drift already landed, no flash
+  // the collection's gnomes, one after another on the tee from second at, a new one every that many seconds, each popping in
+  morph?: { traits: readonly string[]; at: number; every: number };
 }
 
 // a capture tool: dev builds, or a page opened with ?camlog where the test hooks answer (testhooks.ts)
@@ -105,6 +108,7 @@ const pace = (ramp: Ramp | undefined, t: number) => {
 };
 
 let E: PromoEngine | null = null; // the engine's insides, given by attach()
+let morphed: string[] = [], worn = -1, seat = 0; // a morph's gnomes known to the game (their skins' ids), the one on, where he sits
 let cfg: Shot | null = null; // the shot being captured
 let tt = 0; // the shot's own time, in seconds (negative during the pre-roll)
 
@@ -326,6 +330,7 @@ function install() {
         c.flash = 0;
       }
       tt = (c.t0 || 0) - (c.pre || 0); // t0: a later slice of a shot cut into several page loads
+      worn = -1;
       // the chain's answers were fetched ahead: a replay never waits on the network
       const paths = c.paths || {};
       e.chain.simulateRound = (_id, shots) => {
@@ -366,8 +371,10 @@ function install() {
         drifts.push({ el: d, i });
       }
       draw();
+      // (a morph's gnomes known to the game first, the wardrobe fetched)
+      const known = c.morph ? import("./gnomes/wear").then((m) => m.know(c.morph!.traits.map((traits, i) => ({ id: `m${i}`, name: "", traits })))).then((sk) => void (morphed = sk.map((k) => k.id))) : Promise.resolve();
       // a frame the browser still owes (asked for before the freeze) joins the queue first
-      return new Promise((r) => nRaf(() => nSet(r, 0)));
+      return known.then(() => new Promise((r) => nRaf(() => nSet(r, 0))));
     },
     /** One frame on: the clock, the game, the camera and the titles. */
     async step(n = 1) {
@@ -387,6 +394,7 @@ function install() {
         // clockAt: the timed pieces held at one tick (a tram that would sink out of a still shot)
         if (cfg_.clockAt != null && !e.g.flying) e.setClock(cfg_.clockAt);
         tick(r);
+        if (cfg_.morph) morph(cfg_.morph);
         // the pieces shown play their CSS animations (a callout's pop) on the promo clock too
         // (a scroll-driven one is left alone)
         if (cfg_.ui) for (const a of document.getAnimations()) {
@@ -501,6 +509,21 @@ function install() {
 // where a title's sparkles sit (percent of the title box), and what they look like
 const SPARKS = [[8, 30], [90, 20], [18, 82], [84, 74], [50, 2], [64, 92]];
 const STAR = `<svg viewBox="-11 -11 22 22" width="110" height="110"><path d="M0-10Q1.8-1.8 10 0Q1.8 1.8 0 10Q-1.8 1.8-10 0Q-1.8-1.8 0-10Z" fill="#fffaf0" stroke="#144134" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+
+// -------------------------------------------------------------- the morph
+
+/** The gnome on the tee swapped for the next on each step of the morph (the last kept), each hopping in with a spin
+ *  and a squash as he lands (where the swap set him down: placeBall's). */
+function morph(m: NonNullable<Shot["morph"]>) {
+  const k = Math.min(Math.floor((tt - m.at) / m.every), morphed.length - 1);
+  if (k < 0) return;
+  if (k !== worn) (worn = k), E!.setGnome(morphed[k]), (seat = E!.ball().position.y);
+  const u = Math.min(1, (tt - m.at - k * m.every) / m.every), b = E!.ball(), land = Math.max(0, u - 0.7) / 0.3;
+  b.position.y = seat + 0.45 * Math.sin(Math.PI * Math.min(u / 0.7, 1));
+  b.rotation.y = 2 * Math.PI * smoothstep(Math.min(u / 0.7, 1));
+  const sq = 0.22 * Math.sin(Math.PI * land);
+  b.scale.set(1 + sq, 1 - sq, 1 + sq);
+}
 
 // -------------------------------------------------------------- the camera
 

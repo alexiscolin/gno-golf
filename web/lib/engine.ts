@@ -1507,7 +1507,17 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     return asked ? "hole" : cupLink && typeof link === "object" && link && "n" in link && !link.n ? "cup" : null;
   }
 
-  promo.attach({ g, chain, fire, ball: () => ball, ghost: () => rival.ball(), every: () => everyOf(), setClock: (t: number) => (clock = t) }); // ?promo only
+  /** Swap the gnome; cosmetic only, the chain never sees it. */
+  const setGnome = (id: string) => {
+    scene.remove(ball);
+    disposeCourse(ball);
+    ball = makeBall(gnomeById((gnomeId = id)));
+    dressTrail(id);
+    if (g.s) (headlamp(ball, g.s.world === "mines"), warmAside()); // (his holing's shaders now, not at the putt)
+    scene.add(ball);
+    if (g.s) placeBall();
+  };
+  promo.attach({ g, chain, fire, ball: () => ball, ghost: () => rival.ball(), every: () => everyOf(), setClock: (t: number) => (clock = t), setGnome }); // ?promo only
   const api = {
     start,
     load,
@@ -1630,16 +1640,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       g.failed = null;
       void publish();
     },
-    /** Swap the gnome; cosmetic only, the chain never sees it. */
-    setGnome(id: string) {
-      scene.remove(ball);
-      disposeCourse(ball);
-      ball = makeBall(gnomeById((gnomeId = id)));
-      dressTrail(id);
-      if (g.s) (headlamp(ball, g.s.world === "mines"), warmAside()); // (his holing's shaders now, not at the putt)
-      scene.add(ball);
-      if (g.s) placeBall();
-    },
+    setGnome,
     /** Graphics: "auto" | "high" | "low". The outlines follow at the next hole
      *  built — now, if no stroke has been played on this one. */
     setGfx(m: string) {

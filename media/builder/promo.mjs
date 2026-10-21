@@ -2,16 +2,17 @@
 // The Builder's video, for social media: node media/builder/promo.mjs [--record] [--shoot [--only=a,b]] [--edit]
 //
 // The trailer's tone (media/promo/render.mjs, v11): its music ("Dizzy Racing", CC0, 175 BPM, its last 30 s), its
-// titles (big rounded words in ink, a word in gold or red, landing on a beat), cut on the beat. Play first: three fun
+// titles (big rounded words in ink, a word in gold or red, landing on a beat), cut on the beat. The news first, on the
+// cards' paper (the cover: the first frame, whole); then play: three fun
 // holes built of the Builder's own pieces (holes.ts: checked, proved, published on the local chain under AUTHOR), filmed
 // in 3D by the trailer's own rig, each a one-stroker in its world and weather; the Avalanche's making in the Builder,
 // close up, a word each (its trap dropped and grown, snowmen by the cup, played), then the same hole in 3D; a friend
-// dared to beat it, their ball into the crevasse; the logo, the slogan and the button on the music's last hit.
+// dared to beat it, over the cup's lip and away; the collection's gnomes on the tee, one after another; the logo, the slogan, mainnet soon and its surprise on the music's last hit.
 //
 // --record: the Builder's take (a headless Chrome against a site with the Builder on, APP: the playground's by
 // default; its frames and marks in WORK); --shoot: the 3D shots (render.mjs --cut=builder --frames; --only=name,…
 // some again); --edit: the cut, from the last take and shots; none: all three. -> media/builder/gnogolf-builder.mp4
-// (1920x1080, H.264 and AAC) and its first frame as gnogolf-builder-cover.jpg. CTA sets the end card's button.
+// (1920x1080, H.264 and AAC) and its first frame as gnogolf-builder-cover.jpg.
 //   (from web/) node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./test/setup.mjs ../media/builder/holes.ts
 //   then publish holes.json's holes (PublishMine, as AUTHOR), then
 //   APP=http://100.104.210.102:5181 node media/builder/promo.mjs
@@ -34,7 +35,6 @@ const MUSIC = path.join(HERE, "..", "promo", "music", "dizzy_racing.flac"), MUSI
 const W = 1280, H = 720, DPR = 1.5;
 // the author the holes are published under: gnodev's test1 (a well-known dev key, on the local chain)
 const AUTHOR = process.env.AUTHOR || "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-const CTA = process.env.CTA || "BUILD YOURS ON GNO.LAND";
 
 // ------------------------------------------------------------------ the take
 
@@ -187,14 +187,15 @@ async function record() {
 
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 66.5, on the end card's button). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 84.5, on the end card's surprise). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
 //   titles land on; dropAt is moved by what they differ);
 // - from/to: the Builder's take between two marks (seconds after them) played to fill its beats, cropped to [x, y, w]
 //   of its window (16:9);
-// - stills: the take's frames at those marks, an equal share of the beats each (hard cuts), cropped alike.
+// - stills: the take's frames at those marks, an equal share of the beats each (hard cuts), cropped alike;
+// - card: the cards' paper (the overlay's), over nothing.
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
 // when the friend's ball lips out, in seconds into its shot (seen in its frames)
@@ -203,42 +204,62 @@ const MISS = 2.4;
 const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
 // the key words: huge, centred, slammed in (a line each when two)
 const WORD = { y: 0, kind: "slam", sparkle: 4 };
+// the morph's gnomes (data/gnomes.json): a spread of every tier, the Legendaries last
+const MORPH = (() => {
+  const all = JSON.parse(fs.readFileSync(path.join(HERE, "..", "..", "data", "gnomes.json"), "utf8")).gnomes, of = (/** @type {string} */ t) => all.filter((/** @type {any} */ g) => g.tier === t);
+  const spread = (/** @type {any[]} */ gs, n) => Array.from({ length: n }, (_, i) => gs[Math.floor(((i + 0.5) * gs.length) / n)]);
+  const mixed = [...spread(of("common"), 6), ...spread(of("rare"), 4), ...spread(of("epic"), 3)].sort((a, b) => (a.id * 37) % 101 - (b.id * 37) % 101);
+  return [...mixed, ...of("legendary")].map((g) => g.traits);
+})();
 const CUT = [
+  // the cover (X shows a video's first frame): the news on the cards' paper, all there from the first frame
+  { card: true, beats: [0, 6], titles: [
+    { logo: 420, at: -1, tilt: -3, y: -250, tilt3d: true },
+    { big: "BUILDER MODE<br><b>IS OUT!</b>", size: 150, at: -1, tilt: -3, y: 90 },
+    { pill: "HAVE FUN!!", size: 54, at: -1, tilt: 0, y: 330 },
+  ] },
   // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
   { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 2.05,
-    cam: { ...CHASE, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
+    cam: { ...CHASE, stay: true }, flash: 0.6 }, beats: [6, 16], titles: [
     { ...WORD, big: "BUILD YOUR<br><b>OWN HOLE.</b>", size: 210, drop: true },
   ] },
   // that hole's making, close up, a word each (in and out quick, the gesture seen under it): the Avalanche built (its trap dropped, grown, snowmen by the cup), played
-  { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 15], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
-  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [15, 19], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
-  { from: ["block", 0], to: ["blocked", -0.1], beats: [19, 28], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
-  { from: ["play", -0.7], to: ["play", 0.1], beats: [28, 30], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
+  { from: ["drop", 0], to: ["dropped", -0.1], beats: [16, 21], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
+  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [21, 25], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
+  { from: ["block", 0], to: ["blocked", -0.1], beats: [25, 34], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
+  { from: ["play", -0.7], to: ["play", 0.1], beats: [34, 36], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
   // the same hole in 3D, then another world
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
-    cam: { ...CHASE, stay: true } }, beats: [30, 39], titles: [
+    cam: { ...CHASE, stay: true } }, beats: [36, 45], titles: [
     { ...WORD, big: "SNOW.", size: 300, at: 0.02, to: 0.9 },
     { ...WORD, big: "<b>SUNK!</b>", size: 340, drop: true },
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
-    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [39, 49], titles: [
+    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [45, 55], titles: [
     { ...WORD, big: "<b>RAIN.</b>", size: 300, at: 0.02, to: 0.9 },
     { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
   // shared: a friend's go at it (round the crevasse, over the cup's lip, off a snowman and away), the dare first, then their fate
   { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
-    cam: CHASE }, beats: [49, 59], titles: [
+    cam: CHASE }, beats: [55, 65], titles: [
     { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -320 },
     { ...WORD, big: "THEIR<br><i>NIGHTMARE.</i>", size: 230, at: MISS },
   ] },
-  // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [59, 70.5], titles: [
-    { logo: 520, at: 0, bounce: 3.2, tilt: -3, y: -210, sparkle: 4, tilt3d: true },
-    { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 112, at: 1.03, tilt: -2, y: 140 },
-    { cta: CTA, size: 76, at: 2.57, kind: "slam", tilt: 0, y: 300 },
+  // the collection: a gnome on the tee, ready to play, turning into one after another (the rarest last), on the half beat
+  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: BEAT / 2 },
+    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 12, fov: 36, lookUp: 0.45 } }, beats: [65, 77], titles: [
+    { ...WORD, big: "<b>720</b> GNOMES.", size: 190, at: 0.3, to: 2.2, y: -360 },
+    { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 2.4, y: -360 },
+  ] },
+  // the end card over the avalanche, blurred: the logo, the slogan, mainnet soon, the surprise on the last hit
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [77, 88.5], titles: [
+    { logo: 440, at: 0, bounce: 3.2, tilt: -3, y: -260, sparkle: 4, tilt3d: true },
+    { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 84, at: 0.5, tilt: -2, y: -30 },
+    { big: "MAINNET <b>SOON.</b>", size: 170, at: 1.37, kind: "slam", tilt: -3, y: 125 },
+    { pill: "WITH A SURPRISE…", size: 56, at: 2.57, kind: "slam", tilt: 0, y: 320, sparkle: 4 },
   ] },
 ];
-const HIT = 66.5, LEN = 70.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 84.5, LEN = 88.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)
@@ -347,7 +368,7 @@ async function overlay(/** @type {any[]} */ cut_) {
   await c.send("Page.navigate", { url: `${APP}/` }); // (the site's own Fredoka and the logo's colours)
   for (let k = 0; k < 60 && !(await c.ev(`document.readyState === "complete" && document.fonts.status === "loaded"`)); k++) await sleep(300);
   const cut = {
-    cards: [],
+    cards: cut_.filter((s) => s.card).map((s) => [s.beats[0] * BEAT, s.beats[1] * BEAT]),
     cuts: cut_.filter((s) => s.shot && s.shot.flash).map((s) => s.beats[0] * BEAT), // (a white flash into a shot that asks for one)
     // (each logo its own ids: two logos, or the page's own, would share their clip paths and gradient)
     titles: cut_.flatMap((s, i) => s.titles.map((/** @type {any} */ t) => ({ ...t, html: title(t).replace(/(id="|url\(#|href="#)([\w-]+)/g, `$1$2-t${i}`), at: t.at < 0 ? -1 : t.at, base: s.beats[0] * BEAT, end: F(s.beats[1]) / FPS }))),
@@ -383,6 +404,10 @@ function base(/** @type {any[]} */ cut, /** @type {[number, string][]} */ frames
   for (const [i, s] of cut.entries()) {
     const f0 = F(s.beats[0]), n = F(s.beats[1]) - f0, out = path.join(WORK, `part${i}.mp4`), dir = path.join(WORK, `part${i}`);
     parts.push(out);
+    if (s.card) { // (the overlay's paper covers it whole)
+      execFileSync(FFMPEG, ["-y", "-v", "error", "-f", "lavfi", "-i", `color=c=0xfdebcf:s=1920x1080:r=${FPS}`, "-frames:v", String(n), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "16", out]);
+      continue;
+    }
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir);
     for (let f = 0; f < n; f++) {
