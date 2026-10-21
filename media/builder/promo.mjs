@@ -68,6 +68,8 @@ async function record() {
   const frames = [];
   /** @type {Record<string, number>} */
   const marks = {};
+  /** @type {Record<string, number[]>} */
+  const spots = {};
   const now = () => Date.now() / 1000, mark = (/** @type {string} */ n) => ((marks[n] = now()), console.log(`  ${n}`));
   c.on("Page.screencastFrame", (p) => {
     const f = path.join(TAKE, `${String(frames.length).padStart(5, "0")}.jpg`);
@@ -169,16 +171,18 @@ async function record() {
     await place("obstacle", [37, 10.5]);
     mark("blocked");
 
-    // play: the button pressed (the cut leaves on the press), the test's start cards then
+    // play: the button pressed (the cut centred on it: its spot kept), the test's start cards then
     await until(`!document.querySelector(".bhead__act[aria-disabled]")`, "Play on", 10_000);
-    await glide(await centre(`document.querySelector(".bhead__act")`), 600);
+    spots.play = await centre(`document.querySelector(".bhead__act")`);
+    await glide(spots.play, 1000);
+    await sleep(250);
     mark("play");
     await press();
-    await sleep(800);
+    await sleep(900);
     await c.send("Page.stopScreencast");
     await sleep(300);
   } finally {
-    fs.writeFileSync(path.join(WORK, "take.json"), JSON.stringify({ frames, marks }));
+    fs.writeFileSync(path.join(WORK, "take.json"), JSON.stringify({ frames, marks, spots }));
     if (c.errors.length) console.log("page errors:", c.errors.slice(0, 5));
     c.kill();
   }
@@ -187,7 +191,7 @@ async function record() {
 
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 84.5, on the end card's surprise). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 101.5, on the end card's surprise). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
@@ -195,21 +199,21 @@ async function record() {
 // - from/to: the Builder's take between two marks (seconds after them) played to fill its beats, cropped to [x, y, w]
 //   of its window (16:9);
 // - stills: the take's frames at those marks, an equal share of the beats each (hard cuts), cropped alike;
+//   (on/w in place of crop: centred on a spot the take kept, w wide, the window's edges drawn out past it);
 // - card: the cards' paper (the overlay's), over nothing.
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
 // when the friend's ball lips out, in seconds into its shot (seen in its frames)
-const MISS = 2.4;
+const MISS = 1.5;
 // the chase: low behind the ball (the holes run along +x), wide, close on its heels (a stiff spring): speed
 const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
 // the key words: huge, centred, slammed in (a line each when two)
 const WORD = { y: 0, kind: "slam", sparkle: 4 };
-// the morph's gnomes (data/gnomes.json): a spread of every tier, the Legendaries last
+// the morph's gnomes (data/gnomes.json): the showiest, a few Epics then every Legendary
 const MORPH = (() => {
   const all = JSON.parse(fs.readFileSync(path.join(HERE, "..", "..", "data", "gnomes.json"), "utf8")).gnomes, of = (/** @type {string} */ t) => all.filter((/** @type {any} */ g) => g.tier === t);
   const spread = (/** @type {any[]} */ gs, n) => Array.from({ length: n }, (_, i) => gs[Math.floor(((i + 0.5) * gs.length) / n)]);
-  const mixed = [...spread(of("common"), 6), ...spread(of("rare"), 4), ...spread(of("epic"), 3)].sort((a, b) => (a.id * 37) % 101 - (b.id * 37) % 101);
-  return [...mixed, ...of("legendary")].map((g) => g.traits);
+  return [...spread(of("epic"), 4), ...of("legendary")].map((g) => g.traits);
 })();
 const CUT = [
   // the cover (X shows a video's first frame): the news on the cards' paper, all there from the first frame
@@ -227,39 +231,46 @@ const CUT = [
   { from: ["drop", 0], to: ["dropped", -0.1], beats: [16, 21], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
   { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [21, 25], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
   { from: ["block", 0], to: ["blocked", -0.1], beats: [25, 34], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
-  { from: ["play", -0.7], to: ["play", 0.1], beats: [34, 36], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
+  { from: ["play", -1.3], to: ["play", 0.4], beats: [34, 38], on: "play", w: 420, titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.6, y: 250 }] },
   // the same hole in 3D, then another world
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
-    cam: { ...CHASE, stay: true } }, beats: [36, 45], titles: [
+    cam: { ...CHASE, stay: true } }, beats: [38, 47], titles: [
     { ...WORD, big: "SNOW.", size: 300, at: 0.02, to: 0.9 },
     { ...WORD, big: "<b>SUNK!</b>", size: 340, drop: true },
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
-    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [45, 55], titles: [
+    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [47, 57], titles: [
     { ...WORD, big: "<b>RAIN.</b>", size: 300, at: 0.02, to: 0.9 },
     { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
-  // shared: a friend's go at it (round the crevasse, over the cup's lip, off a snowman and away), the dare first, then their fate
-  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
-    cam: CHASE }, beats: [55, 65], titles: [
-    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -320 },
+  // shared: a friend's goes at it, the stroke count climbing: off a snowman, into the crevasse and back to the tee; off a
+  // snowman and all the way back across the ice; over the cup's lip and away (holes.ts's hole: shots swept offline)
+  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 0.9 }], cam: CHASE }, beats: [57, 65], titles: [
+    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.3, tilt: -2, y: -320 },
+    { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 1.4, y: -360 },
+  ] },
+  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: -19, power: 9.5, at: 0.05 }], cam: CHASE }, beats: [65, 72], titles: [
+    { ...WORD, big: "STROKE <i>7.</i>", size: 170, at: 0.05, y: -360 },
+  ] },
+  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.05 }], cam: CHASE }, beats: [72, 80], titles: [
+    { ...WORD, big: "STROKE <i>12.</i>", size: 170, at: 0.05, to: MISS - 0.05, y: -360 },
     { ...WORD, big: "THEIR<br><i>NIGHTMARE.</i>", size: 230, at: MISS },
   ] },
-  // the collection: a gnome on the tee, ready to play, turning into one after another (the rarest last), on the half beat
-  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: BEAT / 2 },
-    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 12, fov: 36, lookUp: 0.45 } }, beats: [65, 77], titles: [
-    { ...WORD, big: "<b>720</b> GNOMES.", size: 190, at: 0.3, to: 2.2, y: -360 },
-    { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 2.4, y: -360 },
+  // the collection: a gnome on the tee, ready to play, turning into one after another (the rarest last), on the beat
+  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: BEAT },
+    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 12, fov: 36, lookUp: 0.45 } }, beats: [80, 94], titles: [
+    { ...WORD, big: "<b>720</b> NFT CHARACTERS.", size: 140, at: 0.3, to: 2.6, y: -360 },
+    { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 2.75, y: -360 },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, mainnet soon, the surprise on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [77, 88.5], titles: [
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [94, 105.5], titles: [
     { logo: 440, at: 0, bounce: 3.2, tilt: -3, y: -260, sparkle: 4, tilt3d: true },
     { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 84, at: 0.5, tilt: -2, y: -30 },
     { big: "MAINNET <b>SOON.</b>", size: 170, at: 1.37, kind: "slam", tilt: -3, y: 125 },
     { pill: "WITH A SURPRISE…", size: 56, at: 2.57, kind: "slam", tilt: 0, y: 320, sparkle: 4 },
   ] },
 ];
-const HIT = 84.5, LEN = 88.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 101.5, LEN = 105.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)
@@ -396,34 +407,36 @@ function punch(/** @type {number} */ start0, /** @type {number[]} */ hits) {
 
 // the cut's frames, a stretch at a time, cropped and scaled to 1920x1080: a shot's from render.mjs at its beats, the
 // take's (each output frame the take's latest by then) or its stills (an equal share each)
-function base(/** @type {any[]} */ cut, /** @type {[number, string][]} */ frames, /** @type {Record<string, number>} */ marks) {
+function base(/** @type {any[]} */ cut, /** @type {[number, string][]} */ frames, /** @type {Record<string, number>} */ marks, /** @type {Record<string, number[]>} */ spots) {
   const ts = frames.map((f) => f[0]);
+  // a card's frames: the paper's colour (the overlay's paper covers it whole), each part made alike for the concat
+  const paper = path.join(WORK, "paper.jpg");
+  execFileSync(FFMPEG, ["-y", "-v", "error", "-f", "lavfi", "-i", "color=c=0xfdebcf:s=1920x1080", "-frames:v", "1", paper]);
   const hits = cut.flatMap((s) => [s.beats[0] * BEAT, ...s.titles.filter((/** @type {any} */ t) => t.kind === "slam").map((/** @type {any} */ t) => s.beats[0] * BEAT + t.at)]);
   const latest = (/** @type {number} */ at) => frames[Math.max(0, ts.findLastIndex((t) => t <= at))][1];
   const parts = [];
   for (const [i, s] of cut.entries()) {
     const f0 = F(s.beats[0]), n = F(s.beats[1]) - f0, out = path.join(WORK, `part${i}.mp4`), dir = path.join(WORK, `part${i}`);
     parts.push(out);
-    if (s.card) { // (the overlay's paper covers it whole)
-      execFileSync(FFMPEG, ["-y", "-v", "error", "-f", "lavfi", "-i", `color=c=0xfdebcf:s=1920x1080:r=${FPS}`, "-frames:v", String(n), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "16", out]);
-      continue;
-    }
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir);
     for (let f = 0; f < n; f++) {
-      const src = s.shot ? path.join(FILMED, "frames", `${String(f0 + f).padStart(5, "0")}.jpg`)
+      const src = s.card ? paper : s.shot ? path.join(FILMED, "frames", `${String(f0 + f).padStart(5, "0")}.jpg`)
         : s.stills ? latest(marks[s.stills[Math.floor((f * s.stills.length) / n)][0]] + s.stills[Math.floor((f * s.stills.length) / n)][1])
         : latest(s.a + ((s.b - s.a) * f) / n);
       if (!fs.existsSync(src)) throw new Error(`no frame ${src} (${s.shot ? "render.mjs --cut=builder --frames first" : "the take"})`);
       fs.symlinkSync(src, path.join(dir, `${String(f).padStart(5, "0")}.jpg`));
     }
-    const [x, y, w] = (s.crop || [0, 0, W]).map((/** @type {number} */ v) => v * DPR), h = (w * 9) / 16;
-    const vf = `${s.shot ? "" : `crop=${w}:${h}:${x}:${y},`}${punch(s.beats[0] * BEAT, hits.filter((t) => t < s.beats[1] * BEAT))},crop=1920:1080`;
+    const [x, y, w] = (s.on ? [spots[s.on][0] - s.w / 2, spots[s.on][1] - (s.w * 9) / 32, s.w] : s.crop || [0, 0, W]).map((/** @type {number} */ v) => v * DPR), h = (w * 9) / 16;
+    // (centred on a spot near the window's edge: the edges smeared out past it, P each side)
+    const P = Math.ceil(w), edges = s.on ? `pad=iw+${2 * P}:ih+${2 * P}:${P}:${P},fillborders=left=${P}:right=${P}:top=${P}:bottom=${P}:mode=smear,` : "";
+    const vf = `${s.shot ? "" : `${edges}crop=${w}:${h}:${s.on ? x + P : x}:${s.on ? y + P : y},`}${punch(s.beats[0] * BEAT, hits.filter((t) => t < s.beats[1] * BEAT))},crop=1920:1080`;
     execFileSync(FFMPEG, ["-y", "-v", "error", "-framerate", String(FPS), "-i", path.join(dir, "%05d.jpg"), "-vf", vf, "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "16", out]);
   }
   const list = path.join(WORK, "parts.txt");
   fs.writeFileSync(list, parts.map((p) => `file '${p}'`).join("\n"));
-  execFileSync(FFMPEG, ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", path.join(WORK, "base.mp4")]);
+  // (joined anew, a frame its index at the frame rate: the parts' own clocks would drift a join apart)
+  execFileSync(FFMPEG, ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", list, "-vf", `setpts=N/${FPS}/TB`, "-r", String(FPS), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "16", path.join(WORK, "base.mp4")]);
 }
 
 /** The 3D shots filmed by the trailer's rig: shots-builder.json written, render.mjs run for its frames and sounds only (--only=a,b:
@@ -442,9 +455,9 @@ function shoot() {
 
 async function edit() {
   const sinks = fs.existsSync(path.join(WORK, "sinks.json")) ? JSON.parse(fs.readFileSync(path.join(WORK, "sinks.json"), "utf8")) : {};
-  const { frames, marks } = JSON.parse(fs.readFileSync(path.join(WORK, "take.json"), "utf8")), cut = cutOf(marks, sinks);
+  const { frames, marks, spots } = JSON.parse(fs.readFileSync(path.join(WORK, "take.json"), "utf8")), cut = cutOf(marks, sinks);
   await overlay(cut);
-  base(cut, frames, marks);
+  base(cut, frames, marks, spots);
   const len = (F(LEN) / FPS).toFixed(3);
   // the shots' own sounds (the putt, the cup, the confetti: render.mjs's sfx-<i>.wav, from its shot's start) under the music
   const sfx = shotsOf().map((s, i) => [path.join(FILMED, `sfx-${i}.wav`), F(s.beats[0]) / FPS]).filter(([f]) => fs.existsSync(String(f)));
@@ -454,9 +467,9 @@ async function edit() {
     : `[2:a]afade=t=in:d=0.25,apad[a]`;
   execFileSync(FFMPEG, ["-y", "-v", "error", "-i", path.join(WORK, "base.mp4"), "-framerate", String(FPS), "-i", path.join(OVER, "%05d.png"),
     "-ss", String(MUSIC_AT), "-i", MUSIC, ...ins,
-    // (both on one clock, a frame its index: the mp4's rounded times paired a frame with the titles' one before)
-    "-filter_complex", `[0:v]settb=1/${FPS},setpts=N[b];[1:v]settb=1/${FPS},setpts=N[o];[b][o]overlay=format=auto,format=yuv420p[v];${mix}`,
-    "-map", "[v]", "-map", "[a]", "-t", len, "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", OUT]);
+    // (each title frame on the nearest picture's, at a steady frame rate: rounded times would pair a frame with the one before, or drop some)
+    "-filter_complex", `[0:v][1:v]overlay=format=auto:ts_sync_mode=nearest,format=yuv420p[v];${mix}`,
+    "-map", "[v]", "-map", "[a]", "-fps_mode", "cfr", "-r", String(FPS), "-t", len, "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", OUT]);
   execFileSync(FFMPEG, ["-y", "-v", "error", "-i", OUT, "-frames:v", "1", "-q:v", "2", OUT.replace(/\.mp4$/, "-cover.jpg")]);
   console.log(`-> ${OUT} (${len} s)`);
 }
