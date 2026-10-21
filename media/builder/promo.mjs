@@ -7,7 +7,7 @@
 // holes built of the Builder's own pieces (holes.ts: checked, proved, published on the local chain under AUTHOR), filmed
 // in 3D by the trailer's own rig, each a one-stroker in its world and weather; the Avalanche's making in the Builder,
 // close up, a word each (its trap dropped and grown, snowmen by the cup, played), then the same hole in 3D; a friend
-// dared to beat it, over the cup's lip and away; the collection's gnomes on the tee, one after another; the logo, the slogan, mainnet soon and its surprise on the music's last hit.
+// dared to beat it, never near the cup; mainnet soon and its surprise: the collection's gnomes on the tee, one after another; the logo, the slogan, the call on the music's last hit.
 //
 // --record: the Builder's take (a headless Chrome against a site with the Builder on, APP: the playground's by
 // default; its frames and marks in WORK); --shoot: the 3D shots (render.mjs --cut=builder --frames; --only=name,…
@@ -191,7 +191,7 @@ async function record() {
 
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 101.5, on the end card's surprise). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 113.5, on the end card's call). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
@@ -203,7 +203,7 @@ async function record() {
 // - card: the cards' paper (the overlay's), over nothing.
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
-// when the friend's ball lips out, in seconds into its shot (seen in its frames)
+// when the friend's ball is stuck for good, in seconds into its shot (seen in its frames)
 const MISS = 1.5;
 // the chase: low behind the ball (the holes run along +x), wide, close on its heels (a stiff spring): speed
 const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
@@ -223,54 +223,60 @@ const CUT = [
     { pill: "HAVE FUN!!", size: 54, at: -1, tilt: 0, y: 330 },
   ] },
   // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
-  { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 2.05,
-    cam: { ...CHASE, stay: true }, flash: 0.6 }, beats: [6, 16], titles: [
+  { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -1.5, pre: 1.75, sink: 1.3,
+    cam: { ...CHASE, stay: true }, flash: 0.6 }, beats: [6, 14], titles: [
     { ...WORD, big: "BUILD YOUR<br><b>OWN HOLE.</b>", size: 210, drop: true },
   ] },
   // that hole's making, close up, a word each (in and out quick, the gesture seen under it): the Avalanche built (its trap dropped, grown, snowmen by the cup), played
-  { from: ["drop", 0], to: ["dropped", -0.1], beats: [16, 21], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
-  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [21, 25], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
-  { from: ["block", 0], to: ["blocked", -0.1], beats: [25, 34], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
-  { from: ["play", -1.3], to: ["play", 0.4], beats: [34, 38], on: "play", w: 420, titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.6, y: 250 }] },
-  // the same hole in 3D, then another world
+  { from: ["drop", 0], to: ["dropped", -0.1], beats: [14, 19], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
+  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [19, 23], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
+  { from: ["block", 0], to: ["blocked", -0.1], beats: [23, 32], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
+  { from: ["play", -1.3], to: ["play", 0.4], beats: [32, 36], on: "play", w: 420, titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.6, y: 250 }] },
+  // the same hole in 3D, then another world, shared
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
-    cam: { ...CHASE, stay: true } }, beats: [38, 47], titles: [
-    { ...WORD, big: "SNOW.", size: 300, at: 0.02, to: 0.9 },
+    cam: { ...CHASE, stay: true } }, beats: [36, 45], titles: [
+    { ...WORD, big: "MAKE IT<br><i>CRAZY.</i>", size: 260, at: 0.02, to: 0.9 },
     { ...WORD, big: "<b>SUNK!</b>", size: 340, drop: true },
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
-    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [47, 57], titles: [
+    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [45, 55], titles: [
     { ...WORD, big: "SHARE<br><b>IT!</b>", size: 260, at: 0.02, to: 0.9 },
-    { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
+    { ...WORD, big: "DARE YOUR<br><i>FRIENDS.</i>", size: 220, drop: true },
   ] },
-  // shared: a friend's goes at it, the stroke count climbing: off a snowman, into the crevasse and back to the tee; off a
-  // snowman and all the way back across the ice; over the cup's lip and away (holes.ts's hole: shots swept offline)
-  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 0.9 }], cam: CHASE }, beats: [57, 65], titles: [
+  // shared: a friend's goes at it, the stroke count climbing, never near the cup: off a snowman, into the crevasse and
+  // back to the tee; off a snowman and all the way back across the ice; over the ice and stuck in the far corner
+  // (holes.ts's hole: shots swept offline)
+  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 0.9 }], cam: CHASE }, beats: [55, 63], titles: [
     { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.3, tilt: -2, y: -320 },
     { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 1.4, y: -360 },
   ] },
-  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: -19, power: 9.5, at: 0.05 }], cam: CHASE }, beats: [65, 72], titles: [
+  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: -19, power: 9.5, at: 0.05 }], cam: CHASE }, beats: [63, 70], titles: [
     { ...WORD, big: "STROKE <i>7.</i>", size: 170, at: 0.05, y: -360 },
   ] },
-  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.05 }], cam: CHASE }, beats: [72, 80], titles: [
+  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: -18.5, power: 6.75, at: 0.05 }], cam: CHASE }, beats: [70, 80], titles: [
     { ...WORD, big: "STROKE <i>12.</i>", size: 170, at: 0.05, to: MISS - 0.05, y: -360 },
     { ...WORD, big: "THEIR<br><i>NIGHTMARE.</i>", size: 230, at: MISS },
   ] },
-  // the collection: a gnome on the tee, ready to play, turning into one after another (the rarest last), on the beat
-  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: BEAT },
-    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 12, fov: 36, lookUp: 0.45 } }, beats: [80, 94], titles: [
-    { ...WORD, big: "<b>720</b> NFT CHARACTERS.", size: 140, at: 0.3, to: 2.6, y: -360 },
-    { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 2.75, y: -360 },
+  // what's next: mainnet soon, its surprise
+  { shot: { ...UP, name: "soon", hole: "skate-plaza", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 40, speed: 8, fov: 42 } }, beats: [80, 88], titles: [
+    { ...WORD, big: "MAINNET<br><b>SOON.</b>", size: 230, at: 0.05, y: -60 },
+    { pill: "WITH A SURPRISE…", size: 60, at: 1.4, kind: "slam", tilt: 0, y: 260, sparkle: 4 },
   ] },
-  // the end card over the avalanche, blurred: the logo, the slogan, mainnet soon, the surprise on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [94, 105.5], titles: [
+  // the surprise: a gnome on the tee, ready to play, turning into one after another (the rarest last)
+  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: 1.5 * BEAT },
+    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 10, fov: 36, lookUp: 0.45 } }, beats: [88, 108], titles: [
+    { ...WORD, big: "<b>720</b> NFT CHARACTERS.", size: 140, at: 0.3, to: 3.3, y: -360 },
+    { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 3.4, y: -360 },
+    { pill: "ON MAINNET", size: 56, at: 3.9, kind: "slam", tilt: 0, y: 380 },
+  ] },
+  // the end card over the avalanche, blurred: the logo, the slogan, the call on the last hit
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [108, 117.5], titles: [
     { logo: 440, at: 0, bounce: 3.2, tilt: -3, y: -260, sparkle: 4, tilt3d: true },
     { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 84, at: 0.5, tilt: -2, y: -30 },
-    { big: "MAINNET <b>SOON.</b>", size: 170, at: 1.37, kind: "slam", tilt: -3, y: 125 },
-    { pill: "WITH A SURPRISE…", size: 56, at: 2.57, kind: "slam", tilt: 0, y: 320, sparkle: 4 },
+    { big: "BUILD YOURS <b>NOW!</b>", size: 150, at: 1.886, kind: "slam", tilt: -3, y: 140, sparkle: 4 },
   ] },
 ];
-const HIT = 101.5, LEN = 105.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 113.5, LEN = 117.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)
