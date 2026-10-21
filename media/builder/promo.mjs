@@ -234,25 +234,26 @@ const CUT = [
   { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [19, 23], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
   { from: ["block", 0], to: ["blocked", -0.1], beats: [23, 32], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
   { from: ["play", -1.3], to: ["play", 0.4], beats: [32, 36], on: "play", w: 420, titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.6, y: 250 }] },
-  // the same hole in 3D, then another world, shared
+  // the same hole in 3D, then another world
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
     cam: { ...CHASE, stay: true } }, beats: [36, 45], titles: [
     { ...WORD, big: "MAKE IT<br><i>CRAZY.</i>", size: 260, at: 0.02, to: 0.9 },
     { ...WORD, big: "<b>SUNK!</b>", size: 340, drop: true },
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
-    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [45, 55], titles: [
-    { ...WORD, big: "SHARE<br><b>IT!</b>", size: 260, at: 0.02, to: 0.9 },
-    { ...WORD, big: "DARE YOUR<br><i>FRIENDS.</i>", size: 220, drop: true },
+    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [45, 54], titles: [
+    { ...WORD, big: "ANY<br><b>WORLD.</b>", size: 280, at: 0.02, to: 0.9 },
+    { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
-  // shared: a friend's goes at it, the stroke count climbing, never near the cup: off a snowman, into the crevasse and
+  // shared, a friend dared: their goes at it, the stroke count climbing, never near the cup: off a snowman, into the crevasse and
   // back to the tee; up the right, off the back wall and all the way back across the ice (from high up); over the ice and stuck in the far corner
   // (holes.ts's hole: shots swept offline)
-  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 0.9 }], cam: CHASE }, beats: [55, 63], titles: [
-    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.3, tilt: -2, y: -320 },
-    { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 1.4, y: -360 },
+  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 1.6 }], cam: CHASE }, beats: [54, 64], titles: [
+    { ...WORD, big: "SHARE IT.<br><i>DARE FRIENDS.</i>", size: 165, at: 0.02, to: 0.8 },
+    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.85, to: 2.0, tilt: -2, y: -320 },
+    { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 2.1, y: -360 },
   ] },
-  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: 10, power: 9.75, at: 0.05 }], cam: DRONE }, beats: [63, 70], titles: [
+  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: 10, power: 9.75, at: 0.05 }], cam: DRONE }, beats: [64, 70], titles: [
     { ...WORD, big: "STROKE <i>7.</i>", size: 170, at: 0.05, y: -360 },
   ] },
   { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: -18.5, power: 6.75, at: 0.05 }], cam: CHASE }, beats: [70, 80], titles: [
