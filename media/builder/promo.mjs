@@ -142,7 +142,7 @@ async function record() {
       await mouse("mousePressed", at, true);
       await glide(await cell(to[0], to[1]), 550, true);
       await mouse("mouseReleased", at);
-      await sleep(300);
+      await sleep(120);
       if ((await pieces()) <= n) console.log(`  (${tile} not placed: ${await c.ev(`document.querySelector(".board__said")?.textContent || ""`)})`);
     };
 
@@ -151,20 +151,15 @@ async function record() {
     await place("drop", [25, 7]);
     mark("dropped");
 
-    // tweak: the piece's width slider dragged up, the crevasse growing on the board
-    await c.js(`document.querySelector(".insp__details") && (document.querySelector(".insp__details").open = true)`);
-    const slider = `document.querySelector(".insp__details .range input[type=range]")`;
-    await until(`!!${slider}`, "the size slider", 5000);
-    const [lo, hi, v0] = await c.js(`[+${slider}.min, +${slider}.max, +${slider}.value]`);
-    const sr = await c.js(`(() => { const r = ${slider}.getBoundingClientRect(); return [r.left, r.top + r.height / 2, r.width]; })()`);
-    const xOf = (/** @type {number} */ v) => sr[0] + ((v - lo) / (hi - lo)) * sr[2];
-    const v1 = Math.min(hi, v0 + 2.5); // (its width: 2.5 more, clear of the cup)
-    await glide([xOf(v0), sr[1]], 450);
+    // tweak: the crevasse's corner caught on the board and pulled, the trap growing under the pointer (clear of the cup)
+    const corner = await c.js(`(() => { const hs = [...document.querySelectorAll("[data-handle]")].map((h) => h.getBoundingClientRect()).map((r) => [r.left + r.width / 2, r.top + r.height / 2]); return hs.sort((p, q) => q[0] + q[1] - p[0] - p[1])[0]; })()`);
+    if (!corner) throw new Error("no handle on the crevasse");
+    const [cx, cy] = await cell(25, 7), [ex, ey] = await cell(27.5, 8); // (a cell's size on screen: the pull, 2.5 along and 1 down)
+    await glide(corner, 450);
     mark("tweak");
     await mouse("mousePressed", at, true);
-    await glide([xOf(v1), sr[1]], 700, true, (e) => c.js(`(() => { const el = ${slider}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${v0} + (${v1} - ${v0}) * ${e}); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); })()`));
+    await glide([corner[0] + ex - cx, corner[1] + ey - cy], 800, true);
     await mouse("mouseReleased", at);
-    await c.js(`${slider}.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }))`);
     await sleep(300);
     mark("tweaked");
 
@@ -203,7 +198,7 @@ async function record() {
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
 // when the friend's ball lips out, in seconds into its shot (seen in its frames)
-const DENIED = 2.4;
+const MISS = 2.4;
 // the chase: low behind the ball (the holes run along +x), wide, close on its heels (a stiff spring): speed
 const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
 // the key words: huge, centred, slammed in (a line each when two)
@@ -216,7 +211,7 @@ const CUT = [
   ] },
   // that hole's making, close up, a word each (in and out quick, the gesture seen under it): the Avalanche built (its trap dropped, grown, snowmen by the cup), played
   { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 15], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
-  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [15, 19], crop: [380, 150, 900], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
+  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [15, 19], crop: [200, 140, 800], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
   { from: ["block", 0], to: ["blocked", -0.1], beats: [19, 28], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
   { from: ["play", -0.7], to: ["play", 0.1], beats: [28, 30], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
   // the same hole in 3D, then another world
@@ -231,10 +226,10 @@ const CUT = [
     { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
   // shared: a friend's go at it (round the crevasse, over the cup's lip, off a snowman and away), the dare first, then their fate
-  { shot: { ...UP, name: "denied", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
+  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
     cam: CHASE }, beats: [49, 59], titles: [
-    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -60 },
-    { ...WORD, big: "<i>DENIED!</i>", size: 300, at: DENIED },
+    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -320 },
+    { ...WORD, big: "THEIR<br><i>NIGHTMARE.</i>", size: 230, at: MISS },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
   { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [59, 70.5], titles: [
@@ -369,11 +364,12 @@ async function overlay(/** @type {any[]} */ cut_) {
   c.kill();
 }
 
-/** The punch: the picture scaled up a little on every other beat and more on each hit (a cut, a slam), easing back
- *  at once (ffmpeg's scale per frame, its centre kept by the crop after it), t the stretch's own from start0. */
+/** The punch: the picture pushed in on each hit (a cut, a slam), in over a few frames and easing back (never a jump
+ *  from one frame to the next), by ffmpeg's scale per frame, its centre kept by the crop after it; t the stretch's own
+ *  from start0. */
 function punch(/** @type {number} */ start0, /** @type {number[]} */ hits) {
-  const T = `(t+${start0.toFixed(3)})`;
-  const z = `(1+0.03*exp(-9*mod(${T},${(2 * BEAT).toFixed(4)}))${hits.map((h) => `+0.08*exp(-8*max(0,${T}-${h.toFixed(3)}))*gte(${T},${h.toFixed(3)})`).join("")})`;
+  const T = `(t+${start0.toFixed(3)})`, IN = 0.1;
+  const z = `(1${hits.map((h) => { const d = `(${T}-${h.toFixed(3)})`; return `+0.06*gte(${d},0)*if(lt(${d},${IN}),sin(PI/2*${d}/${IN}),exp(-5*(${d}-${IN})))`; }).join("")})`;
   return `scale=w='2*trunc(960*${z})':h='2*trunc(540*${z})':eval=frame:flags=lanczos`;
 }
 
