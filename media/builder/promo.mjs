@@ -5,9 +5,8 @@
 // titles (big rounded words in ink, a word in gold or red, landing on a beat), cut on the beat. Play first: three fun
 // holes built of the Builder's own pieces (holes.ts: checked, proved, published on the local chain under AUTHOR), filmed
 // in 3D by the trailer's own rig, each a one-stroker in its world and weather; the Avalanche's making in the Builder,
-// close up, a word each (its trap dropped and grown, snowmen by the cup, played), then the same hole in 3D; the test's
-// weathers turning green; the Publish step's 3D view; the dare between friends; the logo, the slogan and the button on
-// the music's last hit.
+// close up, a word each (its trap dropped and grown, snowmen by the cup, played), then the same hole in 3D; a friend
+// dared to beat it, their ball into the crevasse; the logo, the slogan and the button on the music's last hit.
 //
 // --record: the Builder's take (a headless Chrome against a site with the Builder on, APP: the playground's by
 // default; its frames and marks in WORK); --shoot: the 3D shots (render.mjs --cut=builder --frames; --only=name,…
@@ -33,7 +32,7 @@ const FPS = 30, BEAT = 60 / 175;
 const MUSIC = path.join(HERE, "..", "promo", "music", "dizzy_racing.flac"), MUSIC_END = 134.53;
 // the take's window: the Builder at its laptop size, filmed at 1.5x (1920x1080)
 const W = 1280, H = 720, DPR = 1.5;
-// the author the test rounds are proved under: gnodev's test1 (a well-known dev key; nothing is published)
+// the author the holes are published under: gnodev's test1 (a well-known dev key, on the local chain)
 const AUTHOR = process.env.AUTHOR || "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 // the pieces the Avalanche is built with on camera (holes.ts ids): its crevasse and snowmen
 const LATER = ["p3", "p4", "p5"];
@@ -175,51 +174,7 @@ async function record() {
     await glide(await centre(`document.querySelector(".bhead__act")`), 600);
     mark("play");
     await press();
-    await until(`!!document.querySelector(".tmode__sign--start")`, "the start card");
-    // the start cards until round 1: the address pasted (the author's), then the next free one if the slug is taken
-    const next = button(/^Use [a-z0-9-]+-\d+$/), paste = button(/^Paste an address/i), field = `document.querySelector(".tmode__addr input")`;
-    for (let k = 0; k < 60 && (await c.ev(`!!document.querySelector(".tmode__sign")`)); k++, await sleep(500)) {
-      if (await c.ev(`!!${next} && !${next}.disabled`)) await c.js(`${next}.click()`);
-      else if (await c.ev(`!!${field}`)) {
-        await c.js(`(() => { const el = ${field}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(AUTHOR)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
-        await sleep(300);
-        await c.js(`${button(/^Use this address$/)}?.click()`);
-      } else if (await c.ev(`!!${paste}`)) await c.js(`${paste}.click()`);
-    }
-    await c.js(`window.__pointer(false)`);
-    for (let w = 1; w <= 6 && !(await c.ev(`!!document.querySelector(".tmode__sum")`)); w++) {
-      await until(`!!window.__g && !!document.querySelector(".tmode__chip--now:not(.tmode__chip--done)") && document.querySelector(".tmode__score strong")?.textContent === "0" && !document.querySelector(".tmode__won")`, "a weather to play", 90_000);
-      const done = await c.js(`document.querySelectorAll(".tmode__chip--done").length`);
-      await sleep(1500); // (the round set up: its weather's period read, as builderwalk waits)
-      const round = await c.js(FIND);
-      if (!round) throw new Error(`no round found in weather ${w}`);
-      mark(`w${w}`);
-      for (const [k, [a, pw]] of round.entries()) {
-        await until(`document.querySelector(".tmode__score strong")?.textContent === "${k}"`, `stroke ${k} ready`, 30_000);
-        if (k) await sleep(500);
-        await c.js(`window.__g.shoot(${a}, ${pw})`); // (back once the ball is still: the last one, holed)
-      }
-      mark(`sunk${w}`);
-      await until(`document.querySelectorAll(".tmode__chip--done").length > ${done} || !!document.querySelector(".tmode__won")`, `weather ${w} holed`, 60_000);
-      mark(`holed${w}`);
-      await until(`!!document.querySelector(".tmode__sum") || !!document.querySelector(".tmode__chip--now:not(.tmode__chip--done)")`, "the next round or the summary", 60_000);
-    }
-    await until(`[...document.querySelectorAll(".tmode__won button")].some((b) => /^Publish →$/.test(b.textContent))`, "Publish on the summary", 60_000);
-    mark("summary");
-    await c.js(`[...document.querySelectorAll(".tmode__won button")].find((b) => /^Publish →$/.test(b.textContent)).click()`);
-    await until(`!!document.querySelector(".pub .preview canvas")`, "the Publish step's 3D view", 30_000);
-    await sleep(1500);
-    // the 3D view swung round fast by a drag, then let go turning on its own
-    await c.js(`window.__pointer(true)`);
-    const pv = await centre(`document.querySelector(".pub .preview")`);
-    await glide([pv[0] - 260, pv[1]], 300);
-    mark("publish");
-    await mouse("mousePressed", at, true);
-    await glide([pv[0] + 300, pv[1] + 20], 1100, true);
-    await mouse("mouseReleased", at);
-    await glide([pv[0] + 420, pv[1] + 240], 500);
-    await sleep(3000);
-    mark("end");
+    await sleep(800);
     await c.send("Page.stopScreencast");
     await sleep(300);
   } finally {
@@ -230,33 +185,9 @@ async function record() {
   console.log(`take: ${frames.length} frames over ${(frames.at(-1)[0] - frames[0][0]).toFixed(1)} s`);
 }
 
-// a round of the weather now played holed: each shot the one ending nearest the cup, within 40 degrees of it (scripts/builderwalk.ts holeOne)
-const FIND = `(async () => {
-  const g = window.__g, id = g.current(), p = await g.chain.period(), s = await g.chain.state(id);
-  const pin = s.cup, shots = [];
-  let rest = s.start;
-  const of = (a, pw) => a.toFixed(4) + "," + pw.toFixed(4);
-  for (let k = 0; k < 8; k++) {
-    let best = null;
-    const toward = Math.atan2(pin[1] - rest[1], pin[0] - rest[0]) * 180 / Math.PI;
-    for (let da = -40; da <= 40; da += 2) for (let pw = 0.5; pw <= 10; pw += 0.25) {
-      const a = Math.round((toward + da) * 100) / 100;
-      let r;
-      try { r = k === 0 ? await g.chain.simulateRound(id, [of(a, pw)], p) : await g.chain.simulateFrom(id, rest, of(a, pw), k, p); } catch { continue; }
-      if (r.holed) return [...shots, [a, pw]];
-      const d = Math.hypot(r.rest[0] - pin[0], r.rest[1] - pin[1]);
-      if (!best || d < best.d) best = { a, pw, rest: r.rest, d };
-    }
-    if (!best) return null;
-    shots.push([best.a, best.pw]);
-    rest = best.rest;
-  }
-  return null;
-})()`;
-
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 69.5, on the end card's button). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 57.5, on the end card's button). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
@@ -266,10 +197,12 @@ const FIND = `(async () => {
 // - stills: the take's frames at those marks, an equal share of the beats each (hard cuts), cropped alike.
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
+// when the friend's ball lips out, in seconds into its shot (seen in its frames)
+const NOPE = 2.4;
 const CUT = [
   // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
   { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 2.05,
-    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
+    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
     { big: "BUILD YOUR <b>OWN HOLE.</b>", size: 132, drop: true, kind: "slam", y: 300, sparkle: 4 },
   ] },
   // that hole's making, close up, a word each: the Avalanche built (its trap dropped, grown, snowmen by the cup), played
@@ -279,42 +212,35 @@ const CUT = [
   { from: ["play", -0.7], to: ["play", 0.1], beats: [19, 21], crop: [880, 0, 400], titles: [{ big: "PLAY IT.", size: 150, at: 0.02, y: 300 }] },
   // the same hole in 3D, then two more worlds
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
-    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [21, 30], titles: [
+    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [21, 30], titles: [
     { big: "SNOW.", size: 170, at: 0.02, to: 1.5, y: 280 },
     { big: "<b>SUNK!</b>", size: 170, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
-  { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, sink: 2.65,
-    cam: { mode: "track", off: [-3, 8, 7], lag: 5, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [30, 40], titles: [
+  { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
+    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [30, 40], titles: [
     { big: "<b>RAIN.</b>", size: 170, at: 0.02, to: 1.5, y: 280 },
     { big: "NAILED <i>IT!</i>", size: 160, drop: true, kind: "slam", y: 260, sparkle: 4 },
   ] },
-  // proved in each weather: the test's weathers turning green, one cut each (as many as its world has)
-  { stills: [["holed1", 0.05], ["holed2", 0.05], ["holed3", 0.05], ["holed4", 0.05]], beats: [40, 44], crop: [0, 0, 640], titles: [
-    { big: "HOLE IT IN <b>EVERY WEATHER.</b>", size: 110, at: 0.02, y: 330 },
-  ] },
-  // published: the step's 3D view swung round
-  { from: ["publish", -0.2], to: ["end", -1.5], beats: [44, 50], crop: [16, 120, 940], titles: [{ big: "PUBLISH IT <b>ON-CHAIN.</b>", size: 132, at: 0.02, y: 320 }] },
-  // the dare: a friend's message over the plaza, then why
-  { shot: { ...UP, name: "dare", hole: "skate-plaza", weather: "clear", cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 120, speed: 14, fov: 42 } }, beats: [50, 62], titles: [
-    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 3.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.4, tilt: -2, y: -60 },
-    { big: "BUILD IT.", size: 150, at: 1.72, to: 2.24, y: 0 },
-    { big: "SHARE IT.", size: 150, at: 2.4, to: 2.92, y: 0 },
-    { big: "BEAT YOUR <b>FRIENDS.</b>", size: 140, at: 3.09, y: 0, sparkle: 4 },
+  // shared: a friend's go at it (round the crevasse, over the cup's lip, off a snowman and away), the dare first, then their fate
+  { shot: { ...UP, name: "nope", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
+    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50 } }, beats: [40, 50], titles: [
+    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -60 },
+    { big: "<i>NOPE.</i>", size: 190, at: NOPE, kind: "slam", y: 220, sparkle: 4 },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [62, 73.5], titles: [
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [50, 61.5], titles: [
     { logo: 520, at: 0, bounce: 3.2, tilt: -3, y: -210, sparkle: 4, tilt3d: true },
     { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 96, at: 1.03, tilt: -2, y: 140 },
     { cta: CTA, size: 76, at: 2.57, kind: "slam", tilt: 0, y: 300 },
   ] },
 ];
-const HIT = 69.5, LEN = 73.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 57.5, LEN = 61.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)
 
 /** The 3D shots for render.mjs (shots-builder.json): each at its stretch's beats, its hole's id, its first stroke a one-stroker found then. */
-const shotsOf = () => CUT.filter((s) => s.shot).map((s) => ({ ...s.shot, hole: `${AUTHOR}/${s.shot.hole}/v1`, beats: s.beats, fire: s.shot.ace ? [{ deg: 0, power: 5, at: 0 }] : undefined }));
+const shotsOf = () => CUT.filter((s) => s.shot).map((s) => ({ ...s.shot, hole: `${AUTHOR}/${s.shot.hole}/v1`, beats: s.beats, fire: s.shot.fire ?? (s.shot.ace ? [{ deg: 0, power: 5, at: 0 }] : undefined) }));
 
 /** The cut as this take allows, each title's time set (a drop's: as its shot's ball sank when filmed, else its sink). */
 function cutOf(/** @type {Record<string, number>} */ marks, /** @type {Record<string, number>} */ sinks = {}) {

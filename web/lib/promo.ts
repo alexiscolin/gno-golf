@@ -505,7 +505,7 @@ const STAR = `<svg viewBox="-11 -11 22 22" width="110" height="110"><path d="M0-
 // -------------------------------------------------------------- the camera
 
 const V = () => new THREE.Vector3();
-const pos = V(), look = V(), dir = new THREE.Vector3(1, 0, 0), prevBall = V(), tmp = V();
+const pos = V(), look = V(), dir = new THREE.Vector3(1, 0, 0), prevBall = V(), tmp = V(), anchor = V(), anchorV = V();
 let camInit = false, stayed = false;
 const shot = chaseState(); // the follow framing, shared with the game's third-person view
 
@@ -532,11 +532,16 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
   } else if (c.mode === "track" && c.hold && camInit && (who.scale.x < 0.97 || !who.visible || B.y < -0.3)) {
     // hold: the ball goes into water or a crevasse, the camera stays where it was and watches it go
   } else if (c.mode === "track") {
-    // alongside the ball at a fixed offset, lagging a little
-    const want = V().copy(B).add(V().fromArray(c.off || [0, 3, 9]));
-    if (!camInit) pos.copy(want);
-    else pos.lerp(want, 1 - Math.exp(-(c.lag || 6) / FPS));
-    look.copy(B).y += c.lookUp || 0.3;
+    // alongside the ball at a fixed offset: camera and aim on one point that follows the ball on a critically damped
+    // spring (lag: its stiffness), so the frame glides, never swivels on the ball nor jerks as it starts or stops
+    const w = c.lag || 6;
+    if (!camInit) anchor.copy(B), anchorV.set(0, 0, 0);
+    else {
+      anchorV.addScaledVector(tmp.subVectors(B, anchor), (w * w) / FPS).multiplyScalar(1 - (2 * w) / FPS);
+      anchor.addScaledVector(anchorV, 1 / FPS);
+    }
+    pos.copy(anchor).add(tmp.fromArray(c.off || [0, 3, 9]));
+    look.copy(anchor).y += c.lookUp || 0.3;
   } else if (c.mode === "orbit") {
     const ctr = c.center === "ball" ? V().copy(B) : c.center === "cup" ? V().set(s.cup[0], h(s.cup[0], s.cup[1]), s.cup[1]) : u(c.center!).clone();
     const cr = c.r!, ch = c.h!;

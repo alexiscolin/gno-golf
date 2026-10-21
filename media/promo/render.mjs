@@ -175,7 +175,7 @@ async function shoot(c, s, i, out) {
   // that holes (the most to watch; ace "short": the quickest, for a shot that must be holed fast), kept in paths.json with the others
   if (s.ace && s.fire?.[0]) {
     const k = `${s.hole}|ace${s.ace === "short" ? "-short" : ""}`, at = paths[k] && key({ deg: paths[k][0], power: paths[k][1] });
-    const kept = at && (paths[at] ??= await c.js(`__promo.simulate([[${paths[k][0]}, ${paths[k][1]}, null]])`)); // (one set by hand: its path asked now)
+    const kept = at && (paths[at] = await c.js(`__promo.simulate([[${paths[k][0]}, ${paths[k][1]}, null]])`)); // (its path asked now: the chain's weather moves on)
     if (!kept?.holed) { // (none yet, or kept from another period: its path, played now, would miss)
       const best = await c.js(`(async () => {
         const g = __promo, best = { len: 0, shot: null, r: null };
