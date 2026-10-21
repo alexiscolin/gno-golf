@@ -207,13 +207,15 @@ const UP = { day: true, cup: "" };
 const MISS = 1.5;
 // the chase: low behind the ball (the holes run along +x), wide, close on its heels (a stiff spring): speed
 const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
+// the friend's other side, seen from high up (a stroke unlike the next)
+const DRONE = { mode: "track", off: [-2, 9, 8], lag: 8, lookUp: 0, fov: 50 };
 // the key words: huge, centred, slammed in (a line each when two)
 const WORD = { y: 0, kind: "slam", sparkle: 4 };
 // the morph's gnomes (data/gnomes.json): the showiest, a few Epics then every Legendary
 const MORPH = (() => {
   const all = JSON.parse(fs.readFileSync(path.join(HERE, "..", "..", "data", "gnomes.json"), "utf8")).gnomes, of = (/** @type {string} */ t) => all.filter((/** @type {any} */ g) => g.tier === t);
   const spread = (/** @type {any[]} */ gs, n) => Array.from({ length: n }, (_, i) => gs[Math.floor(((i + 0.5) * gs.length) / n)]);
-  return [...spread(of("epic"), 4), ...of("legendary")].map((g) => g.traits);
+  return [...spread(of("epic"), 8), ...of("legendary")].map((g) => g.traits);
 })();
 const CUT = [
   // the cover (X shows a video's first frame): the news on the cards' paper, all there from the first frame
@@ -244,13 +246,13 @@ const CUT = [
     { ...WORD, big: "DARE YOUR<br><i>FRIENDS.</i>", size: 220, drop: true },
   ] },
   // shared: a friend's goes at it, the stroke count climbing, never near the cup: off a snowman, into the crevasse and
-  // back to the tee; off a snowman and all the way back across the ice; over the ice and stuck in the far corner
+  // back to the tee; up the right, off the back wall and all the way back across the ice (from high up); over the ice and stuck in the far corner
   // (holes.ts's hole: shots swept offline)
   { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 0.9 }], cam: CHASE }, beats: [55, 63], titles: [
     { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.3, tilt: -2, y: -320 },
     { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 1.4, y: -360 },
   ] },
-  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: -19, power: 9.5, at: 0.05 }], cam: CHASE }, beats: [63, 70], titles: [
+  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: 10, power: 9.75, at: 0.05 }], cam: DRONE }, beats: [63, 70], titles: [
     { ...WORD, big: "STROKE <i>7.</i>", size: 170, at: 0.05, y: -360 },
   ] },
   { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: -18.5, power: 6.75, at: 0.05 }], cam: CHASE }, beats: [70, 80], titles: [
@@ -263,8 +265,8 @@ const CUT = [
     { pill: "WITH A SURPRISE…", size: 60, at: 1.4, kind: "slam", tilt: 0, y: 260, sparkle: 4 },
   ] },
   // the surprise: a gnome on the tee, ready to play, turning into one after another (the rarest last)
-  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: 1.5 * BEAT },
-    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 10, fov: 36, lookUp: 0.45 } }, beats: [88, 108], titles: [
+  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: 1.25 * BEAT },
+    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 65, speed: 10, fov: 36, lookUp: 0.15 } }, beats: [88, 108], titles: [
     { ...WORD, big: "<b>720</b> NFT CHARACTERS.", size: 140, at: 0.3, to: 3.3, y: -360 },
     { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 3.4, y: -360 },
     { pill: "ON MAINNET", size: 56, at: 3.9, kind: "slam", tilt: 0, y: 380 },
