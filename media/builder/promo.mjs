@@ -34,8 +34,6 @@ const MUSIC = path.join(HERE, "..", "promo", "music", "dizzy_racing.flac"), MUSI
 const W = 1280, H = 720, DPR = 1.5;
 // the author the holes are published under: gnodev's test1 (a well-known dev key, on the local chain)
 const AUTHOR = process.env.AUTHOR || "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-// the pieces the Avalanche is built with on camera (holes.ts ids): its crevasse and snowmen
-const LATER = ["p3", "p4", "p5"];
 const CTA = process.env.CTA || "BUILD YOURS ON GNO.LAND";
 
 // ------------------------------------------------------------------ the take
@@ -51,9 +49,9 @@ const POINTER = `addEventListener("DOMContentLoaded", () => {
   addEventListener("pointerdown", (e) => (at(e), (d.style.scale = ".82")), true);
   addEventListener("pointerup", () => (d.style.scale = "1"), true);
   window.__pointer = (on) => (d.style.display = on ? "" : "none");
-  // the first run's hints left out of the film
+  // the first run's hints left out of the film, and what the board says of a piece carried over another on its way
   const s = document.createElement("style");
-  s.textContent = ".bhint { display: none !important; }";
+  s.textContent = ".bhint { display: none !important; } .board__said, .measure--no { visibility: hidden !important; }";
   document.head.appendChild(s);
 });`;
 
@@ -85,14 +83,16 @@ async function record() {
   let at = [W * 0.62, H * 0.55];
   const mouse = (/** @type {string} */ type, [x, y] = at, down = false) =>
     c.send("Input.dispatchMouseEvent", { type, x, y, button: down || type !== "mouseMoved" ? "left" : "none", buttons: down ? 1 : 0, clickCount: 1 });
+  // (on the clock: each step where the pointer should be by now, however long the page took to answer the last)
   const glide = async (/** @type {number[]} */ to, ms = 450, down = false, each = (/** @type {number} */ _u) => Promise.resolve()) => {
-    const from = at, n = Math.max(2, Math.round(ms / 16));
-    for (let k = 1; k <= n; k++) {
-      const u = k / n, e = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+    const from = at, t0 = Date.now();
+    for (let u = 0; u < 1; ) {
+      u = Math.min(1, (Date.now() - t0) / ms);
+      const e = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
       at = [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e];
       await mouse("mouseMoved", at, down);
       await each(e);
-      await sleep(16);
+      if (u < 1) await sleep(16);
     }
   };
   const press = async () => (await mouse("mousePressed", at, true), await sleep(90), await mouse("mouseReleased", at));
@@ -103,11 +103,12 @@ async function record() {
   const editor = `!!document.querySelector(".palette [data-tool=grow]") && document.querySelectorAll("[data-end]").length === 2`;
 
   try {
-    // the Avalanche, built on camera from its file without its trap and its snowmen (the 3D shot's hole, as published)
+    // the Avalanche, built on camera from its file without its trap and its snowmen (the 3D shot's hole, as published): its
+    // trap and a snowman there at first, for their looks to be chosen (the next of each tile takes it), then taken off
     const holes = JSON.parse(fs.readFileSync(path.join(HERE, "holes.json"), "utf8")), draft = holes.avalanche.draft;
     const file = path.join(WORK, "avalanche.gnogolf.json");
     // (its rounds played on camera: no proofs)
-    fs.writeFileSync(file, JSON.stringify({ ...draft, slug: "avalanche", proofs: [], pieces: draft.pieces.filter((/** @type {any} */ p) => !LATER.includes(p.id)) }));
+    fs.writeFileSync(file, JSON.stringify({ ...draft, slug: "avalanche", proofs: [], pieces: draft.pieces.filter((/** @type {any} */ p) => p.id !== "p5") }));
     await c.send("Page.navigate", { url: `${APP}/build/?camlog` });
     // (the editor, or the holes' list): to the list, where a file is opened
     const open = button(/^Open a file/);
@@ -119,32 +120,35 @@ async function record() {
     const { nodeId } = await c.send("DOM.querySelector", { nodeId: root.nodeId, selector: "input[type=file]" });
     await c.send("DOM.setFileInputFiles", { nodeId, files: [file] });
     await until(`${editor} && document.querySelector(".bhead__name input")?.value === ${JSON.stringify(draft.title)}`, "the Avalanche in the editor", 20_000);
+    for (const id of ["p3", "p4"]) {
+      await glide(await centre(`document.querySelector('[data-piece="${id}"]')`), 100);
+      await press();
+      await until(`!!document.querySelector(".insp__looks [aria-pressed=true]")`, `${id}'s looks`, 5000);
+      await c.js(`document.querySelector(".insp__looks [aria-pressed=true]").click()`);
+      await sleep(200);
+      await c.js(`${button(/^Delete/, `document.querySelector(".insp__acts")`)}.click()`);
+      await until(`!document.querySelector('[data-piece="${id}"]')`, `${id} off`, 5000);
+    }
     await c.js(`document.querySelectorAll(".palette details").forEach((d) => (d.open = true))`);
     await sleep(1500);
     await c.send("Page.startScreencast", { format: "jpeg", quality: 90, maxWidth: W * DPR, maxHeight: H * DPR });
     await sleep(600);
     await mouse("mouseMoved");
-    /** a piece carried from its tile's row (scrolled into sight) onto a cell of the board, then given its look (the next of its tile takes it) */
-    const place = async (/** @type {string} */ tile, /** @type {string} */ look, /** @type {number[]} */ to, /** @type {string} */ m) => {
+    /** a piece carried from its tile's row (scrolled into sight) onto a cell of the board, in the look chosen */
+    const place = async (/** @type {string} */ tile, /** @type {number[]} */ to) => {
       const n = await pieces(), row = `document.querySelector('.palette [data-tile="${tile}"]')`;
       await c.js(`${row}.scrollIntoView({ block: "center" })`);
-      await sleep(250);
-      await glide(await centre(row), 420);
-      if (m) mark(m);
+      await glide(await centre(row), 400);
       await mouse("mousePressed", at, true);
-      await glide(await cell(to[0], to[1]), 600, true);
+      await glide(await cell(to[0], to[1]), 550, true);
       await mouse("mouseReleased", at);
-      await sleep(450);
-      if ((await pieces()) <= n) console.log(`  (${look} not placed: ${await c.ev(`document.querySelector(".board__said")?.textContent || ""`)})`);
-      const pick = `document.querySelector('.insp__looks [data-look="${look}"]')`;
-      if (!(await c.ev(`!!${pick} && ${pick}.getAttribute("aria-pressed") !== "true"`))) return;
-      await glide(await centre(pick), 380);
-      await press();
-      await sleep(350);
+      await sleep(300);
+      if ((await pieces()) <= n) console.log(`  (${tile} not placed: ${await c.ev(`document.querySelector(".board__said")?.textContent || ""`)})`);
     };
 
     // drop: the crevasse in the middle of the ice
-    await place("drop", "mountain/hazard/crevasse", [25, 7], "drop");
+    mark("drop");
+    await place("drop", [25, 7]);
     mark("dropped");
 
     // tweak: the piece's width slider dragged up, the crevasse growing on the board
@@ -158,15 +162,16 @@ async function record() {
     await glide([xOf(v0), sr[1]], 450);
     mark("tweak");
     await mouse("mousePressed", at, true);
-    await glide([xOf(v1), sr[1]], 800, true, (e) => c.js(`(() => { const el = ${slider}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${v0} + (${v1} - ${v0}) * ${e}); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); })()`));
+    await glide([xOf(v1), sr[1]], 700, true, (e) => c.js(`(() => { const el = ${slider}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${v0} + (${v1} - ${v0}) * ${e}); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); })()`));
     await mouse("mouseReleased", at);
     await c.js(`${slider}.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }))`);
-    await sleep(400);
+    await sleep(300);
     mark("tweaked");
 
     // block: two snowmen by the cup
-    await place("obstacle", "mountain/post/snowman", [37, 3.5], "block");
-    await place("obstacle", "mountain/post/snowman", [37, 10.5], "");
+    mark("block");
+    await place("obstacle", [37, 3.5]);
+    await place("obstacle", [37, 10.5]);
     mark("blocked");
 
     // play: the button pressed (the cut leaves on the press), the test's start cards then
@@ -187,7 +192,7 @@ async function record() {
 
 // ------------------------------------------------------------------ the cut
 
-// the cut on the music's beat grid (175 BPM; the last hit, beat 57.5, on the end card's button). Each stretch is one of:
+// the cut on the music's beat grid (175 BPM; the last hit, beat 66.5, on the end card's button). Each stretch is one of:
 // - shot: the game's own 3D, filmed by the trailer's rig (media/promo/render.mjs, its frames at these beats): a hole
 //   published (holes.ts), its camera, the weather drawn, a one-stroker found in the chain's weather now (ace), timed to
 //   drop in the cup at dropAt seconds into the stretch (render.mjs logs when it sinks: sink, that time, is what the
@@ -198,7 +203,7 @@ async function record() {
 // Titles at seconds into a stretch; "drop": as its ball drops (sink).
 const UP = { day: true, cup: "" };
 // when the friend's ball lips out, in seconds into its shot (seen in its frames)
-const NOPE = 2.4;
+const DENIED = 2.4;
 // the chase: low behind the ball (the holes run along +x), wide, close on its heels (a stiff spring): speed
 const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
 // the key words: huge, centred, slammed in (a line each when two)
@@ -209,36 +214,36 @@ const CUT = [
     cam: { ...CHASE, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
     { ...WORD, big: "BUILD YOUR<br><b>OWN HOLE.</b>", size: 210, drop: true },
   ] },
-  // that hole's making, close up, a word each: the Avalanche built (its trap dropped, grown, snowmen by the cup), played
-  { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 13], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02 }] },
-  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [13, 16], crop: [380, 150, 900], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02 }] },
-  { from: ["block", 0], to: ["blocked", -0.1], beats: [16, 19], crop: [0, 120, 760], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02 }] },
-  { from: ["play", -0.7], to: ["play", 0.1], beats: [19, 21], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
+  // that hole's making, close up, a word each (in and out quick, the gesture seen under it): the Avalanche built (its trap dropped, grown, snowmen by the cup), played
+  { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 15], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02, to: 0.75 }] },
+  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [15, 19], crop: [380, 150, 900], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02, to: 0.75 }] },
+  { from: ["block", 0], to: ["blocked", -0.1], beats: [19, 28], crop: [120, 140, 880], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02, to: 0.9 }] },
+  { from: ["play", -0.7], to: ["play", 0.1], beats: [28, 30], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
   // the same hole in 3D, then another world
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
-    cam: { ...CHASE, stay: true } }, beats: [21, 30], titles: [
+    cam: { ...CHASE, stay: true } }, beats: [30, 39], titles: [
     { ...WORD, big: "SNOW.", size: 300, at: 0.02, to: 0.9 },
     { ...WORD, big: "<b>SUNK!</b>", size: 340, drop: true },
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
-    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [30, 40], titles: [
+    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [39, 49], titles: [
     { ...WORD, big: "<b>RAIN.</b>", size: 300, at: 0.02, to: 0.9 },
     { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
   // shared: a friend's go at it (round the crevasse, over the cup's lip, off a snowman and away), the dare first, then their fate
-  { shot: { ...UP, name: "nope", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
-    cam: CHASE }, beats: [40, 50], titles: [
+  { shot: { ...UP, name: "denied", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
+    cam: CHASE }, beats: [49, 59], titles: [
     { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -60 },
-    { ...WORD, big: "<i>NOPE.</i>", size: 360, at: NOPE },
+    { ...WORD, big: "<i>DENIED!</i>", size: 300, at: DENIED },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
-  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [50, 61.5], titles: [
+  { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [59, 70.5], titles: [
     { logo: 520, at: 0, bounce: 3.2, tilt: -3, y: -210, sparkle: 4, tilt3d: true },
     { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 112, at: 1.03, tilt: -2, y: 140 },
     { cta: CTA, size: 76, at: 2.57, kind: "slam", tilt: 0, y: 300 },
   ] },
 ];
-const HIT = 57.5, LEN = 61.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
+const HIT = 66.5, LEN = 70.5, MUSIC_AT = +(MUSIC_END - HIT * BEAT).toFixed(3);
 const F = (/** @type {number} */ beat) => Math.round(beat * BEAT * FPS);
 const RENDER = path.join(HERE, "..", "promo", "render.mjs"), SHOTS = path.join(HERE, "..", "promo", "shots-builder.json");
 const FILMED = path.join(os.tmpdir(), "gnogolf-promo"); // (render.mjs's WORK: its frames and the shots' sounds)

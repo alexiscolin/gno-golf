@@ -515,7 +515,8 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
   // [u, y, v, dz]: board fractions across and along, height and an extra depth in units
   const u = (p: Key) => tmp.set(p[0] * b.w, p[1], p[2] * b.h + (p[3] || 0));
   const k = Math.min(Math.max(tt / T, 0), 1), sk = smoothstep(k);
-  if (c.stay && camInit && (stayed ||= who.scale.x < 0.97 || !who.visible || (c.stay !== true && tt >= c.stay))) {
+  const stop = !!c.stay && camInit && (stayed ||= who.scale.x < 0.97 || !who.visible || (c.stay !== true && tt >= c.stay));
+  if (stop && c.mode !== "track") {
     // stay: once the ball is in, the camera stays for good (the game's replay after it, from the tee, not followed)
   } else if (c.mode === "follow") {
     // low behind the ball, looking where it goes: the direction follows its motion
@@ -533,14 +534,16 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
     // hold: the ball goes into water or a crevasse, the camera stays where it was and watches it go
   } else if (c.mode === "track") {
     // alongside the ball at a fixed offset: camera and aim on one point that follows the ball on a critically damped
-    // spring (lag: its stiffness), so the frame glides, never swivels on the ball nor jerks as it starts or stops
+    // spring (lag: its stiffness), so the frame glides, never swivels on the ball nor jerks as it starts or stops; once the
+    // ball is in (stay), on the cup: it eases to a stop there (the game's replay after it, from the tee, not followed)
+    const to = stop ? tmp.set(s.cup[0], h(s.cup[0], s.cup[1]), s.cup[1]).clone() : B;
     // (the spring stepped exactly, as Unity's SmoothDamp does: stable however stiff)
     const x = (c.lag || 6) / FPS, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
     if (!camInit) anchor.copy(B), anchorV.set(0, 0, 0);
     else {
-      const d = tmp.subVectors(anchor, B), step = V().copy(anchorV).addScaledVector(d, (c.lag || 6)).multiplyScalar(1 / FPS);
+      const d = tmp.subVectors(anchor, to), step = V().copy(anchorV).addScaledVector(d, (c.lag || 6)).multiplyScalar(1 / FPS);
       anchorV.addScaledVector(step, -(c.lag || 6)).multiplyScalar(e);
-      anchor.copy(B).add(d.add(step).multiplyScalar(e));
+      anchor.copy(to).add(d.add(step).multiplyScalar(e));
     }
     pos.copy(anchor).add(tmp.fromArray(c.off || [0, 3, 9]));
     look.copy(anchor).y += c.lookUp || 0.3;
