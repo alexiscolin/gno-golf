@@ -199,38 +199,42 @@ async function record() {
 const UP = { day: true, cup: "" };
 // when the friend's ball lips out, in seconds into its shot (seen in its frames)
 const NOPE = 2.4;
+// the chase: low behind the ball (the holes run along +x), wide, close on its heels (a stiff spring): speed
+const CHASE = { mode: "track", off: [-3.6, 2.4, 1.4], lag: 22, lookUp: 0.5, fov: 56 };
+// the key words: huge, centred, slammed in (a line each when two)
+const WORD = { y: 0, kind: "slam", sparkle: 4 };
 const CUT = [
   // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
   { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -0.75, pre: 1, sink: 2.05,
-    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
-    { big: "BUILD YOUR <b>OWN HOLE.</b>", size: 132, drop: true, kind: "slam", y: 300, sparkle: 4 },
+    cam: { ...CHASE, stay: true }, flash: 0.6 }, beats: [0, 10], titles: [
+    { ...WORD, big: "BUILD YOUR<br><b>OWN HOLE.</b>", size: 210, drop: true },
   ] },
   // that hole's making, close up, a word each: the Avalanche built (its trap dropped, grown, snowmen by the cup), played
-  { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 13], crop: [0, 120, 760], titles: [{ big: "DROP A <i>TRAP.</i>", size: 140, at: 0.02, y: 300 }] },
-  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [13, 16], crop: [380, 150, 900], titles: [{ big: "<b>TWEAK.</b>", size: 150, at: 0.02, y: 300 }] },
-  { from: ["block", 0], to: ["blocked", -0.1], beats: [16, 19], crop: [0, 120, 760], titles: [{ big: "BLOCK <b>THE CUP.</b>", size: 140, at: 0.02, y: 300 }] },
-  { from: ["play", -0.7], to: ["play", 0.1], beats: [19, 21], crop: [880, 0, 400], titles: [{ big: "PLAY IT.", size: 150, at: 0.02, y: 300 }] },
-  // the same hole in 3D, then two more worlds
+  { from: ["drop", 0], to: ["dropped", -0.1], beats: [10, 13], crop: [0, 120, 760], titles: [{ ...WORD, big: "DROP A<br><i>TRAP.</i>", size: 250, at: 0.02 }] },
+  { from: ["tweak", 0], to: ["tweaked", -0.2], beats: [13, 16], crop: [380, 150, 900], titles: [{ ...WORD, big: "<b>TWEAK.</b>", size: 300, at: 0.02 }] },
+  { from: ["block", 0], to: ["blocked", -0.1], beats: [16, 19], crop: [0, 120, 760], titles: [{ ...WORD, big: "BLOCK<br><b>THE CUP.</b>", size: 250, at: 0.02 }] },
+  { from: ["play", -0.7], to: ["play", 0.1], beats: [19, 21], crop: [880, 0, 400], titles: [{ ...WORD, big: "PLAY IT.", size: 300, at: 0.02 }] },
+  // the same hole in 3D, then another world
   { shot: { ...UP, name: "avalanche", hole: "avalanche", weather: "snow", ace: "short", dropAt: 2.62, putt: 0, sink: 2.2,
-    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [21, 30], titles: [
-    { big: "SNOW.", size: 170, at: 0.02, to: 1.5, y: 280 },
-    { big: "<b>SUNK!</b>", size: 170, drop: true, kind: "slam", y: 260, sparkle: 4 },
+    cam: { ...CHASE, stay: true } }, beats: [21, 30], titles: [
+    { ...WORD, big: "SNOW.", size: 300, at: 0.02, to: 0.9 },
+    { ...WORD, big: "<b>SUNK!</b>", size: 340, drop: true },
   ] },
   { shot: { ...UP, name: "skate", hole: "skate-plaza", weather: "rain", ace: true, dropAt: 3.25, putt: 0, sink: 2.3,
-    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50, stay: true }, punch: 0.1 }, beats: [30, 40], titles: [
-    { big: "<b>RAIN.</b>", size: 170, at: 0.02, to: 1.5, y: 280 },
-    { big: "NAILED <i>IT!</i>", size: 160, drop: true, kind: "slam", y: 260, sparkle: 4 },
+    cam: { ...CHASE, stay: true }, flash: 0.5 }, beats: [30, 40], titles: [
+    { ...WORD, big: "<b>RAIN.</b>", size: 300, at: 0.02, to: 0.9 },
+    { ...WORD, big: "NAILED<br><i>IT!</i>", size: 260, drop: true },
   ] },
   // shared: a friend's go at it (round the crevasse, over the cup's lip, off a snowman and away), the dare first, then their fate
   { shot: { ...UP, name: "nope", hole: "avalanche", weather: "clear", fire: [{ deg: 23.5, power: 9.75, at: 0.9 }],
-    cam: { mode: "track", off: [-3, 8, 7], lag: 9, lookUp: 0.3, fov: 50 } }, beats: [40, 50], titles: [
+    cam: CHASE }, beats: [40, 50], titles: [
     { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.05, to: 1.5, tilt: -2, y: -60 },
-    { big: "<i>NOPE.</i>", size: 190, at: NOPE, kind: "slam", y: 220, sparkle: 4 },
+    { ...WORD, big: "<i>NOPE.</i>", size: 360, at: NOPE },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the button on the last hit
   { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [50, 61.5], titles: [
     { logo: 520, at: 0, bounce: 3.2, tilt: -3, y: -210, sparkle: 4, tilt3d: true },
-    { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 96, at: 1.03, tilt: -2, y: 140 },
+    { big: "YOUR HOLE. <i>THEIR NIGHTMARE.</i>", size: 112, at: 1.03, tilt: -2, y: 140 },
     { cta: CTA, size: 76, at: 2.57, kind: "slam", tilt: 0, y: 300 },
   ] },
 ];
@@ -360,10 +364,19 @@ async function overlay(/** @type {any[]} */ cut_) {
   c.kill();
 }
 
+/** The punch: the picture scaled up a little on every other beat and more on each hit (a cut, a slam), easing back
+ *  at once (ffmpeg's scale per frame, its centre kept by the crop after it), t the stretch's own from start0. */
+function punch(/** @type {number} */ start0, /** @type {number[]} */ hits) {
+  const T = `(t+${start0.toFixed(3)})`;
+  const z = `(1+0.03*exp(-9*mod(${T},${(2 * BEAT).toFixed(4)}))${hits.map((h) => `+0.08*exp(-8*max(0,${T}-${h.toFixed(3)}))*gte(${T},${h.toFixed(3)})`).join("")})`;
+  return `scale=w='2*trunc(960*${z})':h='2*trunc(540*${z})':eval=frame:flags=lanczos`;
+}
+
 // the cut's frames, a stretch at a time, cropped and scaled to 1920x1080: a shot's from render.mjs at its beats, the
 // take's (each output frame the take's latest by then) or its stills (an equal share each)
 function base(/** @type {any[]} */ cut, /** @type {[number, string][]} */ frames, /** @type {Record<string, number>} */ marks) {
   const ts = frames.map((f) => f[0]);
+  const hits = cut.flatMap((s) => [s.beats[0] * BEAT, ...s.titles.filter((/** @type {any} */ t) => t.kind === "slam").map((/** @type {any} */ t) => s.beats[0] * BEAT + t.at)]);
   const latest = (/** @type {number} */ at) => frames[Math.max(0, ts.findLastIndex((t) => t <= at))][1];
   const parts = [];
   for (const [i, s] of cut.entries()) {
@@ -379,7 +392,7 @@ function base(/** @type {any[]} */ cut, /** @type {[number, string][]} */ frames
       fs.symlinkSync(src, path.join(dir, `${String(f).padStart(5, "0")}.jpg`));
     }
     const [x, y, w] = (s.crop || [0, 0, W]).map((/** @type {number} */ v) => v * DPR), h = (w * 9) / 16;
-    const vf = s.shot ? "scale=1920:1080:flags=lanczos" : `crop=${w}:${h}:${x}:${y},scale=1920:1080:flags=lanczos`;
+    const vf = `${s.shot ? "" : `crop=${w}:${h}:${x}:${y},`}${punch(s.beats[0] * BEAT, hits.filter((t) => t < s.beats[1] * BEAT))},crop=1920:1080`;
     execFileSync(FFMPEG, ["-y", "-v", "error", "-framerate", String(FPS), "-i", path.join(dir, "%05d.jpg"), "-vf", vf, "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "16", out]);
   }
   const list = path.join(WORK, "parts.txt");

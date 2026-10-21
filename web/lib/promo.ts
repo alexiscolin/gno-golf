@@ -534,11 +534,13 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
   } else if (c.mode === "track") {
     // alongside the ball at a fixed offset: camera and aim on one point that follows the ball on a critically damped
     // spring (lag: its stiffness), so the frame glides, never swivels on the ball nor jerks as it starts or stops
-    const w = c.lag || 6;
+    // (the spring stepped exactly, as Unity's SmoothDamp does: stable however stiff)
+    const x = (c.lag || 6) / FPS, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
     if (!camInit) anchor.copy(B), anchorV.set(0, 0, 0);
     else {
-      anchorV.addScaledVector(tmp.subVectors(B, anchor), (w * w) / FPS).multiplyScalar(1 - (2 * w) / FPS);
-      anchor.addScaledVector(anchorV, 1 / FPS);
+      const d = tmp.subVectors(anchor, B), step = V().copy(anchorV).addScaledVector(d, (c.lag || 6)).multiplyScalar(1 / FPS);
+      anchorV.addScaledVector(step, -(c.lag || 6)).multiplyScalar(e);
+      anchor.copy(B).add(d.add(step).multiplyScalar(e));
     }
     pos.copy(anchor).add(tmp.fromArray(c.off || [0, 3, 9]));
     look.copy(anchor).y += c.lookUp || 0.3;
