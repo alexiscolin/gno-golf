@@ -150,13 +150,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: calc(var(--chip-r
 .tierbtn__left::before { content: "· "; }
 .tierbtn[aria-pressed="true"] { background: var(--gold); }
 .gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
-.gbar__icon svg, .gsearch svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
-/* the search open: a row of its own under the toolbar, the gallery's width (over nothing, the toolbar unmoved) */
-.gsearch { display: flex; align-items: center; gap: var(--sp-2); width: 100%; height: 44px; padding: 0 6px 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); }
-.gsearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
-.gsearch input::-webkit-search-cancel-button { display: none; }
-/* (its focus ring the field's own frame, as every field's: globals.css) */
-.gsearch__close svg { width: 16px; height: 16px; }
+/* (the search's icon and row: globals.css, the community's holes have it too) */
 .gbar--skel { min-height: 32px; }
 /* under the widest: the tiers' unit said once by their label (GNOT), so the one line still fits */
 @media (max-width: 1179px) { .tierbtn__unit { display: none; } }

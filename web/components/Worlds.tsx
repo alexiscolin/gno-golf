@@ -288,7 +288,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   // the community's screen: every hole, ordered, by world, the day's on top; back to the cups
   if (holes) return (
     <FrontScreen className="worlds--v2 worlds--community" tint="garden" back="Back to the cups" onBack={() => (sound("blip"), setHoles(false))} onAbout={onAbout} eyebrow="Holes by players · not ranked" title="Community holes" dare={racing}>
-      <Community community={community} chain={chain} me={me} onPlay={onCommunity} page />
+      <Community community={community} chain={chain} me={me} onPlay={onCommunity} />
     </FrontScreen>
   );
   return (

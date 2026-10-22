@@ -2506,11 +2506,7 @@ body:has(.pending) .turncall { top: 34%; }
 /* a community hole's mark: whether its author has holed it (Community.tsx), its line held while the chain answers */
 .community__mark { display: block; min-height: 1.3em; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .community__judging { margin: var(--sp-2) 0 0; font-size: 13px; color: var(--ink-soft); }
-/* the community's holes as cards (Community.tsx): the order to list them in by the title, the hole of the day
-   above, then a card each: its map in a window of its world's colours, its lines, Play (and Remix on a computer) */
-.community__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
-.community__sort.seg { box-shadow: none; }
-.community__sort.seg button { min-height: 36px; padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+/* the community's holes as cards (Community.tsx): the hole of the day and the most played above, then a card each: its map in a window of its world's colours, its lines, Play (and Remix on a computer) */
 .community__day { display: grid; justify-items: start; gap: var(--sp-2); margin-top: var(--sp-4); }
 .community__day .ccard { width: 100%; }
 /* the community's screen: the day's hole and the most played up top, then every hole under its search and filters */
@@ -2521,16 +2517,26 @@ body:has(.pending) .turncall { top: 34%; }
 .community__featured:not(:has(.community__day)) { grid-template-columns: 1fr; }
 .community__featured:not(:has(.community__trending)) { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
 @media (max-width: 900px) { .community__featured { grid-template-columns: 1fr; } }
-.community__filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin-top: var(--sp-3); }
-.community__worlds.seg { box-shadow: none; }
-.community__worlds.seg button { min-height: 36px; padding: 6px 12px; font-size: 13px; white-space: nowrap; }
-/* on a narrow screen a row of choices scrolls inside the panel, never the page */
-.community__sort.seg, .community__worlds.seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-@media (max-width: 600px) { .community__head { align-items: stretch; } .community__head .community__sort { width: 100%; } .community { min-width: 0; } }
-.csearch { display: flex; flex: 1 1 260px; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); }
-.csearch svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
-.csearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
-.csearch:focus-within { box-shadow: 0 0 0 3px var(--glow); }
+/* a toolbar's search (components/Search.tsx: the shop's, the community's): its icon, and open, a row of its own
+   under the toolbar, the list's width (over nothing, the toolbar unmoved) */
+.gbar__icon svg, .gsearch svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
+.gsearch { display: flex; align-items: center; gap: var(--sp-2); width: 100%; height: 44px; padding: 0 6px 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); }
+.gsearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
+.gsearch input::-webkit-search-cancel-button { display: none; }
+/* (its focus ring the field's own frame, as every field's) */
+.gsearch__close svg { width: 16px; height: 16px; }
+/* the community's toolbar, as the shop's (.gbar): a chip a world at its left (pressed, that world's holes only;
+   pressed again, every world), the search's icon and the order at its right; on a phone the worlds a line of their own */
+.community > .eyebrow { display: block; margin-bottom: var(--sp-2); }
+.cbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "worlds end"; align-items: center; gap: var(--sp-2) var(--sp-4); }
+.cbar__worlds { grid-area: worlds; display: flex; flex-wrap: wrap; gap: var(--sp-2); min-width: 0; }
+.cbar__worlds .btn[aria-pressed="true"] { background: var(--gold); }
+.cbar__worlds:has([aria-pressed="true"]) .btn:not([aria-pressed="true"]) { opacity: .55; }
+.cbar__end { grid-area: end; display: flex; align-items: center; gap: var(--sp-2); }
+.cbar .seg { box-shadow: none; }
+.cbar .seg button { min-height: 28px; padding: 4px 12px; font-size: 13px; white-space: nowrap; }
+.community .gsearch { margin-top: var(--sp-2); }
+@media (max-width: 700px) { .cbar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "end" "worlds"; } .cbar__end { justify-content: space-between; } }
 .community .community__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--sp-4); margin-top: var(--sp-4); }
 .ccard { box-sizing: border-box; display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--sp-2) var(--sp-3); height: 100%; padding: var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); }
 .ccard__map { grid-row: 1 / 3; align-self: start; display: grid; place-items: center; padding: 4px; border: var(--edge); border-radius: 12px; background: var(--panel-dots), var(--c1); }

@@ -31,6 +31,7 @@ import { undeclared, type Chain } from "@/lib/chain";
 import { aliasOf, authorHoled, BESTS_AT_ONCE, shownOnly, bornBefore, dayHole, dayRows, dayStart, heldBefore, heldFor, keepDay, keepLevel, keptDay, keptLevel, pageOf, sortHoles, verdictOf, type Helds, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
 import { takedownOf, takenDown } from "@/lib/takedown";
 import { cap } from "@/lib/builder/rules";
+import { SearchButton, SearchRow, useSearch } from "@/components/Search";
 import { CUPS } from "@/lib/card";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
@@ -39,27 +40,26 @@ const SORTS: readonly (readonly [SortBy, string])[] = [["new", "Newest"], ["play
 /** How many community holes are judged at once (their data read side by side). */
 const JUDGE_AT_ONCE = 4;
 
-/** The worlds a filter offers: every one a community hole is in, in the cups' order, "all" first. */
-const worldsOf = (holes: readonly HoleRow[]) => ["all", ...CUPS.filter((w) => holes.some((h) => h.world === w))];
+/** The worlds a filter offers: every one a community hole is in, in the cups' order. */
+const worldsOf = (holes: readonly HoleRow[]): string[] => CUPS.filter((w) => holes.some((h) => h.world === w));
 /** A hole a search finds: the words typed in its name, its slot or its author's address. */
 const found = (h: HoleRow, q: string) => !q || [h.name, h.slot, authorOf(h.id)].some((t) => !!t && t.toLowerCase().includes(q));
 /** How many holes the trending row shows (the most played of those open), and how many of the most played are judged for it. */
 const TRENDING = 3, TREND_JUDGED = 8;
 
-export default function Community({ community, chain, me = null, onPlay, page: own = false }: {
+export default function Community({ community, chain, me = null, onPlay }: {
   community: readonly HoleRow[];
   chain: Pick<Chain, "bests" | "blockTime" | "dayCandidates" | "ghost" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn"> | null;
   /** the player's address, if known: their own holes listed before they hold a best on them */
   me?: string | null;
   onPlay: (id: string) => void;
-  /** on a screen of their own (its title the screen's): no heading of the section's */
-  page?: boolean;
 }) {
   const [by, setBy] = useState<SortBy>("new");
   // one world's holes, or every one (offered once there are holes in two worlds)
   const [world, setWorld] = useState("all");
   const worlds = useMemo(() => worldsOf(community), [community]);
   const [query, setQuery] = useState("");
+  const search = useSearch(query, (text) => (setQuery(text), setShown(PAGE)), { label: "Find a community hole by its name or its maker", placeholder: "A hole's name or its maker's address", id: "csearch" });
   const q = query.trim().toLowerCase();
   const inWorld = useMemo(() => community.filter((h) => (world === "all" || h.world === world) && found(h, q)), [community, world, q]);
   // the most played of all, whatever the filters: the trending row's candidates, judged with the page
@@ -205,21 +205,23 @@ export default function Community({ community, chain, me = null, onPlay, page: o
           )}
         </div>
       )}
-      <div className="community__head">
-        {!own ? <h3 className="h-section">Community holes <small>not ranked</small></h3> : <h3 className="h-section">Every hole</h3>}
-        <Segmented options={SORTS} value={by} onChange={(v) => (sound("blip"), setBy(v))} label="Order the community holes" className="community__sort" />
-      </div>
-      <div className="community__filters">
-        <label className="csearch" role="search">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
-          <input type="search" placeholder="A hole's name or its maker's address" aria-label="Find a community hole by its name or its maker" value={query}
-            onChange={(e) => (setQuery(e.target.value), setShown(PAGE))} spellCheck={false} autoCapitalize="off" autoComplete="off" />
-        </label>
-        {worlds.length > 2 && (
-          <Segmented options={worlds.map((w) => [w, w === "all" ? "Every world" : cap(w)] as const)} value={world} onChange={(v) => (sound("blip"), setWorld(v), setShown(PAGE))}
-            label="The community holes of one world" className="community__worlds" />
+      {/* every hole, under one toolbar as the shop's: a chip a world at its left (pressed again, every world); the
+          search's icon (its row under the toolbar while in use) and the order at its right */}
+      <span className="eyebrow">Every hole</span>
+      <div className="cbar">
+        {worlds.length > 1 && (
+          <div className="cbar__worlds" role="group" aria-label="Show one world's holes">
+            {worlds.map((w) => (
+              <Button key={w} size="s" type="button" aria-pressed={world === w} onClick={() => (sound("blip"), setWorld(world === w ? "all" : w), setShown(PAGE))}>{cap(w)}</Button>
+            ))}
+          </div>
         )}
+        <div className="cbar__end">
+          <SearchButton search={search} />
+          <Segmented options={SORTS} value={by} onChange={(v) => (sound("blip"), setBy(v))} label="Order the community holes" />
+        </div>
       </div>
+      <SearchRow search={search} />
       <ul className="community__cards">
         {listed.map((h) => <li key={h.id}>{card(h)}</li>)}
       </ul>

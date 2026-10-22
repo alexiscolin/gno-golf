@@ -22,7 +22,8 @@ import { canBuyCard, cardFact, closingSlot, theirTitle, makeShop, neverMade, now
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
-import { Closes, EarnedTile, GnomeCard, LookSwitch, SaleLine, SearchButton, SearchRow, ShareOne, TierChip, TierFilter, useSearch } from "./parts";
+import { Closes, EarnedTile, GnomeCard, LookSwitch, SaleLine, ShareOne, TierChip, TierFilter } from "./parts";
+import { SearchButton, SearchRow, useSearch } from "@/components/Search";
 import { BlankShelf, SaleSlot, SHOP_HEAD, ShopPitch } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
@@ -70,7 +71,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [now, setNow] = useState(() => Math.floor(chain.now() / 1000));
   const [f, setF] = useState<{ tier?: Listed["tier"]; text: string }>({ text: "" });
   const [shown, setShown] = useState(PAGE);
-  const search = useSearch(f.text, (text) => setF((x) => ({ ...x, text })));
+  const search = useSearch(f.text, (text) => setF((x) => ({ ...x, text })), { label: "Find a gnome by name or number", placeholder: "A name or a number", id: "gsearch" });
   // the look the viewer picked, kept in this browser: on chain, the portraits read as the cards come into view
   const [look, setLook] = useState<Look>(savedLook);
   const onLook = (l: Look) => (setLook(l), saveLook(l));
