@@ -11,14 +11,14 @@ const files: Record<string, string> = {
   "gno.land/r/gnogolf/golf/v2/golf.gno": 'package golf\nimport "gno.land/p/gnogolf/physics"',
   "gno.land/r/gnogolf/golf/v2/state.gno": "package golf // the store",
 };
-const chainOf = (on: Record<string, string>) => ({ realm, file: async (p: string) => on[p] ?? "" });
+const chainOf = (on: Record<string, string>) => ({ realm, file: (p: string) => Promise.resolve(on[p] ?? "") });
 // the files as stage.sh deploys them: under the realm's namespace, its imports rewritten
-const deployed = (over: Record<string, string> = {}) =>
+const deployed = (over: Record<string, string> = {}): Record<string, string> =>
   Object.fromEntries(Object.entries({ ...files, ...over }).map(([p, t]) => [
     p.replace("gno.land/r/gnogolf/golf/v2/", realm + "/").replace("gno.land/p/gnogolf/", "gno.land/p/nym-x/gnogolf/"),
     t.replaceAll("gno.land/p/gnogolf/", "gno.land/p/nym-x/gnogolf/"),
-  ]));
-const sums = async () => Object.fromEntries(await Promise.all(Object.entries(files).map(async ([p, t]) => [p, await sha256(t)])));
+  ] as const));
+const sums = async (): Promise<Record<string, string>> => Object.fromEntries(await Promise.all(Object.entries(files).map(async ([p, t]) => [p, await sha256(t)] as const)));
 
 void test("sameSources: the same rules; a read added to the store since (state.gno) changes nothing; a rule's file does", async () => {
   const src = await sums();
