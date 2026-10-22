@@ -226,8 +226,9 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
           </div>
           {/* what went wrong, then its Try again */}
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
-            : step.why && <p className={step.at === "name" || step.at === "funds" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
+            : step.why && <p className={step.at === "name" || step.at === "funds" || step.at === "rules" || step.at === "unread" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
           {step.at === "unread" && <Button onClick={() => setTries((n) => n + 1)}>Try again</Button>}
+          {step.at === "rules" && <Button onClick={() => window.location.reload()}>Reload the page</Button>}
           {step.at === "funds" && <Button onClick={() => setTries((n) => n + 1)}>Check again</Button>}
           {/* the total on the button; what it is made of a tap away, before any signature */}
           <details className="pub__bill">

@@ -120,7 +120,7 @@ export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "paus
  */
 export function publishSteps(r: Readings, { author, slug, proved, sha, realm, pay }: { author: string; slug: string; proved: string; sha: string; realm: string; pay?: { gas: number; price: number; deposit: number; most: number } }): Step {
   if (r.publishing === false) return { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." };
-  if (r.rules === false) return { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." };
+  if (r.rules === false) return { at: "rules", why: "This page's Builder is not up to date with the rules on gno.land, so it can't publish safely. Reload the page; if this stays, the site is being updated: try again in a few minutes. Your draft is kept." };
   if (r.writer === "") return { at: "paused", why: "Saves are paused on gno.land for now. Your draft is kept." };
   if (r.writer && r.writer !== realm) return { at: "rules", why: "New rules play this course now. Your draft is kept: reload the page once the site has caught up." };
   if (r.taken) return { at: "taken", why: "This hole was taken down: it cannot be published again." };

@@ -6,6 +6,9 @@
 import type { Chain } from "../chain";
 import { sha256 as digest } from "../sha";
 
+/** The realm's store and its reads: not compared (sameSources). */
+const STORE = /^gno\.land\/r\/gnogolf\/golf(\/v[0-9]+)?\/state\.gno$/;
+
 /** Whether src (path → sha-256) is what the realm runs; tag: the build's own key in this browser ("sim", "builder"). */
 export async function sameSources(chain: Pick<Chain, "file" | "realm">, src: Record<string, string>, tag: string): Promise<boolean> {
   const key = `gnogolf.${tag}|${chain.realm}|${await digest(JSON.stringify(src))}`;
@@ -20,7 +23,10 @@ export async function sameSources(chain: Pick<Chain, "file" | "realm">, src: Rec
   const deployed = (p: string) =>
     rules.test(p) ? chain.realm + "/" + p.replace(rules, "") : p.replace(/^gno\.land\/p\/gnogolf\//, `gno.land/p/${at}`);
   const back = (s: string) => s.replaceAll(`gno.land/p/${at}`, "gno.land/p/gnogolf/").replaceAll(`gno.land/r/${at}`, "gno.land/r/gnogolf/");
-  const same = await Promise.all(Object.entries(src).map(async ([p, sum]) => (await digest(back(await chain.file(deployed(p))))) === sum));
+  // (the realm's store and its reads, state.gno, decide no rule: a read added since a realm was deployed, as
+  // DayCandidates since onyx's v2, never makes its rules another's; the rules are physics, course and the realm's
+  // data, golf and weather)
+  const same = await Promise.all(Object.entries(src).filter(([p]) => !STORE.test(p)).map(async ([p, sum]) => (await digest(back(await chain.file(deployed(p))))) === sum));
   if (!same.every(Boolean)) return false;
   try {
     localStorage.setItem(key, "ok");

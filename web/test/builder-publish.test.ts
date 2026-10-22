@@ -92,7 +92,7 @@ void test("publishSteps: open once every check holds; else the first that does n
   assert.deepEqual(publishSteps(ready, at), { at: "ready", why: "" });
   assert.equal(publishSteps({ ...ready, publishing: undefined }, at).at, "reading");
   assert.deepEqual(publishSteps({ ...ready, publishing: false }, at), { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." });
-  assert.deepEqual(publishSteps({ ...ready, rules: false }, at), { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." });
+  assert.deepEqual(publishSteps({ ...ready, rules: false }, at), { at: "rules", why: "This page's Builder is not up to date with the rules on gno.land, so it can't publish safely. Reload the page; if this stays, the site is being updated: try again in a few minutes. Your draft is kept." });
   assert.equal(publishSteps({ ...ready, versions: null }, at).at, "unread");
   assert.equal(publishSteps({ ...ready, publishing: null }, at).at, "unread", "a read that failed is said, never waited on");
   assert.equal(publishSteps({ ...ready, rules: null }, at).at, "unread");
