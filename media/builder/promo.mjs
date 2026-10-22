@@ -288,6 +288,8 @@ const CUT = [
     cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 70, speed: 8, fov: 36, lookUp: 0.15 } }, beats: [84, 104], titles: [
     { ...WORD, big: "<b>720</b> NFT CHARACTERS.", size: 140, at: 0.3, to: 3.8, y: -360 },
     { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 3.9, y: -360 },
+    // (not before it: the collection comes with mainnet)
+    { pill: "ARRIVING WITH MAINNET", size: 56, at: 4.2, kind: "slam", tilt: 0, y: 400 },
   ] },
   // the end card over the avalanche, blurred: the logo, the slogan, the call on the last hit, the site
   { shot: { ...UP, name: "end", hole: "avalanche", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 34, h: 20, a0: 60, speed: 8, fov: 42 } }, beats: [104, 116.5], titles: [
