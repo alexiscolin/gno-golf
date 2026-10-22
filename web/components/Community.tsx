@@ -1,7 +1,8 @@
 "use client";
 
-// The community's holes on the cups screen (the game-design review's #9):
-// anyone's holes, playable outside the cups, in no cup and on no ranking.
+// The community's holes, on a screen of their own (the band under the cups opens it; the game-design review's #9):
+// the hole of the day and the most played up top, then every hole, searched by name or maker, one world's or all.
+// Anyone's holes, playable outside the cups, in no cup and on no ranking.
 // Each is a card: its map from above (HoleMap's SVG, no WebGL), name, author,
 // world, par and players (addresses with a round saved on it, never its
 // author), in the order asked: newest (the chain's order), most played, or
@@ -27,8 +28,10 @@ import { savedOnMore, statsOf, type SavedRead } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
 import { inTurn, type MapHole } from "@/lib/duel";
 import { undeclared, type Chain } from "@/lib/chain";
-import { aliasOf, authorHoled, BESTS_AT_ONCE, bornBefore, dayHole, dayRows, dayStart, heldBefore, heldFor, keepDay, keepLevel, keptDay, keptLevel, pageOf, sortHoles, verdictOf, type Helds, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
+import { aliasOf, authorHoled, BESTS_AT_ONCE, shownOnly, bornBefore, dayHole, dayRows, dayStart, heldBefore, heldFor, keepDay, keepLevel, keptDay, keptLevel, pageOf, sortHoles, verdictOf, type Helds, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
 import { takedownOf, takenDown } from "@/lib/takedown";
+import { cap } from "@/lib/builder/rules";
+import { CUPS } from "@/lib/card";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
 const PAGE = 24;
@@ -36,19 +39,36 @@ const SORTS: readonly (readonly [SortBy, string])[] = [["new", "Newest"], ["play
 /** How many community holes are judged at once (their data read side by side). */
 const JUDGE_AT_ONCE = 4;
 
-export default function Community({ community, chain, me = null, onPlay }: {
+/** The worlds a filter offers: every one a community hole is in, in the cups' order, "all" first. */
+const worldsOf = (holes: readonly HoleRow[]) => ["all", ...CUPS.filter((w) => holes.some((h) => h.world === w))];
+/** A hole a search finds: the words typed in its name, its slot or its author's address. */
+const found = (h: HoleRow, q: string) => !q || [h.name, h.slot, authorOf(h.id)].some((t) => !!t && t.toLowerCase().includes(q));
+/** How many holes the trending row shows (the most played of those open), and how many of the most played are judged for it. */
+const TRENDING = 3, TREND_JUDGED = 8;
+
+export default function Community({ community, chain, me = null, onPlay, page: own = false }: {
   community: readonly HoleRow[];
   chain: Pick<Chain, "bests" | "blockTime" | "dayCandidates" | "ghost" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn"> | null;
   /** the player's address, if known: their own holes listed before they hold a best on them */
   me?: string | null;
   onPlay: (id: string) => void;
+  /** on a screen of their own (its title the screen's): no heading of the section's */
+  page?: boolean;
 }) {
   const [by, setBy] = useState<SortBy>("new");
+  // one world's holes, or every one (offered once there are holes in two worlds)
+  const [world, setWorld] = useState("all");
+  const worlds = useMemo(() => worldsOf(community), [community]);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const inWorld = useMemo(() => community.filter((h) => (world === "all" || h.world === world) && found(h, q)), [community, world, q]);
+  // the most played of all, whatever the filters: the trending row's candidates, judged with the page
+  const played = useMemo(() => sortHoles(community, "played", new Map()).filter((h) => h.plays > 0).slice(0, TREND_JUDGED), [community]);
   const [shown, setShown] = useState(PAGE);
   // the visit's UTC day: its hole changes at midnight UTC, not under the player
   const [now] = useState(() => Date.now());
   // most played: the whole list ordered first, then paged; hardest: the page as shown, once each of it is measured
-  const ordered = useMemo(() => (by === "played" ? sortHoles(community, "played", new Map()) : community), [community, by]);
+  const ordered = useMemo(() => (by === "played" ? sortHoles(inWorld, "played", new Map()) : inWorld), [inWorld, by]);
   // each hole about to be shown judged by the Builder's own rules (lib/community.ts: anyone can publish
   // past the Builder with gnokey), a few at a time, once a version a browser, and whether it is open to the
   // player (heldFor: its author holds a best on it, or it is theirs): only those both pass are listed; the
@@ -71,12 +91,12 @@ export default function Community({ community, chain, me = null, onPlay }: {
   useEffect(() => {
     if (!chain) return;
     let live = true;
-    for (const h of ordered.slice(0, shown)) {
+    for (const h of [...ordered.slice(0, shown), ...played]) {
       void judge(chain, h);
       if (!opens.has(h.id)) void heldFor(chain, h.id, me).catch(() => null).then((b) => live && setOpens((m) => new Map(m).set(h.id, b)));
     }
     return () => void (live = false);
-  }, [chain, ordered, shown, tries, me]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts, opens: asked once each, not again as they fill)
+  }, [chain, ordered, played, shown, tries, me]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts, opens: asked once each, not again as they fill)
   // the hole of the day (lib/community.ts dayHole, its rules there alone): asked what it waits on, that read, asked
   // again, until it has its pick (or is not read now): the realm's candidates from the day's point a page at a time
   // (dayRows), the next page's authors' bests asked ahead (BESTS_AT_ONCE at a time, decided in order). None searched
@@ -165,21 +185,47 @@ export default function Community({ community, chain, me = null, onPlay }: {
     <HoleCard h={h} big={big} map={maps.get(h.id)} players={saved && statsOf(h, saved.saved, authorOf(h.id) ?? "")} mark={authorMark(holed.get(h.id))}
       level={by === "hard" ? levels.get(h.id) : undefined} remix={remix} onPlay={() => (sound("select"), onPlay(h.id))} />
   );
+  // trending: the most played holes open to the player, none the day's
+  const trending = shownOnly(played, verdicts, opens).filter((h) => h.id !== day?.id).slice(0, TRENDING);
   return (
     <section className="community" aria-label="Community holes">
-      <div className="community__head">
-        <h3 className="h-section">Community holes <small>not ranked</small></h3>
-        <Segmented options={SORTS} value={by} onChange={(v) => (sound("blip"), setBy(v))} label="Order the community holes" className="community__sort" />
-      </div>
-      {day && (
-        <div className="community__day">
-          <span className="eyebrow">Hole of the day</span>
-          {card(day, true)}
+      {(day || trending.length > 0) && (
+        <div className="community__featured">
+          {day && (
+            <div className="community__day">
+              <span className="eyebrow">Hole of the day</span>
+              {card(day, true)}
+            </div>
+          )}
+          {trending.length > 0 && (
+            <div className="community__trending">
+              <span className="eyebrow">Most played</span>
+              <ul className="community__cards">{trending.map((h) => <li key={h.id}>{card(h)}</li>)}</ul>
+            </div>
+          )}
         </div>
       )}
+      <div className="community__head">
+        {!own ? <h3 className="h-section">Community holes <small>not ranked</small></h3> : <h3 className="h-section">Every hole</h3>}
+        <Segmented options={SORTS} value={by} onChange={(v) => (sound("blip"), setBy(v))} label="Order the community holes" className="community__sort" />
+      </div>
+      <div className="community__filters">
+        <label className="csearch" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+          <input type="search" placeholder="A hole's name or its maker's address" aria-label="Find a community hole by its name or its maker" value={query}
+            onChange={(e) => (setQuery(e.target.value), setShown(PAGE))} spellCheck={false} autoCapitalize="off" autoComplete="off" />
+        </label>
+        {worlds.length > 2 && (
+          <Segmented options={worlds.map((w) => [w, w === "all" ? "Every world" : cap(w)] as const)} value={world} onChange={(v) => (sound("blip"), setWorld(v), setShown(PAGE))}
+            label="The community holes of one world" className="community__worlds" />
+        )}
+      </div>
       <ul className="community__cards">
         {listed.map((h) => <li key={h.id}>{card(h)}</li>)}
       </ul>
+      {!page.judging && !rating && !unread && !listed.length && (
+        <p className="community__none">{q || world !== "all" ? "No hole here: try other words or another world." : "No hole open here yet: a community hole shows once its maker has holed it, saved on-chain."}</p>
+      )}
       {unread && !page.judging && <p className="note note--bad">Some holes did not load. <button className="linkish" onClick={retry}>Try again</button></p>}
       {page.judging ? (
         <p className="community__judging" aria-live="polite">Checking the holes against the Builder rules…</p>

@@ -314,6 +314,33 @@ body:has(.netbanner) .screen--title { padding-bottom: var(--chip-room); }
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
 .worlds--v2 .world:active:not([disabled]), .mode:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
 .worlds--v2 .world[disabled] { background: #c9d2cd; }
+/* the community's holes: a long band under the cups, a card of another kind (paper and a blueprint, not a
+   cup's colour and diorama), leaping as a cup does; a tap opens their screen */
+.cband {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--sp-4); width: 100%; margin: var(--gap-grid) 0 76px; /* (clear of the corner's chips below) */
+  padding: 10px 26px 10px 12px; border: var(--edge-bold); border-radius: var(--r-panel); background: var(--panel-dots), var(--paper);
+  box-shadow: var(--deep-card); font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  transition: transform var(--t-pop) var(--spring), box-shadow .2s;
+}
+.cband:hover, .cband:focus-visible { transform: translateY(-6px) rotate(-.4deg); box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 13px 0 var(--ink); }
+.cband:active { transform: translateY(2px) scale(.99); box-shadow: 0 2px 0 var(--ink); }
+.cband__art { display: grid; place-items: center; width: 132px; aspect-ratio: 5 / 4; border: var(--edge-bold); border-radius: 18px; background: #dbe8f5; overflow: hidden; }
+.cband__art .mode__sketch { width: 92%; }
+.cband__text { display: grid; gap: 4px; min-width: 0; }
+.cband__name { display: flex; align-items: center; gap: 10px; font-size: var(--fs-name); font-weight: 800; }
+.cband__name .tag { font-size: 12px; }
+.cband__stats { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 15px; font-weight: 700; color: var(--ink-soft); }
+.cband__stats b { font-size: 20px; color: var(--ink); }
+.cband__new { font-size: 14px; font-weight: 700; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cband__go { padding: 8px 16px; border: var(--edge-bold); border-radius: var(--pill); background: var(--gold); font-weight: 800; white-space: nowrap; box-shadow: 0 3px 0 var(--ink); }
+@media (max-width: 700px) {
+  .cband { grid-template-columns: auto 1fr; padding-right: 14px; }
+  .cband__art { width: 88px; }
+  .cband__go { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
+}
+/* their screen: the list as wide as the cups' row */
+.worlds--community .community { width: min(1200px, 100%); max-width: none; margin-top: 0; } /* (the screen centres its children: a width of its own, not its content's) */
+.community__none { margin: var(--sp-4) 0 0; font-weight: 700; color: var(--ink-soft); }
 /* the cup's diorama in a round inked window, as a game's panel shows its gnome */
 /* sized by the window's height too, so a laptop's cards end clear of the network banner */
 .worlds--v2 .world__art { width: min(80%, 20vh); margin: 4px auto 0; aspect-ratio: 1 / 1; border-radius: 50%; }

@@ -11,6 +11,8 @@ import { Button, VsPar } from "@/components/ui";
 import { plural } from "@/components/common";
 import type { Chain } from "@/lib/chain";
 import Community from "@/components/Community";
+import { Sketch } from "@/components/Sketch";
+import { authorOf } from "@/lib/builder/holes";
 import "@/app/title.css";
 
 // The world screen, between the game's choice (Modes.tsx) and the course: one
@@ -238,6 +240,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
+  const [holes, setHoles] = useState(false); // the community's holes on a screen of their own (the band under the cups)
   // the cards fade in once their stills are decoded (300 ms at most): never an empty disc
   const [ready, setReady] = useState(() => shownOnce);
   useEffect(() => {
@@ -281,6 +284,12 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         </div>
       )}
     </div>
+  );
+  // the community's screen: every hole, ordered, by world, the day's on top; back to the cups
+  if (holes) return (
+    <FrontScreen className="worlds--v2 worlds--community" tint="garden" back="Back to the cups" onBack={() => (sound("blip"), setHoles(false))} onAbout={onAbout} eyebrow="Holes by players · not ranked" title="Community holes" dare={racing}>
+      <Community community={community} chain={chain} me={me} onPlay={onCommunity} page />
+    </FrontScreen>
   );
   return (
     <FrontScreen className="worlds--v2" tint={hot || current || "garden"} back="Back to the games" onBack={onBack} onAbout={onAbout} eyebrow="Choose your cup" title="Where do we play?" dare={racing} corner={resetMenu}>
@@ -335,7 +344,29 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         })}
       </ul>
       {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
-      {community.length > 0 && <Community community={community} chain={chain} me={me} onPlay={onCommunity} />}
+      {community.length > 0 && <CommunityBand community={community} onOpen={() => (sound("select"), setHoles(true))} />}
     </FrontScreen>
+  );
+}
+
+/** The community's holes as a long band under the cups, a card of another kind (a blueprint, not a diorama; not
+ *  ranked): how many holes, by how many makers, in how many worlds, the newest named; a tap opens their screen. */
+function CommunityBand({ community, onOpen }: { community: readonly HoleRow[]; onOpen: () => void }) {
+  const makers = new Set(community.map((h) => authorOf(h.id)).filter(Boolean)).size, worlds = new Set(community.map((h) => h.world)).size;
+  const newest = community[0];
+  return (
+    <button className="cband" onClick={onOpen} aria-label={`Community holes: ${community.length} ${plural("hole", community.length)} by ${makers} ${plural("maker", makers)}, not ranked. See them all`}>
+      <span className="cband__art"><Sketch /></span>
+      <span className="cband__text">
+        <span className="cband__name">Community holes <span className="tag">Not ranked</span></span>
+        <span className="cband__stats">
+          <span><b>{community.length}</b> {plural("hole", community.length)} published</span>
+          <span><b>{makers}</b> {plural("maker", makers)}</span>
+          <span><b>{worlds}</b> {plural("world", worlds)}</span>
+        </span>
+        {newest && <span className="cband__new">Newest: {newest.name || newest.slot}</span>}
+      </span>
+      <span className="cband__go" aria-hidden="true">See them all ▸</span>
+    </button>
   );
 }
