@@ -394,7 +394,7 @@ function install() {
         // clockAt: the timed pieces held at one tick (a tram that would sink out of a still shot)
         if (cfg_.clockAt != null && !e.g.flying) e.setClock(cfg_.clockAt);
         tick(r);
-        if (cfg_.morph) morph(cfg_.morph);
+        if (cfg_.morph) morph(cfg_.morph, cfg_.cam);
         // the pieces shown play their CSS animations (a callout's pop) on the promo clock too
         // (a scroll-driven one is left alone)
         if (cfg_.ui) for (const a of document.getAnimations()) {
@@ -513,14 +513,16 @@ const STAR = `<svg viewBox="-11 -11 22 22" width="110" height="110"><path d="M0-
 // -------------------------------------------------------------- the morph
 
 /** The gnome on the tee swapped for the next on each step of the morph (the last kept), each hopping in with a spin
- *  and a squash as he lands (where the swap set him down: placeBall's). */
-function morph(m: NonNullable<Shot["morph"]>) {
+ *  and a squash as he lands (where the swap set him down: placeBall's), turned with an orbit around him: his face kept
+ *  to the camera as at its start. */
+function morph(m: NonNullable<Shot["morph"]>, c?: Cam) {
   const k = Math.min(Math.floor((tt - m.at) / m.every), morphed.length - 1);
   if (k < 0) return;
   if (k !== worn) (worn = k), E!.setGnome(morphed[k]), (seat = E!.ball().position.y);
   const u = Math.min(1, (tt - m.at - k * m.every) / m.every), b = E!.ball(), land = Math.max(0, u - 0.7) / 0.3;
   b.position.y = seat + 0.45 * Math.sin(Math.PI * Math.min(u / 0.7, 1));
-  b.rotation.y = 2 * Math.PI * smoothstep(Math.min(u / 0.7, 1));
+  const turn = c?.mode === "orbit" && c.center === "ball" ? ((c.speed || 30) * Math.max(tt, 0) * Math.PI) / 180 : 0;
+  b.rotation.y = 2 * Math.PI * smoothstep(Math.min(u / 0.7, 1)) - turn;
   const sq = 0.22 * Math.sin(Math.PI * land);
   b.scale.set(1 + sq, 1 - sq, 1 + sq);
 }
