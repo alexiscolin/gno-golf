@@ -57,7 +57,6 @@ export default function Community({ community, chain, me = null, onPlay }: {
   const [by, setBy] = useState<SortBy>("new");
   // one world's holes, or every one (offered once there are holes in two worlds)
   const [world, setWorld] = useState("all");
-  const worlds = useMemo(() => worldsOf(community), [community]);
   const [query, setQuery] = useState("");
   const search = useSearch(query, (text) => (setQuery(text), setShown(PAGE)), { label: "Find a community hole by its name or its maker", placeholder: "A hole's name or its maker's address", id: "csearch" });
   const q = query.trim().toLowerCase();
@@ -76,6 +75,8 @@ export default function Community({ community, chain, me = null, onPlay }: {
   // for the day's, asked again on Try again
   const [verdicts, setVerdicts] = useState<Verdicts>(new Map());
   const [opens, setOpens] = useState<Helds>(new Map());
+  // (the worlds of the holes shown: a world none of whose holes is open to the player offers no chip)
+  const worlds = useMemo(() => worldsOf(shownOnly(community, verdicts, opens)), [community, verdicts, opens]);
   const [tries, setTries] = useState(0);
   const [turn] = useState(() => inTurn(JUDGE_AT_ONCE));
   const asked = useRef(new Map<string, Promise<Verdict | null>>()); // (the judgings under way)

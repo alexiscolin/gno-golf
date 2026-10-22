@@ -197,6 +197,8 @@ export function makeGesture(out: Out) {
         : d.t === "handle" ? dropHandle(d.start, d.id, d.key, on(at), e.quick, e.full)
           : dropEnd(d.start, d.which, on(at), e.quick, e.full);
       if ("why" in next) return (out.onCancel(), next.why ? { refused: next.why } : null);
+      // let go where it was (a click that selects, a drag back to its place): nothing to undo
+      if (unmoved(d.start, next)) return (out.onCancel(), null);
       out.onPreview(next);
       out.onCommit();
       return d.t === "piece" ? { moved: d.id } : {};
@@ -222,3 +224,6 @@ export function makeGesture(out: Out) {
     },
   };
 }
+
+/** Whether an edit left the hole as it was: its pieces, tee and cup the same. */
+const unmoved = (a: Draft, b: Draft) => a.tee.join() === b.tee.join() && a.pin.join() === b.pin.join() && JSON.stringify(a.pieces) === JSON.stringify(b.pieces);
