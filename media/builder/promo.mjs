@@ -237,9 +237,9 @@ const MORPH = (() => {
 const CUT = [
   // the cover (X shows a video's first frame): the news on the cards' paper, all there from the first frame
   { card: true, beats: [0, 3], titles: [
-    { logo: 420, at: -1, tilt: -3, y: -250, tilt3d: true },
-    { big: "BUILDER MODE<br><b>IS OUT!</b>", size: 150, at: -1, tilt: -3, y: 90 },
-    { pill: "BUILD. SHARE. DARE.", size: 54, at: -1, tilt: 0, y: 330 },
+    { logo: 600, at: -1, tilt: -3, y: -205, tilt3d: true },
+    { big: "BUILDER MODE<br><b>IS OUT!</b>", size: 130, at: -1, tilt: -3, y: 205 },
+    { pill: "BUILD. SHARE. DARE.", size: 50, at: -1, tilt: 0, y: 410 },
   ] },
   // the hook: the ball shot out of the blowhole (its putt and its ride under the lagoon before the shot), spat over the lagoon, holed
   { shot: { ...UP, name: "opener", hole: "blowhole", weather: "clear", ace: "short", dropAt: 1, putt: -2.5, pre: 2.75, sink: 0.6,
