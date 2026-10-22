@@ -266,26 +266,26 @@ const CUT = [
   // shared, a friend dared: their goes at it, the stroke count climbing, never near the cup: off a snowman, into the crevasse and
   // back to the tee; up the right, off the back wall and all the way back across the ice (from high up); over the ice and stuck in the far corner
   // (holes.ts's hole: shots swept offline)
-  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 1.6 }], cam: CHASE }, beats: [51, 61], titles: [
+  { shot: { ...UP, name: "fail1", hole: "avalanche", weather: "clear", fire: [{ deg: -8, power: 10, at: 2.2 }], cam: CHASE }, beats: [51, 63], titles: [
     { ...WORD, big: "SHARE IT.<br><i>DARE FRIENDS.</i>", size: 165, at: 0.02, to: 0.8 },
-    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.85, to: 2.0, tilt: -2, y: -320 },
-    { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 2.1, y: -360 },
+    { raw: "<div class='bubble'><b>alex.gno</b> sank it in 1.<br>Your turn. <i>Good luck.</i></div>", at: 0.85, to: 2.6, tilt: -2, y: -320 },
+    { ...WORD, big: "STROKE <i>3.</i>", size: 170, at: 2.7, y: -360 },
   ] },
-  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: 10, power: 9.75, at: 0.05 }], cam: DRONE }, beats: [61, 67], titles: [
+  { shot: { ...UP, name: "fail2", hole: "avalanche", weather: "clear", fire: [{ deg: 10, power: 9.75, at: 0.05 }], cam: DRONE }, beats: [63, 69], titles: [
     { ...WORD, big: "STROKE <i>7.</i>", size: 170, at: 0.05, y: -360 },
   ] },
-  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: -18.5, power: 6.75, at: 0.05 }], cam: { ...CHASE, off: [-4, 5, 2] } }, beats: [67, 77], titles: [
+  { shot: { ...UP, name: "miss", hole: "avalanche", weather: "clear", fire: [{ deg: -18.5, power: 6.75, at: 0.05 }], cam: { ...CHASE, off: [-4, 5, 2] } }, beats: [69, 79], titles: [
     { ...WORD, big: "STROKE <i>12.</i>", size: 170, at: 0.05, to: MISS - 0.05, y: -360 },
     { ...WORD, big: "THEIR<br><i>NIGHTMARE.</i>", size: 230, at: MISS },
   ] },
   // what's next: mainnet soon, its surprise (short: the time is the gnomes')
-  { shot: { ...UP, name: "soon", hole: "skate-plaza", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 40, speed: 8, fov: 42 } }, beats: [77, 82], titles: [
+  { shot: { ...UP, name: "soon", hole: "skate-plaza", weather: "clear", blur: 14, dim: 0.3, rays: true, cam: { mode: "orbit", center: [0.5, 0, 0.5], r: 30, h: 18, a0: 40, speed: 8, fov: 42 } }, beats: [79, 84], titles: [
     { ...WORD, big: "MAINNET<br><b>SOON.</b>", size: 230, at: 0.05, y: -60 },
     { pill: "WITH A SURPRISE…", size: 60, at: 0.75, kind: "slam", tilt: 0, y: 260, sparkle: 4 },
   ] },
   // the surprise: a gnome on the tee, ready to play, turning into one after another (the rarest last)
-  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: 1.4 * BEAT },
-    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 70, speed: 8, fov: 36, lookUp: 0.15 } }, beats: [82, 104], titles: [
+  { shot: { ...UP, name: "gnomes", hole: "blowhole", weather: "clear", morph: { traits: MORPH, at: 0.25, every: 1.25 * BEAT },
+    cam: { mode: "orbit", center: "ball", r: 2.9, h: 1.1, a0: 70, speed: 8, fov: 36, lookUp: 0.15 } }, beats: [84, 104], titles: [
     { ...WORD, big: "<b>720</b> NFT CHARACTERS.", size: 140, at: 0.3, to: 3.8, y: -360 },
     { ...WORD, big: "PLAY AS <b>YOURS.</b>", size: 170, at: 3.9, y: -360 },
   ] },
