@@ -169,6 +169,11 @@ void test("a piece pressed and let go where it was (a click that selects it), or
   assert.equal(ed.s.canUndo(), false, "a click");
   ed.g.down(env(), at, { t: "piece", id: "r" }), ed.g.move(env(), [at[0] + 2, at[1]]), ed.g.up(env(), at);
   assert.equal(ed.s.canUndo(), false, "dragged away and back");
+  // a handle and the tee touched a little off their point (inside their hit area), let go unmoved: nothing snaps
+  ed.g.down(env(), [at[0] + 0.3, at[1] + 0.2], { t: "handle", key: "c" }), ed.g.up(env(), [at[0] + 0.3, at[1] + 0.2]);
+  const tee = ed.s.now().tee;
+  ed.g.down(env(), [tee[0] + 0.3, tee[1]], { t: "end", which: "tee" }), ed.g.up(env(), [tee[0] + 0.3, tee[1]]);
+  assert.equal(ed.s.canUndo(), false, "a handle, the tee: touched");
   ed.g.down(env(), at, { t: "piece", id: "r" }), ed.g.move(env(), [at[0] + 2, at[1]]), ed.g.up(env(), [at[0] + 2, at[1]]);
   assert.equal(ed.s.canUndo(), true, "moved: undone in one step");
 });

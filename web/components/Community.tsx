@@ -75,8 +75,8 @@ export default function Community({ community, chain, me = null, onPlay }: {
   // for the day's, asked again on Try again
   const [verdicts, setVerdicts] = useState<Verdicts>(new Map());
   const [opens, setOpens] = useState<Helds>(new Map());
-  // (the worlds of the holes shown: a world none of whose holes is open to the player offers no chip)
-  const worlds = useMemo(() => worldsOf(shownOnly(community, verdicts, opens)), [community, verdicts, opens]);
+  // (every world a community hole is in: stable while the list is judged, the toolbar never shifting under the player)
+  const worlds = useMemo(() => worldsOf(community), [community]);
   const [tries, setTries] = useState(0);
   const [turn] = useState(() => inTurn(JUDGE_AT_ONCE));
   const asked = useRef(new Map<string, Promise<Verdict | null>>()); // (the judgings under way)

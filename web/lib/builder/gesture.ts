@@ -62,9 +62,9 @@ export type Let = { placed: string } | { moved?: string } | { refused: string } 
 
 type Checker = ReturnType<typeof dragCheck>;
 type Grab =
-  | { t: "piece"; id: string; start: Draft; grab: V; check: Checker }
-  | { t: "handle"; id: string; key: HandleKey; start: Draft; check: Checker }
-  | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker }
+  | { t: "piece"; id: string; start: Draft; grab: V; check: Checker; from: V; moved: boolean }
+  | { t: "handle"; id: string; key: HandleKey; start: Draft; check: Checker; from: V; moved: boolean }
+  | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker; from: V; moved: boolean }
   | { t: "paint"; grow: boolean; green: Green; from: V; last: V; axis: 0 | 1 | null; brushed: Map<string, V>; now: Painted; wash: Shown["wash"]; check: Checker }
   | { t: "side"; green: Green; side: Side; from: V; by: number; now: Painted | null; wash: Shown["wash"]; check: Checker };
 
@@ -119,12 +119,12 @@ export function makeGesture(out: Out) {
       }
       if (p && target?.t === "side") return (grab = { t: "side", green: p.green, side: p.green.sides[target.i], from: at, by: 0, now: null, wash: null, check: armedOf(e) }), true;
       if (e.armed) return true;
-      if (target?.t === "handle" && e.selected) return (grab = { t: "handle", id: e.selected, key: target.key, start: e.draft, check: dragCheck(e.draft, e.quick) }), true;
-      if (target?.t === "end") return (grab = { t: "end", which: target.which, start: e.draft, check: dragCheck(e.draft, e.quick) }), true;
+      if (target?.t === "handle" && e.selected) return (grab = { t: "handle", id: e.selected, key: target.key, start: e.draft, check: dragCheck(e.draft, e.quick), from: at, moved: false }), true;
+      if (target?.t === "end") return (grab = { t: "end", which: target.which, start: e.draft, check: dragCheck(e.draft, e.quick), from: at, moved: false }), true;
       if (target?.t === "piece") {
         const p = e.draft.pieces.find((q) => q.id === target.id)!, w = whereOf(p.geometry);
         out.onSelect(target.id);
-        return (grab = { t: "piece", id: target.id, start: e.draft, grab: [at[0] - w[0], at[1] - w[1]], check: dragCheck(e.draft, e.quick) }), true;
+        return (grab = { t: "piece", id: target.id, start: e.draft, grab: [at[0] - w[0], at[1] - w[1]], check: dragCheck(e.draft, e.quick), from: at, moved: false }), true;
       }
       out.onSelect(null);
       return false;
@@ -152,6 +152,8 @@ export function makeGesture(out: Out) {
       }
       const d = g;
       if (!d) return null;
+      // (a press that never went further than a quarter of a step: a click, its let-go no edit)
+      d.moved ||= Math.hypot(at[0] - d.from[0], at[1] - d.from[1]) > e.step / 4;
       const on = (v: V) => snap(v, e.step, d.start.tee);
       if (d.t === "piece") {
         const p = d.start.pieces.find((q) => q.id === d.id)!, moved = movePiece(p, on([at[0] - d.grab[0], at[1] - d.grab[1]]));
@@ -190,6 +192,8 @@ export function makeGesture(out: Out) {
         return { placed: p.id };
       }
       if (!d) return null;
+      // a click (a piece pressed to select it, a handle or an end touched): nothing moves, nothing to undo, nothing checked
+      if (!d.moved) return (out.onCancel(), null);
       // let go on the palette's bin: removed (if the hole holds without it)
       if (d.t === "piece" && bin) return (out.onCancel(), out.onSelect(null), out.onBin(d.id), null);
       const on = (v: V) => snap(v, e.step, d.start.tee);
@@ -197,8 +201,8 @@ export function makeGesture(out: Out) {
         : d.t === "handle" ? dropHandle(d.start, d.id, d.key, on(at), e.quick, e.full)
           : dropEnd(d.start, d.which, on(at), e.quick, e.full);
       if ("why" in next) return (out.onCancel(), next.why ? { refused: next.why } : null);
-      // let go where it was (a click that selects, a drag back to its place): nothing to undo
-      if (unmoved(d.start, next)) return (out.onCancel(), null);
+      // dragged back to where it was: nothing to undo
+      if (same(d.start, next)) return (out.onCancel(), null);
       out.onPreview(next);
       out.onCommit();
       return d.t === "piece" ? { moved: d.id } : {};
@@ -225,5 +229,6 @@ export function makeGesture(out: Out) {
   };
 }
 
-/** Whether an edit left the hole as it was: its pieces, tee and cup the same. */
-const unmoved = (a: Draft, b: Draft) => a.tee.join() === b.tee.join() && a.pin.join() === b.pin.join() && JSON.stringify(a.pieces) === JSON.stringify(b.pieces);
+/** Whether an edit left the hole as it was: every field of it the same, a number to a millionth (a drag away and back adds float dust). */
+const same = (a: Draft, b: Draft) => JSON.stringify(a, millionth) === JSON.stringify(b, millionth);
+const millionth = (_: string, v: unknown) => (typeof v === "number" ? Math.round(v * 1e6) / 1e6 : v);
