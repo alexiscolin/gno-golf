@@ -108,6 +108,7 @@ export function FrontScreen({ className, tint = "garden", inner = "", back, onBa
       <div className={`worlds__in ${inner}`.trim()}>
         <FrontHead eyebrow={eyebrow} title={title} dare={dare} />
         {children}
+        <i className="front__veil" aria-hidden="true" />
       </div>
     </div>
   );

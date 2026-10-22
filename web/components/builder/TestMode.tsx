@@ -66,7 +66,7 @@ const BITS = confetti(28);
 /** No chip stamped. */
 const NONE: readonly string[] = [];
 /** The start card's line, no address known as Play opens. */
-const START_LINE = "Your address names the hole and sets its weather. Nothing is signed until you publish.";
+const START_LINE = "The hole is saved under your gno.land address, and its weather comes from it. Nothing is signed until you publish.";
 /** Said when a try holed before the address holes in no weather under it: the line promised it would count. */
 const NOT_CARRIED = "Your practice round did not hold under your address: sink it in each weather.";
 /** How far back a weather is looked for (FIND_BACK periods), in days, for a sentence. */

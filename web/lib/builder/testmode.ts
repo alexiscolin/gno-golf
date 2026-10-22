@@ -134,7 +134,7 @@ export function publishTip(world: string, left: readonly string[]): string {
 
 /** The hole-finished card of a try (no address yet): Clear done, what comes next, then why the address. */
 export const askSaid = (world: string) =>
-  `${weatherName("")} ✓ — next: ${weathersSaid(required(world).filter((k) => k))}. Your address names the hole and sets its weather, so we need it once to go on. Nothing is signed.`;
+  `${weatherName("")} ✓ — next: ${weathersSaid(required(world).filter((k) => k))}. The hole is saved under your gno.land address, and its weather comes from it, so we need it once to go on. Nothing is signed.`;
 
 /** Said when a round's shots, replayed in other weathers, hole there too (those weathers proved without a round of their own);
  *  from null: a practice round's, replayed once the address is given ("Your practice round holds in Clear and Wind ✓"). */

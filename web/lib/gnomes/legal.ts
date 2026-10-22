@@ -86,8 +86,9 @@ export function review(o: Order): { total: Term; pay: Term[]; terms: Term[] } {
 /** The order's button (§1.3), the bill's total in it (the review's own figure). */
 export const orderButton = (total: number) => `Order with obligation to pay (${gnot(total)} GNOT): sign in wallet`;
 /** The chain's part of a buy in one line, under a sheet's price, from the review's own bill: "+ ≈0.5 GNOT chain
- *  costs, 0.43 back if you burn it" (the deposit held by the chain, never paid to us), said as the bill says a figure. */
-export const chainCosts = ({ deposit, fee }: Pick<Bill, "deposit" | "fee">) => `+ ≈${gnot(totalOf(deposit, fee))} GNOT chain costs, ${gnot(totalOf(deposit))} back if you burn it`;
+ *  costs: a 0.43 deposit, returned if you ever destroy (burn) the gnome" (the deposit held by the chain, never paid to
+ *  us; the word a newcomer reads first, the chain's after it), said as the bill says a figure. */
+export const chainCosts = ({ deposit, fee }: Pick<Bill, "deposit" | "fee">) => `+ ≈${gnot(totalOf(deposit, fee))} GNOT chain costs: a ${gnot(totalOf(deposit))} deposit, returned if you ever destroy (burn) the gnome`;
 
 interface Receipt extends Order { at: number; hash: string; realm: string; chainId: string; consents: readonly string[] }
 /** The receipt (§3), a line each: what the buyer prints or saves. consents: the boxes shown and ticked, word for word. */

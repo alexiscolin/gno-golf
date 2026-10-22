@@ -1805,9 +1805,9 @@ export default function Golf() {
                 <section className="drawer__me">
                   <div className="me__stats">
                     <div><strong>{tot.done}/{s.holes.length}</strong><span>holes</span></div>
-                    <div><strong>{tot.strokes || "–"}</strong><span>strokes</span></div>
+                    <div><strong>{tot.strokes || <Nil />}</strong><span>strokes</span></div>
                     <div>
-                      <strong>{tot.done ? vsPar(tot.strokes - tot.par) : "–"}</strong>
+                      <strong>{tot.done ? vsPar(tot.strokes - tot.par) : <Nil />}</strong>
                       <span>vs par</span>
                     </div>
                   </div>
@@ -2589,6 +2589,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
         <Button variant="gold" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
           {unlocked(skin.id) ? "Choose this gnome" : `Play as ${gnomeById(chosen).name}`}
         </Button>
+        <i className="front__veil" aria-hidden="true" />
       </div>
     </div>
   );
@@ -2862,7 +2863,7 @@ function Scorecard({ holes, card, saved, current, compact = false, fresh = NONE,
       ))}
       <div className="scorecard__total">
         <span>Total</span>
-        <strong>{t.strokes || "–"}</strong>
+        <strong>{t.strokes || <Nil />}</strong>
         <span>par {t.par || "–"}</span>
         <span>{t.done}/{holes.length} holes</span>
         <span className="scorecard__links">
@@ -2873,6 +2874,9 @@ function Scorecard({ holes, card, saved, current, compact = false, fresh = NONE,
     </div>
   );
 }
+
+/** No figure yet (a total, a rank): a light dash, not the bold figure's black bar. */
+const Nil = () => <span className="nil">–</span>;
 
 // badges: the cup's card (not compact) shows the badges earned, those fresh pressed on
 function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, onRules, fresh = NONE, badges }: BoardProps & { card: Card; saved: Card; compact?: boolean; onRules: () => void; fresh?: readonly string[]; badges?: { onOpen: () => void } }) {
@@ -2900,8 +2904,8 @@ function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, o
         </div>
         <dl className="cup__sum">
           <div><dt>Holes</dt><dd>{t.done}/{s.holes.length}</dd></div>
-          <div><dt>Vs par</dt><dd>{t.done ? <VsPar vs={vs} /> : "–"}</dd></div>
-          <div><dt>Rank</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{rank && rank.at ? `#${rank.at}` : rank && rank.unnamed ? <small>needs a name</small> : "–"}</dd></div>
+          <div><dt>Vs par</dt><dd>{t.done ? <VsPar vs={vs} /> : <Nil />}</dd></div>
+          <div><dt>Rank</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{rank && rank.at ? `#${rank.at}` : rank && rank.unnamed ? <small>needs a name</small> : <Nil />}</dd></div>
         </dl>
       </header>
       <Scorecard holes={s.holes} card={card} saved={saved} current={s.id} compact={compact} fresh={fresh} onRules={onRules} />

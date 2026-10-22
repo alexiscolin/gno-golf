@@ -1,9 +1,10 @@
 "use client";
 
-// The first run's hints (the GUI spec's B1): one by each place a first hole
-// goes through (the palette, the green's paint, Play, the steps), short, never in the way:
-// the pointer goes through them, and they are gone at the first drag (the
-// editor's onDone); never a tutorial, and never over the 3D. Shown on the
+// The first run's hints (the GUI spec's B1): the four steps a first hole
+// goes through (the palette, the green's paint, Play, the steps), short, in their
+// order under the empty piece settings, never in the way: never over the hole,
+// the 3D or one another, the pointer through them, and they are gone at the first drag (the
+// editor's onDone); never a tutorial. Shown on the
 // first visit only (templates.ts HINTS_KEY). Asked for again (the header's
 // "?"), a glossary of the world's pieces comes under them, on one screen:
 // each palette tile's picture, its name and what it does (tiles.ts), and
@@ -32,8 +33,8 @@ export default function Hints({ world, onDone, glossary = null }: {
   /** the "?": the world's pieces under the hints */
   glossary?: { world: string; palette: readonly PaletteEntry[] } | null;
 }) {
-  const hints = (inPanel: boolean) => hintsOf(world).map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
-  // the first run: each hint by its place, the pointer through them
+  const hints = (inPanel: boolean) => hintsOf(world).map(([at, text], k) => <p key={at} className={inPanel ? "bhint bhint--in" : "bhint"}><b>{k + 1}</b>{text}</p>);
+  // the first run: the four in order, the pointer through them
   if (!glossary) return <div className="bhints" role="note" aria-label="Four hints">{hints(false)}</div>;
   const tiles = allTiles(glossary.palette);
   return (
@@ -49,7 +50,8 @@ export default function Hints({ world, onDone, glossary = null }: {
           </li>
         ))}
       </ul>
-      <p className="bgloss__keys">{KEYS.map((k, i) => <span key={k.key}>{i ? " · " : ""}<kbd>{k.key.replace("mod", MOD)}</kbd> {k.long}</span>)}</p>
+      {/* every key: its key, what it does, a list in two columns (one on a narrow sheet) */}
+      <dl className="bgloss__keys">{KEYS.map((k) => <div key={k.key}><dt><kbd>{k.key.replace("mod", MOD)}</kbd></dt><dd>{k.long}</dd></div>)}</dl>
     </Sheet>
   );
 }

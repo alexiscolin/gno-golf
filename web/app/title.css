@@ -89,6 +89,18 @@
    under it; the corner buttons (2), the mode's tag and the network banner (after the screen) over it */
 .front::after { z-index: 1; box-shadow: 0 0 0 40px var(--s0); }
 @media (max-width: 600px) { .front::after, .victory::after, .screen--title::after { inset: 8px; border-width: 2.5px; } }
+/* what scrolls under the fixed corners, veiled in the backdrop (its dots and sky, fixed, so they meet it): at the
+   foot the network's chips (their row and --chip-room, the last row's room, the same) sit on it, never on a
+   card's Buy or a band's words; on a phone the head's row too (Back, the mode, About). Over the screen's parts,
+   under its head (the shop's, in that row on a phone), its frame and its corner buttons */
+.front__veil::before, .front__veil::after { content: ""; position: fixed; z-index: 5; left: 0; right: 0; pointer-events: none; background: var(--dots), var(--sky); background-attachment: fixed; }
+.front__veil::after { display: none; bottom: 0; height: calc(var(--chip-room) + 12px); mask-image: linear-gradient(transparent, #000 20px); }
+body:has(.netbanner) .front__veil::after { display: block; }
+.front__veil::before { display: none; top: 0; height: 96px; mask-image: linear-gradient(#000 calc(100% - 14px), transparent); }
+@media (max-width: 600px) { .front__veil::before { display: block; } .front { scroll-padding-top: 96px; } }
+body:has(.netbanner) .front { scroll-padding-bottom: calc(var(--chip-room) + 12px); } /* (what is scrolled to, a focus, a band asked for: clear of them) */
+.front .front__head { z-index: 6; } /* (over the veil: 5, over a card's ribbon and badges, 3 and 4) */
+body:has(.sheet) .front__veil { display: none; } body:has(.sheet) .front .front__head { z-index: auto; } /* (a sheet open in the screen, 5: both under its dim) */
 /* the title's film and live scene stay as they are: the frame is its still's only */
 .screen--title:has(.title__film:not(.title__film--off))::after, .screen--title:has(.title__stage--on)::after { display: none; }
 
@@ -434,9 +446,9 @@ body:has(.netbanner) .screen--title { padding-bottom: var(--chip-room); }
   box-shadow: var(--shadow-btn); transform: rotate(-3deg); pointer-events: none;
 }
 body:has(.sheet) .modetag { visibility: hidden; }
-/* in play: pinned small on the hole's card */
+/* in play: pinned small on the hole's card, over its top edge by a little (tilted, any higher and the window's edge cuts it) */
 .card--hole { position: relative; }
-.card--hole > .modetag { position: absolute; top: -12px; left: -8px; z-index: 1; padding: 0 10px 2px; font-size: 16px; --ink-w: 3px; box-shadow: 0 2px 0 var(--ink); }
+.card--hole > .modetag { position: absolute; top: -7px; left: -8px; z-index: 1; padding: 0 10px 2px; font-size: 16px; --ink-w: 3px; box-shadow: 0 2px 0 var(--ink); }
 @media (max-width: 600px) { .modetag { top: 30px; left: 88px; font-size: 22px; padding: 1px 12px 4px; --ink-w: 4px; } }
 /* the rival raced, stuck under the title, big: their ghosts', the cups', the picker's (one sticker across the steps) */
 .front__head > .dare, .screen--pick .dare { margin: -8px 0 0; padding: 6px 18px; font-size: clamp(16px, 1.6vw, 20px); }
@@ -546,6 +558,12 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: calc(var(--chip-room) 
 .rival__board .lb--full ol { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 14px 12px 22px; scrollbar-gutter: stable both-edges; }
 .rival__board .lb ol > li { display: block; padding: 0; border: 0; background: none; }
 .rival__board .lb li.lb__more { grid-column: 1 / -1; }
+/* its blank places (still read, or nobody yet): one row of them, short (their place, no face: the room a short window
+   leaves the board), the board's own height, never a box cut through them that scrolls */
+.rival__board .lb--full > ol.lb__blank { flex: none; max-height: none; overflow: visible; mask-image: none; animation: none; padding: 8px 12px 4px; }
+.rival__board ol.lb__blank .sticker { min-height: 40px; padding: 6px 14px 6px 22px; }
+.rival__board ol.lb__blank .sticker__face { display: none; }
+.rival__board ol.lb__blank > li:nth-child(n+5) { display: none; }
 /* a player as a sticker (the rival board's, the records to beat): their face, their place over its corner, name, a line */
 .sticker {
   position: relative; display: grid; grid-template: auto auto / auto minmax(0, 1fr); column-gap: 12px; align-items: center; width: 100%; min-height: 72px; padding: 8px 14px 8px 8px;
@@ -575,6 +593,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .mode.rival__pick { grid-template-rows: auto minmax(0, 1fr) auto auto auto; grid-template-areas: "tag tag" "stage show" "name name" "line line" "go go"; }
   .rival__pick .rival__go { justify-self: stretch; margin-top: 8px; text-align: center; }
   .rival__board .lb--full ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rival__board ol.lb__blank > li:nth-child(n+4) { display: none; }
 }
 @media (max-width: 700px) {
   /* a phone: the picks side by side in a row of their own, swiped, the next one peeking in */
@@ -586,6 +605,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .rival__pick .rival__go { justify-self: end; margin-top: 0; padding: 4px 16px 5px; font-size: 16px; }
   .rival__best { font-size: 11.5px; }
   .rival__board .lb--full ol { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .rival__board ol.lb__blank > li:nth-child(n+3) { display: none; }
   .sticker { grid-template: auto auto auto / minmax(0, 1fr); justify-items: center; padding: 10px 8px; text-align: center; }
   .sticker__face { grid-row: auto; }
   .sticker__who, .sticker__sub { max-width: 100%; }

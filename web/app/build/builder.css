@@ -30,9 +30,10 @@
 @media (prefers-reduced-motion: reduce) { .bhead__roll .rival__dice { transition: none; } }
 .bhead__name > input { min-width: 0; width: 100%; border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 20px; font-weight: 700; color: var(--ink); padding: 0 0 2px; text-overflow: ellipsis; }
 .bhead__end { display: flex; align-items: center; gap: var(--sp-3); justify-self: end; }
-@media (max-width: 1100px) { .bhead__end { gap: var(--sp-2); } }
-/* the narrowest (900-1000px): the zones closer, the name's dice gone (the name still typed), so the name keeps a word or two */
-@media (max-width: 1000px) { .bhead, .bhead__start { gap: var(--sp-2); } .bhead__roll { display: none; } }
+/* under 1100: the zones closer and the name a size down, so a starter's name ("Garden Dogleg") is read whole at 1024 */
+@media (max-width: 1100px) { .bhead__end, .bhead, .bhead__start { gap: var(--sp-2); } .bhead__name > input { font-size: 18px; } }
+/* the narrowest (900-1000px): the name's dice gone too (the name still typed), so the name keeps a word or two */
+@media (max-width: 1000px) { .bhead__roll { display: none; } }
 /* Play keeps its width as the reason beside it changes */
 .bhead__act { min-width: 104px; }
 /* the world menu (a small button saying the world, its caret turned while open): the hole moved to another from here (the
@@ -504,23 +505,20 @@ button.tmode__chip:focus-visible { outline: 3px solid var(--ink); outline-offset
 .meter--3 > i > b.on { background: var(--ink-soft); }
 .meter--none { color: var(--ink-soft); }
 
-/* the first run's hints: four short notes by the palette, the green's tool, Play and the steps, gone at the first drag */
-.bhints { position: fixed; inset: 0; z-index: 4; pointer-events: none; } /* (under a sheet: the player's view large) */
-.bhint { position: absolute; display: flex; align-items: center; gap: var(--sp-2); max-width: 260px; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); font-size: 15px; font-weight: 700; color: var(--ink); }
-.bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; } /* (as About's steps) */
-/* never over the 3D (the right column), nor over one another down to 1024 wide: Play's at the board's top right, under the
-   steps'; the palette's lower, by its tiles; the pointer through them all (gone at the first drag) */
-.bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
-.bhint--green { left: calc(var(--palette-w) + 24px); top: 150px; max-width: 180px; } /* (by the palette's Green, narrow: clear of Play's at 1024, of the tee) */
-.bhint--test { right: calc(var(--col-w) + 3 * var(--sp-4)); top: 160px; }
-.bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
+/* the first run's hints: four short notes in their order (the palette, the green's tool, Play, the steps) under the empty piece
+   settings, in the right column's flow: never over the hole, the 3D or one another; the pointer through them, gone at the first drag */
+.bhints { display: grid; gap: 6px; pointer-events: none; } /* (compact: all four in the column at 1280×800, under the 3D and the note) */
+.bhint { display: flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 6px 10px; border: var(--edge); border-radius: 14px; background: var(--white); font-size: 13.5px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+.bhint b { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; } /* (as About's steps) */
 /* the "?": the game's sheet (ui.tsx Sheet: its dim, its X), wider: the first run's hints then the world's pieces (each tile's picture,
    name and what it does) and every key on one screen; it scrolls in itself only in a short window */
-.bgloss { display: flex; flex-direction: column; gap: var(--sp-2); width: min(640px, 100%); max-width: none; max-height: 100%; overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); }
+.bgloss { display: flex; flex-direction: column; gap: var(--sp-2); width: min(800px, 100%); max-width: none; max-height: 100%; overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); }
 .bgloss__hints { display: grid; gap: var(--sp-1); }
 .bgloss p { margin: 0; font-size: 15px; line-height: normal; color: var(--ink); } /* (not the sheet's grey prose) */
 .bhint--in { position: static; max-width: none; padding: 0; border: 0; box-shadow: none; background: none; }
-.bgloss .bgloss__keys { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 600; line-height: 1.7; color: var(--ink); }
+.bgloss .bgloss__keys { margin: var(--sp-1) 0 0; columns: 2 300px; column-gap: var(--sp-4); font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink); }
+.bgloss__keys > div { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: var(--sp-2); padding: 3px 0; break-inside: avoid; }
+.bgloss__keys dt { justify-self: start; } .bgloss__keys dd { margin: 0; }
 /* a key said in words (the glossary, the board's keys, the player's view) */
 :is(.bgloss__keys, .board__keys, .pview__say) kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
 .bgloss__keys kbd { font-weight: 800; }

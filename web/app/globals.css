@@ -1718,6 +1718,7 @@ body .toast.toast--center { top: max(14px, env(safe-area-inset-top)); width: max
 .cup__sum div { padding: 6px 10px; min-width: 58px; }
 .cup__sum dd { margin: 0; font-size: 20px; font-weight: 800; color: var(--green); }
 .cup__next { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.nil { font-weight: 300; color: var(--ink-soft); } /* (a figure not there yet: Golf.tsx Nil) */
 
 /* the menu's head: the cup being played, with a way to another */
 /* a button: the cup being played, the name big on two lines */
@@ -2150,6 +2151,9 @@ body:has(.netbanner) .screen.worlds { padding-bottom: var(--chip-room); } /* the
 .lb__ghosts i, .podium__ghost i { height: 10px; border-radius: 6px; background: rgba(var(--ink-rgb), .1); }
 .lb__ghosts li:nth-child(2) i:first-of-type { width: 70%; }
 .lb__ghosts li:nth-child(3) i:first-of-type { width: 50%; }
+/* read, nobody there: the places alone, no bars (those say it is still read), the first one's words in their place */
+.lb__ghosts--free b, .podium__free { color: var(--ink-soft); font-size: 13px; font-weight: 700; }
+.lb__ghosts--free b { grid-column: 2 / -1; }
 .community ul { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
 
 /* the gnokey fallback of a save: the key's name, then one paste for a terminal */

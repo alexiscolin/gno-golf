@@ -50,8 +50,8 @@ test("legal: one figure, up to the hundredth: the review's Total and the button 
 });
 
 test("legal: a sheet's chain costs, from the review's own estimate; a price's golf number, its tier's own price only", () => {
-  assert.equal(chainCosts({ deposit: 429_001, fee: 60_000 }), "+ ≈0.49 GNOT chain costs, 0.43 back if you burn it");
-  assert.equal(chainCosts({ deposit: 430_000, fee: 70_000 }), "+ ≈0.5 GNOT chain costs, 0.43 back if you burn it");
+  assert.equal(chainCosts({ deposit: 429_001, fee: 60_000 }), "+ ≈0.49 GNOT chain costs: a 0.43 deposit, returned if you ever destroy (burn) the gnome");
+  assert.equal(chainCosts({ deposit: 430_000, fee: 70_000 }), "+ ≈0.5 GNOT chain costs: a 0.43 deposit, returned if you ever destroy (burn) the gnome");
   assert.equal(parLine("common", 36e6), "Why 36 GNOT? It's the par of nine holes.");
   assert.equal(parLine("legendary", 1296e6), "Why 1,296 GNOT? Eighteen holes times par 72.");
   assert.equal(parLine("rare", 80e6), "", "another price: no golf number claimed");

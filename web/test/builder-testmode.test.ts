@@ -92,7 +92,7 @@ void test("publishTip, askSaid, heldSaid: the weathers named, never \"every weat
   assert.equal(publishTip("garden", ["", "wind", "rain"]), "Sink it once in each weather: Clear, Wind and Rain. Players meet them all.");
   assert.equal(publishTip("island", ["", "wind", "rain", "storm"]), "Sink it once in each weather: Clear, Wind, Rain and Storm. Players meet them all.");
   assert.equal(publishTip("garden", ["wind", "rain"]), "Still to sink: Wind and Rain.");
-  assert.equal(askSaid("garden"), "Clear ✓ — next: Wind and Rain. Your address names the hole and sets its weather, so we need it once to go on. Nothing is signed.");
+  assert.equal(askSaid("garden"), "Clear ✓ — next: Wind and Rain. The hole is saved under your gno.land address, and its weather comes from it, so we need it once to go on. Nothing is signed.");
   assert.equal(heldSaid("", ["rain"]), "Your Clear round holds in Rain too ✓");
   assert.equal(heldSaid("", ["wind", "rain"]), "Your Clear round holds in Wind and Rain too ✓");
   assert.equal(heldSaid(null, ["", "wind"]), "Your practice round holds in Clear and Wind ✓");

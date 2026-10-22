@@ -78,7 +78,7 @@ export default function PhoneBuilder() {
           <h3 className="h-section">Community holes</h3>
           {failed ? <p className="bphone__note" role="status">The holes can&apos;t be read right now. Try again in a moment.</p>
             : !lists ? <ul aria-busy="true">{[0, 1, 2].map((k) => <li key={k} className="bphone__row skel" />)}</ul>
-            : !community.length ? <p className="bphone__note">None checked on this device yet.</p>
+            : !community.length ? <p className="bphone__note">No community hole is open yet.</p>
             : <ul>{community.slice(0, shown).map((h) => <Row key={h.id} h={h} keep={keep} sub={holeByline({ author: authorOf(h.id) ?? "", world: h.world, par: h.par })} />)}</ul>}
           {community.length > shown && <Button className="btn--wide" onClick={() => setShown((n) => n + PAGE)}>More community holes</Button>}
           {!failed && <a className={buttonClass({}, "btn--wide")} href={cupsLink(keep)}>Every community hole, in the game</a>}

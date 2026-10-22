@@ -80,19 +80,21 @@ const RaceButton = ({ player, name, me, here, onClick, gold = true }: { player: 
 const ConnectLink = ({ onConnect }: { onConnect?: () => void }) =>
   onConnect ? <button className="linkish" onClick={onConnect}>Connect Adena</button> : <>Connect Adena</>;
 
-/** An empty board's places, drawn blank: the table is there before its first row. */
-const Ghosts = () => (
-  <ol className="lb__ghosts" aria-hidden="true">
+/** An empty board's places, drawn blank: the table is there before its first row. Its bars while it is read;
+ *  read and nobody there (free), its places alone, the first one's words saying it (a board read is never a
+ *  board still loading). */
+const Ghosts = ({ free }: { free?: string }) => (
+  <ol className={free === undefined ? "lb__ghosts" : "lb__ghosts lb__ghosts--free"} aria-hidden="true">
     {Array.from({ length: 3 }, (_, i) => (
       <li key={i}>
         <span className="lb__rank">{i + 1}</span>
-        <i />
-        <i />
-        <i />
+        {free === undefined ? <><i /><i /><i /></> : i === 0 && free && <b>{free}</b>}
       </li>
     ))}
   </ol>
 );
+/** What an empty place says, on the first one, once the board is read with nobody on it. */
+const FREE = "Yours to take";
 
 // The bot check's list (lib/flags.ts), read once a visit when a board opens, from
 // the site's own root (a hole's page is /h/<slot>/). Missing or broken: nobody is hidden,
@@ -555,7 +557,8 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   // your score as a dare says it: a hole's strokes, the course's holes and score against par
   const myBest = myRow || mine, myScore = !myBest ? "" : kind === "hole" ? strokesWord(myBest.strokes) : `${holesWord(myBest.holes || 0)} at ${vsPar(standingVs(myBest))}`;
   // the rows to come, blank: drawn as the rows will be (the rival's stickers, as many as it shows)
-  const ghosts = row ? <ol aria-hidden="true">{Array.from({ length: max || 3 }, (_, i) => <li key={i}><StickerGhost at={i + 1} /></li>)}</ol> : <Ghosts />;
+  // (read, nobody: free, the places with no bars; the rival's, one row of them, never a box that scrolls)
+  const ghosts = (free?: string) => row ? <ol className="lb__blank" aria-hidden="true">{Array.from({ length: max || 3 }, (_, i) => <li key={i}><StickerGhost at={i + 1} free={free} /></li>)}</ol> : <Ghosts free={free} />;
   const title = kind === "hole" ? s.name : "The course";
   const own = !max && !row; // (a board of its own, not the rival's stickers)
   const listedRows = shown ? (whole || !own ? shown.rows.slice(0, max) : shown.rows.slice(0, TOP)) : [];
@@ -601,8 +604,8 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
           </ol>
         </section>
       )}
-      {!rows && !err && ghosts}
-      {rows && rows.length === 0 && (<>{ghosts}<p className="lb__empty late">No saved round yet: {me ? "save one and be the first." : <><ConnectLink onConnect={onConnect} /> and be the first.</>}</p></>)}
+      {!rows && !err && ghosts()}
+      {rows && rows.length === 0 && (<>{ghosts(FREE)}<p className="lb__empty late">No saved round yet: {me ? "save one and be the first." : <><ConnectLink onConnect={onConnect} /> and be the first.</>}</p></>)}
       {/* every row hidden: said, not a blank board */}
       {shown && rows && rows.length > 0 && shown.rows.length === 0 && <p className="lb__empty late">Every record here is flagged.</p>}
       {shown && shown.rows.length > 0 && (
@@ -1044,7 +1047,7 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra, holes = 
             </li>
           ) : (
             <li key={i} aria-hidden="true">
-              <StickerGhost />
+              <StickerGhost at={empty ? i + 1 : 0} free={empty ? (top && top.flagged ? "" : FREE) : undefined} />
             </li>
           );
         })}
@@ -1060,8 +1063,10 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra, holes = 
 const Place = ({ at, plain = false }: { at: number; plain?: boolean }) =>
   <span className={plain && at > 3 ? "lb__rank" : `podium__medal${at <= 3 ? ` podium__medal--${at}` : ""}`}>{at}</span>;
 
-/** A place nobody holds yet, or not yet read: a sticker drawn blank. */
-const StickerGhost = ({ at = 0 }: { at?: number }) => <div className="sticker podium__ghost"><Frame className="sticker__face" />{at > 0 && <Place at={at} />}<i /></div>;
+/** A place nobody holds yet, or not yet read: a sticker drawn blank (its bar while read; free: read, nobody, the
+ *  first place's words in its place). */
+const StickerGhost = ({ at = 0, free }: { at?: number; free?: string }) =>
+  <div className="sticker podium__ghost"><Frame className="sticker__face" />{at > 0 && <Place at={at} />}{free === undefined ? <i /> : at <= 1 && free && <b className="podium__free">{free}</b>}</div>;
 /** A board's player as a sticker: their gnome flat (in their ghost's skin;
  *  yours, your gnome), their place, name and a line under it (sub); a tap
  *  races them (onClick), else it only shows. */
