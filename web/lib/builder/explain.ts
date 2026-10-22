@@ -74,6 +74,15 @@ export function plainOf(i: Pick<Issue, "rule" | "text">): string {
   if ((r = m(/^(.+) comes out, off the board once the hole is fitted$/))) return `${r[1]} comes out off the board: bring its way out inside the hole.`;
   if ((r = m(/^(.+)'s point lies off the board once the hole is fitted$/))) return `${r[1]} has a point off the board: bring it inside the hole.`;
   if ((r = m(/^(.+) comes out, in a zone that moves the ball on$/))) return `${r[1]} comes out where the ball is pushed on: move its way out.`;
+  if ((r = m(/^(.+) comes out, outside the lane$/))) return `${r[1]} comes out outside the lane: move its way out into the lane.`;
+  if ((r = m(/^(.+) comes out, on a wall or a post$/))) return `${r[1]} comes out on a wall or a post: move its way out.`;
+  if ((r = m(/^(.+) comes out, inside (.+)$/))) return `${r[1]} comes out inside ${r[2]}: move its way out.`;
+  if ((r = m(/^(.+) comes out, ([\d.]+) from its own mouth: at least ([\d.]+), .*$/))) return `${r[1]} comes out too close to its own mouth (${r[2]}): move its way out at least ${r[3]} away.`;
+  if ((r = m(/^(.+) lets the ball out, where it can never get back to the cup$/))) return `${r[1]} lets the ball out where it can never get back to the cup: move its way out, or open a way back.`;
+  if ((r = m(/^(.+) sends the ball down, where it can never get back to the cup$/))) return `${r[1]} sends the ball down where it can never climb back to the cup: make it shorter or gentler, or open a way back.`;
+  if ((r = m(/^A jump off (.+) lands the ball, where it can never get back to the cup$/))) return `A jump off ${r[1]} lands the ball where it can never get back to the cup: move it, or open a way back.`;
+  if ((r = m(/^The cup cannot be reached from the tee: (.+) is too long for a ball to climb$/))) return `The ball can't climb ${r[1]} to the cup: make it shorter or gentler.`;
+  if ((r = m(/^(.+) comes back on a ball beside (.+) and would push it in: at least ([\d.]+) between them$/))) return `${r[1]} would push a ball into ${r[2]} as it comes back: leave at least ${r[3]} between them.`;
   if ((r = m(/^(.+)'s (.+) is (-?[\d.]+): (-?[\d.]+) to (-?[\d.]+)$/))) return `${r[1]}'s ${r[2]} is ${r[3]}: make it ${r[4]} to ${r[5]}.`;
   if ((r = m(/^Too many (pieces|moving pieces): \d+ of (\d+)$/)) && i.rule === "E16") return `A Builder hole holds ${r[2]} ${r[1]} at most: ${r[1] === "pieces" ? "remove one to add another" : "remove one, or make one still"}.`;
   if ((r = m(/^(.+) is on for (\d+) of (\d+) (\w+): (\d+) to (\d+)$/))) return `${r[1]} is on ${r[2]} of ${r[3]} ${r[4]}: make it ${r[5]} to ${r[6]}.`;

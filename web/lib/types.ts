@@ -293,6 +293,8 @@ export interface Ghost extends Versioned {
   hole: string;
   mode: Mode;
   player: string;
+  /** the block the best was set at */
+  height?: number;
   strokes: number;
   period: number;
   shots: string;

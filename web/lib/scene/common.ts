@@ -4,6 +4,7 @@
 // the scene files import it without importing each other (and without cycles).
 import type * as THREE from "three";
 import type { Height, Hole } from "./data";
+import type { Vec2, Zone } from "../types";
 
 /** A random in [0, 1): seeded() makes one. */
 export type Rand = () => number;
@@ -53,3 +54,18 @@ export function tangentInto(c: THREE.Curve<THREE.Vector3>, u: number, out: THREE
   c.getPoint(Math.min(1, u + 1e-4), out);
   return out.sub(tmp).normalize();
 }
+
+/** A zone's outline, as the chain has it: its polygon, its ellipse (n points round its box) or its rectangle. */
+export function outlineOf(z: Pick<Zone, "min" | "max"> & Partial<Pick<Zone, "round" | "poly">>, n = 72): readonly Vec2[] {
+  if (z.poly && z.poly.length > 2) return z.poly;
+  const [x0, z0] = z.min, [x1, z1] = z.max;
+  if (!z.round) return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hx = (x1 - x0) / 2, hz = (z1 - z0) / 2;
+  return Array.from({ length: n }, (_, i): Vec2 => [cx + Math.cos((i / n) * Math.PI * 2) * hx, cz + Math.sin((i / n) * Math.PI * 2) * hz]);
+}
+
+/** How a drop (a crevasse, a cliff, a gap) is drawn and cut: "rim" round its own outline (round, or a polygon: the
+ *  Builder's; it cuts no rail, its box's corners are ground), "edge" all its box but a polygon (everything but the
+ *  lane: the lane's own walls run along it, it cuts none either), "straight" its box (it cuts the rails it crosses). */
+export const dropOf = (z: Partial<Pick<Zone, "round" | "poly" | "outside">>): "rim" | "edge" | "straight" =>
+  z.round || (z.poly && z.poly.length > 2 && !z.outside) ? "rim" : z.poly && z.poly.length > 2 ? "edge" : "straight";

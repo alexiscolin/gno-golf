@@ -100,7 +100,8 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
   },
   hazard: {
     "": {}, water: {}, wave: {}, lagoon: {}, tidepool: {}, fountain: {}, canal: {},
-    // (the serac's ice falls now and then, its shadow before it)
+    // (the serac's ice falls now and then, its shadow before it; a cliff and a crevasse round or a polygon are drawn
+    // along their own outline, mountain.ts crevasseRim, never their box's)
     cliff: {}, serac: { clocks: ["substep", "fixed"] }, crevasse: {},
   },
   loop: {},

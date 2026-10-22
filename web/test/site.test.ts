@@ -2,7 +2,7 @@
 // cups' names as the pages say them (the Crystal Mines among them).
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { SITE, siteURL, siteHost, cupName, CUPS } from "../lib/site.ts";
+import { SITE, siteURL, siteHost, cupName, CUPS, ISSUES, reportHole } from "../lib/site.ts";
 
 const w = globalThis as { window?: unknown };
 const at = (href: string) => {
@@ -37,4 +37,13 @@ test("cupName: the course's cups by their names, the mines last; any other world
   assert.deepEqual([...CUPS], ["garden", "island", "town", "mountain", "mines"]);
   assert.deepEqual(CUPS.map(cupName), ["Garden Cup", "Island Cup", "Mushroom Town", "Mountain Cup", "Crystal Mines"]);
   assert.equal(cupName("extras"), "Extras");
+});
+
+test("reportHole: an issue titled with the hole's id, its body a link that plays it and why left to say", () => {
+  at("https://gnogolf.xyz/");
+  const id = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5/avalanche/v1", u = new URL(reportHole(id));
+  assert.equal(u.origin + u.pathname, ISSUES);
+  assert.equal(u.searchParams.get("title"), `Report: ${id}`);
+  const body = u.searchParams.get("body") || "";
+  assert.ok(body.includes(`Play it: https://gnogolf.xyz/?hole=${id}`) && body.includes("Why?"));
 });

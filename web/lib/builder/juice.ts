@@ -6,7 +6,7 @@
 // far a dragged piece leans. The sounds are the game's own (feel.ts sound).
 import { inZone } from "../terrain";
 import { entryParts } from "./gg1";
-import type { Draft, V } from "./draft";
+import { shapeOfPiece, type Draft, type V } from "./draft";
 
 /** f, run at most once every ms (now: the clock, performance.now's by default). */
 export function throttle(f: () => void, ms: number, now: () => number = () => performance.now()) {
@@ -63,8 +63,8 @@ export function reactionAt(d: Pick<Draft, "pieces">, at: V): "ripple" | "puff" |
   for (const p of [...d.pieces].reverse()) {
     const g = p.geometry, kind = entryParts(p.entry).kind;
     if (g.t === "rail" || g.t === "bar" || g.t === "post" || (kind !== "hazard" && kind !== "surface" && kind !== "slope")) continue;
-    const z = g.t === "poly" ? { min: [Math.min(...g.pts.map((q) => q[0])), Math.min(...g.pts.map((q) => q[1]))], max: [Math.max(...g.pts.map((q) => q[0])), Math.max(...g.pts.map((q) => q[1]))], poly: g.pts, outside: !!g.outside } : { min: g.min, max: g.max, round: g.t === "round" };
-    if (inZone(z as Parameters<typeof inZone>[0], at[0], at[1])) return kind === "hazard" ? "ripple" : "puff";
+    const z = shapeOfPiece(g);
+    if (z && inZone(z, at[0], at[1])) return kind === "hazard" ? "ripple" : "puff";
   }
   return "dust";
 }

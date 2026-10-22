@@ -8,7 +8,7 @@ import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/en
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
-import { NOT_BUILDER } from "@/lib/community";
+import { MODES, NOT_BUILDER, NOT_HOLED } from "@/lib/community";
 import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, BYTE_PRICE, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
@@ -16,7 +16,7 @@ import type { Skin } from "@/lib/scene/gnome";
 import type { Ghost, HoleRow, Mode } from "@/lib/types";
 import { duelResult, duelShare, pickGhost, raceLeft, type Duel } from "@/lib/duel";
 import { saveLine } from "@/lib/featured";
-import { SHARE_TAGS } from "@/lib/site";
+import { reportHole, SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
@@ -46,7 +46,7 @@ import { savedCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, 
 import { darkGallery, minesOrder } from "@/lib/scene/data";
 import { SHOP, SHOP_LINE, pick, pickOf } from "@/lib/gnomes/door";
 import type { Worn } from "@/lib/gnomes/shop";
-import { buildLink, endpoints } from "@/lib/builder/holes";
+import { authorOf, buildLink, endpoints } from "@/lib/builder/holes";
 import { CollectionSection, Collector, Owned, PromoLine, ShopScreen as Shop, askWorn, shopPart, useSale, useShopPart, useShopSkin } from "@/components/gnomes/Door";
 import { builderOn } from "@/lib/builder/route";
 import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
@@ -272,6 +272,7 @@ const BANNER = {
   draw: ["That hole could not be drawn", "Something broke on our side while building it. Pick another hole from the menu — your scores are safe."],
   limit: ["That is the most strokes a round holds", "Restart the hole to play it again."],
   unchecked: ["That hole can't be played here", `${NOT_BUILDER} Pick another one from the menu.`],
+  unheld: ["That hole isn't open yet", `${NOT_HOLED} Pick another one from the menu.`],
   shot: ["That shot did not go through", "The chain could not play that shot. Nothing was lost; you can shoot again."],
 } as const satisfies Record<FatalKind | ErrorKind, readonly [string, string]>;
 
@@ -547,6 +548,19 @@ export default function Golf() {
   // playing for real: who is connected, and where the current round's record is
   const [real, setReal] = useState<WalletFrom | false>(false); // the explainer is open, and from where
   const [account, setAccount] = useState<Account | null>(null);
+  const selfRef = useRef<string | null>(null);
+  selfRef.current = account?.address ?? null;
+  // a link to a hole its author has not holed yet, refused before the wallet came back: theirs once their account is
+  // known (the wallet's restore comes later than the link's judging), so judged again then, and opened if it is
+  const unheldLink = useRef("");
+  useEffect(() => {
+    const link = unheldLink.current, me = account?.address;
+    if (!link || !me || authorOf(link) !== me || !game.current) return;
+    unheldLink.current = "";
+    setRestoreNote(null);
+    void game.current.load(link);
+    setScreen("pick");
+  }, [account?.address]);
   // the connected wallet's records, read at each visit: on a new device or cleared data the holes this
   // browser has no score for filled from the chain, then only what was saved since (played elsewhere:
   // a New game or a reset is not filled back); the cups, gnomes and badges follow, said wherever the
@@ -710,6 +724,8 @@ export default function Golf() {
           if (!cold.current || !sameCold(cold.current, snap)) setS((cold.current = snap));
         },
         onHoled: ({ id, strokes }: { id: string; strokes: number }) => holedRef.current(id, strokes),
+        // (the account connected: a community hole of theirs plays before they hold a best on it)
+        self: () => selfRef.current,
         });
       } catch (err) {
         // no WebGL here (hardware acceleration off, a blocklisted GPU, Lockdown Mode)
@@ -742,10 +758,11 @@ export default function Golf() {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first), a cup's from its first, on the picker; a link to
             // nothing lands on the cups, quietly
-            if (!to || to === "taken" || to === "unchecked") {
+            if (!to || to === "taken" || to === "unchecked" || to === "unheld") {
               setScreen("worlds");
               if (to === "taken") setRestoreNote("This hole was taken down."); // (nothing of it shown: no name, no note, no author)
               if (to === "unchecked") setRestoreNote(NOT_BUILDER); // (a community hole the Builder's rules do not pass: nothing of it shown either)
+              if (to === "unheld") (setRestoreNote(NOT_HOLED), (unheldLink.current = typeof cfg.hole === "string" ? cfg.hole : "")); // (one its author has not holed yet: it opens once they have; to them, once their account is known)
             }
             // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo;
             // so does the picker's own address)
@@ -1642,6 +1659,7 @@ export default function Golf() {
           onAbout={() => setAbout(true)}
           community={s.community}
           chain={game.current && game.current.chain}
+          me={account && account.address}
           racing={dare && !solo && <p className="dare">Racing {rivalName}</p>}
           next={(c) => toPlay[c][0]?.name}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onOpen={() => setBoard(true)}
@@ -1696,6 +1714,11 @@ export default function Golf() {
                 <a className="src" href={s.source} target="_blank" rel="noopener noreferrer">
                   read its code ↗
                 </a>
+                {!s.official && s.id && (
+                  <a className="src" href={reportHole(s.id)} target="_blank" rel="noopener noreferrer">
+                    report it ↗
+                  </a>
+                )}
               </div>
             </div>
             {/* in a duel: a row each (the player's first; theirs played so far, of the total to beat), what is left, and a tap to look at their ball (again: back to yours) */}
@@ -1795,6 +1818,8 @@ export default function Golf() {
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen(cupsScreen); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.cups}</svg>All cups</Button>
                     <Button variant="secondary" aria-label="Change gnome" onClick={() => { setMenu(false); setScreen("pick"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.gnome}</svg>Gnome</Button>
                   </div>
+                  {/* a community hole: reported as an issue on the repository (the site can take it down: takedown.ts) */}
+                  {!s.official && s.id && <a className="src drawer__report" href={reportHole(s.id)} target="_blank" rel="noopener noreferrer">Report this hole ↗</a>}
                 </section>
                 <section className="drawer__settings" aria-label="Settings">
                   <span className="eyebrow">Settings</span>
@@ -2363,7 +2388,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
     setSavedRead(!chain || !me);
     if (!chain || !me) return setSavedAny(false);
     let live = true;
-    void Promise.allSettled((["assisted", "pro"] as const).map((m) => within(chain.rank(m, me)).then((r) => live && r.holes > 0 && setSavedAny(true)))).then(() => live && setSavedRead(true));
+    void Promise.allSettled(MODES.map((m) => within(chain.rank(m, me)).then((r) => live && r.holes > 0 && setSavedAny(true)))).then(() => live && setSavedRead(true));
     return () => void (live = false);
   }, [chain, me]);
   const installed = hasAdena();

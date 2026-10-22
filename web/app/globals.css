@@ -317,6 +317,9 @@ html, body {
   color: var(--green);
 }
 
+.src + .src { margin-left: 10px; }
+.drawer__report { display: inline-block; margin-top: 12px; }
+
 /* the burger: same toon language as the cards — ink border, hard shadow */
 .burger {
   width: 76px;

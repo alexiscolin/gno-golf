@@ -16,6 +16,10 @@ export type Geometry =
   | { t: "rect"; min: V; max: V }
   | { t: "round"; min: V; max: V }
   | { t: "poly"; pts: V[]; outside?: boolean };
+/** A zone piece's shape as terrain.ts inZone reads it (a polygon's box closed a hair past its points); null for a rail, a bar, a post. */
+export const shapeOfPiece = (g: Geometry) =>
+  g.t === "poly" ? { min: [Math.min(...g.pts.map((q) => q[0])), Math.min(...g.pts.map((q) => q[1]))] as V, max: [Math.max(...g.pts.map((q) => q[0])) + 1e-9, Math.max(...g.pts.map((q) => q[1])) + 1e-9] as V, round: false, poly: g.pts, outside: !!g.outside }
+  : g.t === "rect" || g.t === "round" ? { min: g.min, max: g.max, round: g.t === "round" } : null;
 /** A piece's settings, each within its entry's ranges: dir a slope's push (a unit of the lattice), to a tunnel's or a loop's way out. */
 export interface Params {
   bounce?: number;

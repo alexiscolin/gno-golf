@@ -7,7 +7,7 @@ import { state, report } from "./state";
 import type { Census, PieceRef } from "./census";
 import { timeOf, islandBox } from "./camera";
 import { bush, stone, flower, tuft, mole, windmill, smokeBatch } from "./props";
-import { seeded, GRASS } from "./common";
+import { seeded, GRASS, dropOf } from "./common";
 import { roughOf } from "./garden";
 import { worldOf, drawnBy, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "./worlds";
 import { WEATHER_SKINS } from "./weather";
@@ -261,9 +261,9 @@ function openings(w: WallLike, zones: readonly Zone[] | undefined, lines: readon
   // a gap across the lane (a crevasse, a ditch) cuts through whatever
   // crosses it: the rails fell in too
   const strips: Strip[] = [];
-  // (a polygon gap, "everything but the lane", cuts nothing: the lane's own
-  // walls run along its edge)
-  for (const z of zones || []) if (GAPS.has(z.skin) && !z.poly) strips.push([z.min[0], z.max[0], z.min[1] - 1, z.max[1] + 1]);
+  // (a polygon gap, "everything but the lane", cuts nothing: the lane's own walls run along its edge; a round or
+  // polygon one, the Builder's, cuts nothing either: its box's corners are ground, the rails there walls: common.ts dropOf)
+  for (const z of zones || []) if (GAPS.has(z.skin) && dropOf(z) === "straight") strips.push([z.min[0], z.max[0], z.min[1] - 1, z.max[1] + 1]);
   // (and where a tram's rails cross it: a level crossing, a low curb instead)
   strips.push(...lines);
   const inlet = (zones || []).some((z) => z.skin === "sea" && z.poly && !z.outside);

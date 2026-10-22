@@ -26,6 +26,14 @@ export const MAX_BOUNCE = 0.75;
 export const MIN_RAMP = 0.12;
 /** physics.MaxMove: a zone a fast ball cannot step over is at least this deep along its way. */
 export const MAX_MOVE = 1.5;
+/** physics.SpeedCap: the fastest a ball goes, per substep, whatever kicked it or ran it downhill. */
+export const SPEED_CAP = 8;
+/** course.Kick: a full stroke (power 10) launches the ball at KICK·10^¾ per substep. */
+export const KICK = 0.79;
+/** physics.Rolling's calibration (RollSpeed, RollDrag, keepBonus, maxKeep): the green's rolling resistance under a surface of scale s is ((1 − min((friction+bonus)·s, keep))·speed + drag/s)·G. */
+export const ROLL = { speed: 1.8, drag: 0.08, bonus: 0.05, keep: 0.98 } as const;
+/** physics.Rolling: the rolling resistance of a green of friction f under a surface of scale s (1: plain grass). */
+export const rolling = (f: number, s = 1) => (1 - Math.min((f + ROLL.bonus) * s, ROLL.keep)) * ROLL.speed + ROLL.drag / s;
 /** course.Decode: a hole's par (Strokes) is at most this. */
 export const MAX_PAR = 19;
 /** golf's minShotWork: the work a commit's first shot may do in its dearest weather, four fifths of physics.MaxWork. */

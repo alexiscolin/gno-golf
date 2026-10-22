@@ -22,6 +22,9 @@ export const siteHost = () => new URL(siteURL()).host;
 
 /** A new issue on the game's repository: feedback, a record hidden by mistake. */
 export const ISSUES = "https://github.com/alexiscolin/gno-golf/issues/new";
+/** A community hole reported: a new issue, its title and body filled in (the hole's id, a link that plays it, why left to say). */
+export const reportHole = (id: string) =>
+  `${ISSUES}?title=${encodeURIComponent(`Report: ${id}`)}&body=${encodeURIComponent(`Hole: ${id}\nPlay it: ${siteURL(`?hole=${id}`)}\n\nWhy? (offensive name or note, impossible to hole, broken, other)\n`)}`;
 
 // the home page's words, also its text for crawlers (app/intro.tsx): a title
 // of 50-60 characters and a description under 160, as search results show them

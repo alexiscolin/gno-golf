@@ -20,6 +20,7 @@ import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
 import { aboutGnot, connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { BYTE_PRICE, makeChain, wait } from "@/lib/chain";
+import { keepOwn } from "@/lib/community";
 import { explain } from "@/lib/builder/explain";
 import { endpoints, playLink } from "@/lib/builder/holes";
 import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
@@ -130,8 +131,12 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
   // after a signature: the chain read until it names the new version
   const land = async () => {
     setSent("landing");
+    // (sent: Adena's answer, or gnokey's "I ran it": this browser may play its version before its author holds a best on
+    // it, lib/community.ts keepOwn; its alias, the link it is shared by, only once the chain names it: never one a
+    // transaction that failed would let this browser play before its author holds it)
+    await keepOwn(chain, id);
     for (const t0 = Date.now(); Date.now() - t0 < LAND_MS && live.current; await wait(3000)) {
-      if ((await chain.current(alias).catch(() => "")) === id) return (setSent("done"), onDone(id));
+      if ((await chain.current(alias).catch(() => "")) === id) return (await keepOwn(chain, id, true), setSent("done"), onDone(id));
     }
     if (live.current) (setSent(""), setWhy("The chain does not show it yet. If you signed, give it a minute and look again."));
   };
@@ -173,7 +178,7 @@ export default function Publish({ host, draft, author, next, onDraft, onRetest, 
         <section className="col pub__doneform">
           <h2>{name} is on gno.land!</h2>
           {strokes > 0 && <p className="pub__beat">{beatLine(strokes)}: your own round is the one to beat.</p>}
-          <p>Play it for real: your best becomes the ghost your friends race.</p>
+          <p>Play it for real: your best becomes the ghost your friends race. Others see it once you have holed it and saved the round.</p>
           <a className={buttonClass({ variant: "gold" })} href={playLink(holeRow(id, draft))}>Play it for real</a>
           <Share {...holeShare(name, id, strokes)} label="Share it" />
           <button type="button" className="linkish" onClick={card}>Save its card</button>

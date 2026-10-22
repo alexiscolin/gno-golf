@@ -146,8 +146,10 @@ const proxy = (color = 0xffffff, opacity = 1): Proxy => {
 const HIDE = new THREE.Matrix4().makeScale(0, 0, 0);
 
 /** The puddles as one fan each: the chain's ellipse, every spoke from its
- *  middle stopped where the lane ends (dry: where rain can lie). */
-function puddleGeo(zones: readonly Zone[], dry: (x: number, z: number) => boolean) {
+ *  middle stopped where the lane ends (dry: where rain can lie), each point
+ *  just over the ground there (ground: the course's height; the chain lays
+ *  puddles on slopes too, which stand above the plain lane). */
+function puddleGeo(zones: readonly Zone[], dry: (x: number, z: number) => boolean, ground: (x: number, z: number) => number = () => 0) {
   const pos: number[] = [], N = 24;
   for (const q of zones) {
     const cx = (q.min[0] + q.max[0]) / 2, cz = (q.min[1] + q.max[1]) / 2, rx = (q.max[0] - q.min[0]) / 2, rz = (q.max[1] - q.min[1]) / 2;
@@ -161,7 +163,7 @@ function puddleGeo(zones: readonly Zone[], dry: (x: number, z: number) => boolea
     }
     for (let k = 0; k < N; k++) {
       const a = rim[k], b = rim[(k + 1) % N];
-      pos.push(cx, 0.03, cz, b[0], 0.03, b[1], a[0], 0.03, a[1]);
+      pos.push(cx, ground(cx, cz) + 0.03, cz, b[0], ground(b[0], b[1]) + 0.03, b[1], a[0], ground(a[0], a[1]) + 0.03, a[1]);
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -266,6 +268,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   group.add(puddleMesh);
   let wet = 0; // how far the puddles have gathered, 0..1
   let green: (x: number, z: number) => boolean = () => true; // where the lane is: puddles and splashes stay on it
+  let ground: (x: number, z: number) => number = () => 0; // the course's height there: puddles and splashes lie on it
   const onLane = (x: number, z: number, r = 0) => green(x, z) && green(x - r, z) && green(x + r, z) && green(x, z - r) && green(x, z + r);
   // fog banks drifting low over the course: soft blobs on planes turned to the camera
   const bankMat = new THREE.MeshBasicMaterial({ map: blob(), color: 0xeef2ef, transparent: true, opacity: 0.55, depthWrite: false });
@@ -440,8 +443,9 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       this.set(lastZones, lastFc);
     },
     /** The board it hangs over: rain falls there and a little around. */
-    board(w: number, h: number, world = "garden", onGreen: (x: number, z: number) => boolean = () => true) {
+    board(w: number, h: number, world = "garden", onGreen: (x: number, z: number) => boolean = () => true, height: (x: number, z: number) => number = () => 0) {
       green = onGreen;
+      ground = height;
       cave = world === "mines";
 
       // the draught's streaks dusty in the cave, white elsewhere (the alpha is per frame)
@@ -500,7 +504,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       // there), cut at the lane's edge: none spills over its side or the water
       const pz = raining ? (zones || []).filter((q): q is Zone => q.skin === "puddle" && !!q.min && !!q.max) : [];
       puddleMesh.geometry.dispose();
-      puddleMesh.geometry = puddleGeo(pz, green);
+      puddleMesh.geometry = puddleGeo(pz, green, ground);
       // in the cave, a puddle beside the lava steams: the banks, small, rising off it
       const lava = cave ? (zones || []).filter((q): q is Zone => q.skin.startsWith("lava") && !!q.min && !!q.max) : [];
       steam = pz.filter((q) => lava.some((l) => Math.max(l.min[0] - q.max[0], q.min[0] - l.max[0], l.min[1] - q.max[1], q.min[1] - l.max[1]) < 3))
@@ -608,7 +612,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
             const lands = cave ? drip.filter(([a, b]) => onLane(a, b)) : [];
             if (lands.length) [x, z] = lands[Math.floor(Math.random() * lands.length)];
             else for (let k = 0; k < 6 && !onLane(x, z); k++) (x = Math.random() * W), (z = Math.random() * H);
-            sp.m.position.set(x, 0.04, z);
+            sp.m.position.set(x, ground(x, z) + 0.04, z);
           }
           sp.m.scale.setScalar(1 + sp.t * 3);
           sp.m.material.opacity = 0.7 * (1 - sp.t);

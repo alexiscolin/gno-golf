@@ -32,7 +32,7 @@ import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
 import { NO_TAKEN, takedownOf, takenDown } from "./takedown";
-import { communityOf, NOT_BUILDER, playable, refused } from "./community";
+import { communityOf, gateOf, type Gate } from "./community";
 import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
@@ -73,6 +73,8 @@ export interface GameOptions {
   onChange?: (snap: Snapshot) => void;
   /** the ball dropped: the hole, the strokes, and the round's shots (the last among them: a snapshot says it only after) */
   onHoled?: (r: { id: string; strokes: number; shots: readonly string[] }) => void;
+  /** the player's address, if known (the account connected): a community hole of theirs plays before they hold a best on it */
+  self?: () => string | null;
 }
 
 /** A thrown value's message, for the HUD. */
@@ -92,7 +94,7 @@ const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing o
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
 
-export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, renderer: lent, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
+export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, renderer: lent, log: logCam = false, onChange = () => {}, onHoled = () => {}, self = () => null }: GameOptions = {}) {
   const chain = given ?? makeChain({ rpc, web });
 
   const renderer = lent ?? makeRenderer(canvas), lentDpr = renderer.getPixelRatio();
@@ -598,7 +600,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     ahead = null;
     return a && a.id === id && performance.now() - a.at < PREFETCH_MS ? a.p.catch(() => chain.state(id)) : chain.state(id);
   }
-  async function load(id: string) {
+  /** Loads hole id; passed: a link's gate already said it plays (start's: one judgement a link). */
+  async function load(id: string, passed = false) {
     const ticket = ++loads;
     // any shot in the air belongs to the old hole: end its round, but ask the
     // chain nothing for it (the new hole's round starts once it is built)
@@ -607,15 +610,16 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     // browser, the Builder's code loaded only then): anyone can publish one with gnokey, past the Builder.
     // Every way into a hole comes here (a link, the cups' list, Next); nothing of a refused one is built.
     // Its data or the rules not read now is no verdict: the hole did not load, with Try again
-    let ok: boolean;
+    // (and, until its author holds a best on it, a community hole is not played, but by its author: lib/community.ts gateOf)
+    let gate: Gate = "";
     try {
-      ok = await playable(chain, id);
+      if (!passed) gate = await gateOf(chain, id, undefined, self());
     } catch (err) {
       if (ticket === loads && alive) (g.failed = id), fail(err, "load");
       return;
     }
-    if (!ok) {
-      if (ticket === loads && alive) fail(new Error(NOT_BUILDER), "unchecked");
+    if (gate) {
+      if (ticket === loads && alive) fail(new Error(gate), gate);
       return;
     }
     if (ticket !== loads || !alive) return;
@@ -704,7 +708,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     setLighting(scene, course.userData.time);
     headlamp(ball, s.world === "mines"); // any gnome clips a lamp on in the mines (the Miner's is always lit)
     // a hole's own weather, until a stroke's forecast says otherwise
-    weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.dry || course.userData.terrain.onGreen);
+    weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.dry || course.userData.terrain.onGreen, course.userData.height);
     // the round's weather: the chain's forecast for its five minutes
     g.period = s.period;
     g.forecast = s.weather || null;
@@ -1454,11 +1458,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
   /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
   const takedown = () => takedownOf(chain).catch(() => NO_TAKEN);
 
-  // a link to a community hole the Builder's rules do not pass lands on the cups, and says so (load refuses it too)
-  const unchecked = () => start(null).then((to) => (to === null ? "unchecked" : to));
+  // a link to a community hole refused (lib/community.ts gateOf: "unchecked", "unheld") lands on the cups, and says which
+  const refusedLink = (gate: Gate) => start(null).then((to) => (to === null ? gate || null : to));
+  // a link's gate, once (null: not read now: load asks again, and says it did not load)
+  const linkGate = (id: string): Promise<Gate | null> => gateOf(chain, id, undefined, self()).catch(() => null);
 
-  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, "unchecked" for a community hole the Builder's rules do not pass, null for a link to nothing). */
-  async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | "unchecked" | null> {
+  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, "unchecked" for a community hole the Builder's rules do not pass, "unheld" for one its author has not holed yet, null for a link to nothing). */
+  async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | "unchecked" | "unheld" | null> {
     // the takedown list (the site's file, the node's chain id) read beside the hole list, never before it:
     // the community's list fills once it is known, and only a link to a community hole waits for it
     const taking = takedown().then((t) => {
@@ -1482,8 +1488,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     // an older archived version, past what Holes() lists: the chain may
     // still have it, so it is asked for; one it has not lands on the cups
     if (!asked && typeof link === "string" && link) {
-      if (await refused(chain, link)) return unchecked(); // (not read now, or a link to nothing: loaded, and it fails)
-      await load(link);
+      const gate = await linkGate(link);
+      if (gate) return refusedLink(gate); // (not read now, or a link to nothing: loaded, and it fails)
+      await load(link, gate === "");
       if (!alive) return null;
       if (g.s) {
         g.linked = true;
@@ -1493,14 +1500,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       g.error = null;
       g.failed = null;
     }
-    if (asked && (await refused(chain, asked.id))) return unchecked();
+    const gate = asked ? await linkGate(asked.id) : null;
+    if (gate) return refusedLink(gate);
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
     const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;
     const cupLink = cupWant && g.list.some((h) => cupOf(h) === cupWant) ? cupWant : "";
     g.world = asked ? cupOf(asked) : cupLink || g.world || "garden";
     const first = asked || inWorld()[0] || g.list[0];
-    await load(first.id);
+    await load(first.id, !!asked && gate === "");
     if (!g.s) throw new Error(g.error || "the first hole could not be loaded");
     requestAnimationFrame(frame);
     // (a cup and a place in it that is not there: a link to nothing)

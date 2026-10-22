@@ -14,7 +14,7 @@ import { timeOf } from "./camera";
 import { hidesPlay } from "./sight";
 import { gnomelet, bunting, stone, smoke } from "./props";
 import { bakeLocal, look, weatherLooks, instances } from "./bake";
-import { seeded, lookSeed, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
+import { seeded, lookSeed, ISLAND, GRASS, placer, onGround, tangentInto, dropOf, outlineOf, type Rand } from "./common";
 import { ud, type Hole, type Height } from "./data";
 import { GAP_Y, type Bar, type Skins } from "./worlds";
 import type { Terrain } from "../terrain";
@@ -1637,94 +1637,130 @@ function iceCave(r: number) {
 }
 const ICE_SOLID = share(new THREE.MeshPhongMaterial({ color: 0xbfe6f4, emissive: 0x6fb4d6, emissiveIntensity: 0.3, shininess: 90, specular: 0xffffff }));
 
+/** Whether a zone runs the board's whole depth (z 0 to h): a straight drop that splits the lane, into the mountain. */
+const acrossBoard = (z: Pick<Zone, "min" | "max">, s: Hole) => z.min[1] <= 0.01 && z.max[1] >= s.board.h - 0.01;
 /** Where a crevasse splits the lane, across it: the [x0, x1] of each. */
-// (only one that crosses the whole board runs on into the mountain; one inside
-// the lane, like mountain17's, stays the lane's)
-const crevasses = (s: Hole) => (s.zones || []).filter((z) => z.skin === "crevasse" && z.min[1] <= 0.01 && z.max[1] >= s.board.h - 0.01).map((z): [number, number] => [z.min[0], z.max[0]]);
+// (only a straight one that crosses the whole board runs on into the mountain; one inside
+// the lane, like mountain17's, stays the lane's; a round or polygon one never splits it, even from edge to edge: it is
+// drawn round its own outline, crevasseRim)
+const crevasses = (s: Hole) => (s.zones || []).filter((z) => z.skin === "crevasse" && dropOf(z) !== "rim" && acrossBoard(z, s)).map((z): [number, number] => [z.min[0], z.max[0]]);
+
+/** How a drop round its own outline looks (crevasseRim): its walls from the lip down, its floor, icicles under its lip. */
+type Rim = { lip: THREE.Color; foot: THREE.Color; floor: number; icicles: boolean };
+/** A crevasse's: pale ice at the lip down to deep navy, a dark floor. A cliff's (cliff): dark rock at the top going into mist, a pale floor. */
+const ICE_RIM: Rim = { lip: new THREE.Color(0xd8f1fb), foot: new THREE.Color(0x10243e), floor: 0x0c1a2e, icicles: true };
+const ROCK_RIM: Rim = { lip: new THREE.Color(0x4d5d72), foot: new THREE.Color(0xc9d7e6), floor: 0xdfe8f1, icicles: false };
+/** A drop's sheets as they are built: its walls (strata, coloured), its snow cornice, and the icicles hung under it. */
+type DropMesh = { walls: number[]; wcol: number[]; widx: number[]; cpos: number[]; cidx: number[]; g: THREE.Group };
+const dropMesh = (): DropMesh => ({ walls: [], wcol: [], widx: [], cpos: [], cidx: [], g: new THREE.Group() });
+const tone = new THREE.Color(); // (a wall's vertex colour, worked out in place)
+/**
+ * One side of a drop, from a to b, its normal n into the drop: a strata wall
+ * from the ground down to GAP_Y, jagged (jag) or plain, and (lip) the snow
+ * cornice along its top overhanging the drop, icicles under it (look's). The
+ * cornice's wobble runs on from `from` along the side.
+ */
+function dropSide(out: DropMesh, a: Vec2, b: Vec2, n: Vec2, t: { height: Height }, look: Rim, rand: Rand, { jag = true, lip = true, from = 0 } = {}) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, D = GAP_Y, rows = 6, P = 7;
+  const m = Math.max(1, Math.ceil(L / 0.6)), base = out.walls.length / 3;
+  for (let j = 0; j <= rows; j++)
+    for (let i = 0; i <= m; i++) {
+      const u = i / m, v = j / rows, off = jag && j && j < rows ? (rand() - 0.5) * 0.35 : 0;
+      const x = a[0] + (b[0] - a[0]) * u + n[0] * off, zz = a[1] + (b[1] - a[1]) * u + n[1] * off, top = t.height(x, zz) - 0.05;
+      out.walls.push(x, top + (D - top) * v, zz);
+      tone.copy(look.lip).lerp(look.foot, Math.pow(v, 0.7));
+      out.wcol.push(tone.r, tone.g, tone.b);
+    }
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < m; i++) {
+      const q = base + j * (m + 1) + i;
+      out.widx.push(q, q + m + 1, q + 1, q + 1, q + m + 1, q + m + 2);
+    }
+  if (!lip) return;
+  // the lip: one continuous rounded cornice along the edge, a half-ellipse across it from the land over the drop
+  const n2 = Math.max(1, Math.ceil(L / 0.25)), cbase = out.cpos.length / 3;
+  for (let k = 0; k <= n2; k++) {
+    const u = k / n2, ex = a[0] + (b[0] - a[0]) * u, ez = a[1] + (b[1] - a[1]) * u, y = t.height(ex - n[0] * 0.3, ez - n[1] * 0.3);
+    const w = from + u * L, wob = 1 + 0.12 * Math.sin(w * 2.3) + 0.08 * Math.sin(w * 5.1);
+    for (let q = 0; q <= P; q++) {
+      const ang = Math.PI * (q / P), off = -Math.cos(ang) * 0.32 * wob - 0.05, hgt = Math.sin(ang) * 0.2 * wob;
+      out.cpos.push(ex + n[0] * off, y + hgt - 0.03, ez + n[1] * off);
+    }
+    if (k) for (let q = 0; q < P; q++) {
+      const a0 = cbase + (k - 1) * (P + 1) + q, b0 = cbase + k * (P + 1) + q;
+      out.cidx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1);
+    }
+    // small icicles hanging under its overhang, on the drop's side
+    if (look.icicles && k % 3 === 1) {
+      const hang = 0.18 + rand() * 0.22, ic = new THREE.Mesh(new THREE.ConeGeometry(0.035, hang, 5), ICE_SOLID), o = 0.2 + rand() * 0.05;
+      ic.rotation.x = Math.PI; // point down
+      ic.position.set(ex + n[0] * o, y - 0.04 - hang / 2, ez + n[1] * o);
+      out.g.add(ic);
+    }
+  }
+}
+/** The drop's group: its sides' walls and cornice as two meshes, and mist and its floor deep down (floor: its outline's sheet, laid flat at a height). */
+function dropDone(out: DropMesh, look: Rim, floor: (y: number, m: THREE.Material) => THREE.Mesh) {
+  out.g.add(new THREE.Mesh(geoOf(out.walls, out.widx, out.wcol), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+  if (out.cpos.length) out.g.add(new THREE.Mesh(geoOf(out.cpos, out.cidx), share(SNOW_2SIDE)));
+  for (const [y, op] of [[GAP_Y + 0.4, 1], [GAP_Y * 0.55, 0.35]]) out.g.add(floor(y, new THREE.MeshBasicMaterial({ color: op === 1 ? look.floor : 0x9fc4de, transparent: op < 1, opacity: op, depthWrite: op === 1 })));
+  return out.g;
+}
 
 /** A chasm: ice walls going blue to black, jagged snow lips, mist deep down. */
-function crevasse(z: Pick<Zone, "min" | "max">, t: { height: Height }, ends = false) {
-  const g = new THREE.Group();
-  const [x0, z0] = z.min, [x1, z1] = z.max, D = GAP_Y, rand = seeded("crev" + z.min.join());
-  // it runs across the lane: its long walls are the short sides' opposites
+function crevasse(z: Pick<Zone, "min" | "max"> & Partial<Pick<Zone, "round" | "poly" | "outside">>, t: { height: Height }, ends = false) {
+  // round or a polygon (the Builder's): its walls and lips along its own outline, never its box's sides (their
+  // corners would be a lip over ground the ball rolls on)
+  if (dropOf(z) === "rim") return crevasseRim(z, t, ICE_RIM);
+  const [x0, z0] = z.min, [x1, z1] = z.max, rand = seeded("crev" + z.min.join()), out = dropMesh();
+  // it runs across the lane: its long walls are the short sides' opposites, each facing into the drop
   const along = x1 - x0 < z1 - z0; // true: the crack runs along z
-  const walls = along ? [[x0, 1], [x1, -1]] : [[z0, 1], [z1, -1]];
   const L = along ? z1 - z0 : x1 - x0;
-  for (const [at, sgn] of walls) {
-    // a wall with strata: pale ice at the lip down to deep navy, jagged
-    const n = Math.ceil(L / 0.6), rows = 6;
-    const geo = gridGeo(n, rows, (i, j, pos, col) => {
-      const u = (i / n - 0.5) * L, v = j / rows, jag = j && j < rows ? (rand() - 0.5) * 0.35 : 0;
-      const x = along ? at + sgn * jag : (x0 + x1) / 2 + u, zz = along ? (z0 + z1) / 2 + u : at + sgn * jag;
-      const top = t.height(x, zz) - 0.05, y = top + (D - top) * v;
-      pos.push(x, y, zz);
-      const c = new THREE.Color(0xd8f1fb).lerp(new THREE.Color(0x10243e), Math.pow(v, 0.7));
-      col.push(c.r, c.g, c.b);
-    });
-    g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-    // the lip: one continuous rounded cornice along the edge, overhanging
-    // the drop a little, with small icicles hanging under its overhang
-    const n2 = Math.ceil(L / 0.25), P = 7, cpos: number[] = [], cidx: number[] = [];
-    for (let k = 0; k <= n2; k++) {
-      const u = (k / n2 - 0.5) * L;
-      const ex = along ? at : (x0 + x1) / 2 + u, ez = along ? (z0 + z1) / 2 + u : at;
-      const y = t.height(ex - (along ? sgn * 0.3 : 0), ez - (along ? 0 : sgn * 0.3));
-      const wob = 1 + 0.12 * Math.sin(u * 2.3) + 0.08 * Math.sin(u * 5.1);
-      for (let m = 0; m <= P; m++) {
-        // a half-ellipse across the edge, from the land side over to the drop
-        const a = Math.PI * (m / P), off = -Math.cos(a) * 0.32 * wob - 0.05, hgt = Math.sin(a) * 0.2 * wob;
-        cpos.push(along ? at + sgn * off : ex, y + hgt - 0.03, along ? ez : at + sgn * off);
-      }
-      if (k) for (let m = 0; m < P; m++) {
-        const a0 = (k - 1) * (P + 1) + m, b0 = k * (P + 1) + m;
-        cidx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1);
-      }
-      if (k % 3 === 1) {
-        const hang = 0.18 + rand() * 0.22;
-        const ic = new THREE.Mesh(new THREE.ConeGeometry(0.035, hang, 5), ICE_SOLID);
-        ic.rotation.x = Math.PI; // point down
-        const o = sgn * (0.2 + rand() * 0.05); // under the overhang, on the drop's side
-        ic.position.set(along ? at + o : ex, y - 0.04 - hang / 2, along ? ez : at + o);
-        g.add(ic);
-      }
-    }
-    const cg = geoOf(cpos, cidx);
-    g.add(new THREE.Mesh(cg, share(SNOW_2SIDE)));
-  }
-  // its short ends too, where it stops inside the lane
+  const long: [Vec2, Vec2, Vec2][] = along
+    ? [[[x0, z0], [x0, z1], [1, 0]], [[x1, z0], [x1, z1], [-1, 0]]]
+    : [[[x0, z0], [x1, z0], [0, 1]], [[x0, z1], [x1, z1], [0, -1]]];
+  for (const [a, b, n] of long) dropSide(out, a, b, n, t, ICE_RIM, rand, { from: -L / 2 });
+  // its short ends too, where it stops inside the lane: plain walls, no lip
   if (ends) {
-    const sh = along ? [[z0, x0, x1], [z1, x0, x1]] : [[x0, z0, z1], [x1, z0, z1]];
-    for (const [at, a0, a1] of sh) {
-      const pos: number[] = [], col: number[] = [], idx: number[] = [], n = 4, rows = 6;
-      for (let j = 0; j <= rows; j++)
-        for (let i = 0; i <= n; i++) {
-          const u = a0 + ((a1 - a0) * i) / n, v = j / rows;
-          const x = along ? u : at, zz = along ? at : u, top = t.height(x, zz) - 0.05;
-          pos.push(x, top + (D - top) * v, zz);
-          const c = new THREE.Color(0xd8f1fb).lerp(new THREE.Color(0x10243e), Math.pow(v, 0.7));
-          col.push(c.r, c.g, c.b);
-        }
-      for (let j = 0; j < rows; j++)
-        for (let i = 0; i < n; i++) {
-          const a = j * (n + 1) + i;
-          idx.push(a, a + n + 1, a + 1, a + 1, a + n + 1, a + n + 2);
-        }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-      geo.setIndex(idx);
-      g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-    }
+    const short: [Vec2, Vec2, Vec2][] = along
+      ? [[[x0, z0], [x1, z0], [0, 1]], [[x0, z1], [x1, z1], [0, -1]]]
+      : [[[x0, z0], [x0, z1], [1, 0]], [[x1, z0], [x1, z1], [-1, 0]]];
+    for (const [a, b, n] of short) dropSide(out, a, b, n, t, ICE_RIM, rand, { jag: false, lip: false });
   }
-  // mist in the depth, and a dark floor
-  const w = along ? x1 - x0 : L, d = along ? L : z1 - z0;
-  for (const [y, op] of [[D + 0.4, 1], [D * 0.55, 0.35]]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: op === 1 ? 0x0c1a2e : 0x9fc4de, transparent: op < 1, opacity: op, depthWrite: op === 1 }));
+  return dropDone(out, ICE_RIM, (y, mat) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set((x0 + x1) / 2, y, (z0 + z1) / 2);
-    g.add(m);
-  }
-  return g;
+    return m;
+  });
+}
+
+/**
+ * A round or polygon drop (a crevasse's, a cliff's, the Builder's): strata
+ * walls, a snow cornice and (ice) icicles round its own outline (an ellipse
+ * by its box, a polygon's points), every wall facing in, and a floor of that
+ * outline deep down, mist over it. The lane's own ground is open over the
+ * zone's cells (course.ts), so what this draws meets the hole the physics has.
+ */
+function crevasseRim(z: Pick<Zone, "min" | "max"> & Partial<Pick<Zone, "round" | "poly">>, t: { height: Height }, look: Rim) {
+  const rand = seeded("crev" + z.min.join()), out = dropMesh(), round = !(z.poly && z.poly.length > 2);
+  const rimOf = outlineOf(z, Math.max(16, Math.ceil((Math.PI * ((z.max[0] - z.min[0]) / 2 + (z.max[1] - z.min[1]) / 2)) / 0.6)));
+  // each side's normal into the drop: toward the inside of the outline
+  const inside = (x: number, zz: number) => inZone({ min: z.min, max: z.max, round, poly: z.poly }, x, zz);
+  rimOf.forEach((a, k) => {
+    const b = rimOf[(k + 1) % rimOf.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    let n: Vec2 = [-(b[1] - a[1]) / L, (b[0] - a[0]) / L];
+    if (!inside((a[0] + b[0]) / 2 + n[0] * 0.05, (a[1] + b[1]) / 2 + n[1] * 0.05)) n = [-n[0], -n[1]];
+    dropSide(out, a, b, n, t, look, rand);
+  });
+  // (its outline as a shape in x and -z, laid flat)
+  const shape = new THREE.Shape(rimOf.map(([x, zz]) => new THREE.Vector2(x, -zz)));
+  return dropDone(out, look, (y, mat) => {
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = y;
+    return m;
+  });
 }
 
 /**
@@ -1736,10 +1772,12 @@ function crevasse(z: Pick<Zone, "min" | "max">, t: { height: Height }, ends = fa
  * lane (or the ridge between two drops) runs on.
  */
 function cliff(z: Zone, t: Terrain, s: Hole) {
+  // round or a polygon (the Builder's): its rock walls round its own outline (crevasseRim), never its box's sides
+  if (dropOf(z) === "rim") return crevasseRim(z, t, ROCK_RIM);
   const g = new THREE.Group();
   const [x0, z0] = z.min, [x1, z1] = z.max, W = s.board.w, H = s.board.h;
   const rand = seeded("cliff" + s.hole + z.min.join(","));
-  const top = new THREE.Color(0x4d5d72), low = new THREE.Color(0xc9d7e6);
+  const { lip: top, foot: low } = ROCK_RIM; // (dark rock at the top going into mist: a rimmed cliff's too)
   // a wall from (ax, az) to (bx, bz), its face towards (fx, fz)
   const wall = (ax: number, az: number, bx: number, bz: number) => {
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(2, Math.ceil(L / 0.6)), rows = 6;
@@ -1750,7 +1788,7 @@ function cliff(z: Zone, t: Terrain, s: Hole) {
       const rim = x <= 0.01 || x >= W - 0.01 || zz <= 0.01 || zz >= H - 0.01;
       const y0 = rim ? GRASS : t.height(Math.min(Math.max(x, 0), W), Math.min(Math.max(zz, 0), H));
       pos.push(x + nx * jag, y0 + (GAP_Y - y0) * v, zz + nz * jag);
-      const c = top.clone().lerp(low, Math.pow(v, 0.8));
+      const c = tone.copy(top).lerp(low, Math.pow(v, 0.8));
       col.push(c.r, c.g, c.b);
     });
     g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
@@ -1762,7 +1800,7 @@ function cliff(z: Zone, t: Terrain, s: Hole) {
   wall(x1, z1, x0, z1);
   wall(x0, z1, x0, z0);
   // the floor far down, lost in mist, and banks of it drifting at mid depth
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), new THREE.MeshBasicMaterial({ color: 0xdfe8f1 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), new THREE.MeshBasicMaterial({ color: ROCK_RIM.floor }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set((x0 + x1) / 2, GAP_Y, (z0 + z1) / 2);
   g.add(floor);
@@ -2592,7 +2630,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
   // a crack inside the lane (mountain17): drawn here, walls on all four
   // sides; one across the whole board (mountain5) is the shared drawing's,
   // carried on into the mountain by base()
-  if (skin === "crevasse" && !(zone.min[1] <= 0.01 && zone.max[1] >= s.board.h - 0.01)) return crevasse(zone, t, true);
+  if (skin === "crevasse" && (dropOf(zone) === "rim" || !acrossBoard(zone, s))) return crevasse(zone, t, true);
   if (zone.kind === "tunnel" && (skin === "ice cave" || skin === "door")) {
     const g = new THREE.Group();
     const face = (x: number, zz: number) => Math.atan2(x - cx, zz - cz); // facing where the ball comes from

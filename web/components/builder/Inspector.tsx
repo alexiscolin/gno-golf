@@ -12,7 +12,7 @@ import { entryName } from "@/lib/builder/names";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented } from "@/components/ui";
 import { settle } from "@/lib/builder/session";
-import { canPlace, newErrors, errorsOf } from "@/lib/builder/edit";
+import { canPlace, newErrors, errorsOf, untrapped } from "@/lib/builder/edit";
 import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
 import { blinkOf, DIRS, sizesOf, TIMING, withBlink, withClock, withDir, withLook, withNumber, withSize, withTiming, type Open, type Speed } from "@/lib/builder/settings";
 import { MS_PER_STEP } from "@/lib/engine/replay";
@@ -103,9 +103,9 @@ export default function Inspector({ draft, piece, quick, full, playing, onPlay, 
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
   const p = piece, ent: PaletteEntry = e;
-  // a setting tried: shown if the hole still holds (fast checks), else refused with why
+  // a setting tried: shown if the hole still holds (fast checks, the trap search left for the let-go as a drag's), else refused with why
   const tryPiece = (next: Piece) => {
-    const why = canPlace(draft, next, quick);
+    const why = canPlace(draft, next, untrapped(quick));
     if (why.length) return onSay(refusalOf(why[0]));
     onPreview({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? next : q)) });
   };

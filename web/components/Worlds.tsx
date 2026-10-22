@@ -221,7 +221,9 @@ interface WorldsProps {
   community?: readonly HoleRow[];
   onCommunity?: (id: string) => void;
   /** the chain: each community hole judged by the Builder's rules before it is listed, its map, its players, whether its author has holed it */
-  chain?: Pick<Chain, "bests" | "blockTime" | "dayCandidates" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn"> | null;
+  chain?: Pick<Chain, "bests" | "blockTime" | "dayCandidates" | "ghost" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn"> | null;
+  /** the player's address, if known: their own community holes listed before they hold a best on them */
+  me?: string | null;
   /** the course's records to beat, under the cups */
   podium?: ReactNode;
   /** a cup's next hole to play, said on its card once begun */
@@ -232,7 +234,7 @@ interface WorldsProps {
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
 let shownOnce = false;
 
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, chain = null, podium, racing, next = () => undefined }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, chain = null, me = null, podium, racing, next = () => undefined }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -333,7 +335,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         })}
       </ul>
       {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
-      {community.length > 0 && <Community community={community} chain={chain} onPlay={onCommunity} />}
+      {community.length > 0 && <Community community={community} chain={chain} me={me} onPlay={onCommunity} />}
     </FrontScreen>
   );
 }

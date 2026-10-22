@@ -5,16 +5,16 @@
 // its limit). checkHole reads a hole as fit gives it (decode's pieces, in
 // GG1's order); the draft's checks (draft-checks.ts) add what only the draft
 // knows. Rules and thresholds: docs/superpowers/specs/2026-10-06-hole-builder-design.md.
-import { inZone, segDist } from "../terrain";
+import { closest, inZone, segDist, wallDist } from "../terrain";
 import type { PieceRef } from "../scene/census";
 import { RULES } from "../chain";
 import { LIMITS } from "./gg1";
 import { cap, MIN_SHOT_WORK, pt } from "./rules";
-import { CELL, laneOf, moves, reach } from "./lane";
+import { CELL, laneOf, movers, moves, outline, reach, traps, type Trap } from "./lane";
 import type { HoleIn, PostIn, V, WallIn, ZoneIn } from "./types";
 import type { Cost } from "./wasm";
 
-export type Rule = "L0" | "E1" | "E1b" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8" | "E9" | "E10" | "E11" | "E12" | "E13" | "E14" | "E15" | "E16" | "L2";
+export type Rule = "L0" | "E1" | "E1b" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8" | "E9" | "E10" | "E11" | "E12" | "E13" | "E14" | "E15" | "E16" | "E17" | "L2";
 export interface Issue {
   rule: Rule;
   severity: "error" | "warning";
@@ -39,6 +39,10 @@ export const MOUTH = 1.5;
 export const PASSAGE = 0.25;
 /** How far a piece keeps from a rail: nearer, the kerb swallows it (E15). */
 export const KERB_GAP = 0.5;
+/** The room a piece that comes back keeps round it, beyond the ball's radius: physics.UnstickIn sets the ball's centre
+ *  its radius and unstickGap (0.02) clear of the piece, and water and a mouth take a ball by its centre, so where it is
+ *  set down stays clear of water (E17). */
+export const PUSH_GAP = 0.05;
 
 /** A hole's piece, its place and pulse. */
 type Each<T> = { item: T; ref: PieceRef };
@@ -192,14 +196,6 @@ export function passages(h: HoleIn, slack: number): Passage[] {
   return gaps.filter((g) => needed.has(g)).map(({ gap, need, mid, a, b }) => ({ gap, need, mid, a, b }));
 }
 
-/** A zone's outline: its polygon, its box's corners, an ellipse by ROUND_SIDES points on it. */
-const ROUND_SIDES = 32;
-function outline(z: ZoneIn): V[] {
-  if (z.poly?.length) return [...z.poly];
-  if (!z.round) return [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]];
-  const [cx, cy] = centreOf(z), rx = (z.max[0] - z.min[0]) / 2, ry = (z.max[1] - z.min[1]) / 2;
-  return Array.from({ length: ROUND_SIDES }, (_, k): V => [cx + rx * Math.cos((2 * Math.PI * k) / ROUND_SIDES), cy + ry * Math.sin((2 * Math.PI * k) / ROUND_SIDES)]);
-}
 
 /** The gap between two solids (a wall a segment, a post a circle) and the middle of its narrowest place. */
 type Solid = { kind: "wall"; a: V; b: V } | { kind: "post"; c: V; r: number };
@@ -275,19 +271,121 @@ function mouths(h: HoleIn, name: Namer): Issue[] {
   return out;
 }
 
-/** E6: a tunnel's way out in the lane, clear of walls and posts by the ball's radius, in no zone that moves the ball. */
+/**
+ * E6: a tunnel's way out in the lane, clear of walls and posts by the ball's
+ * radius, in no zone that moves the ball (of any clock: a pulse's pond is
+ * there on some strokes), and at least MOUTH from its own mouth: nearer, a
+ * ball let out runs straight back in, round and round (by another tunnel's,
+ * it goes on through that one: a chain, which traps judges).
+ */
 function exits(h: HoleIn, lane: (p: V) => boolean, name: Namer): Issue[] {
-  const out: Issue[] = [];
-  for (const { item: z, ref } of each<ZoneIn>(h, "zone")) {
+  const out: Issue[] = [], zones = each<ZoneIn>(h, "zone");
+  for (const { item: z, ref } of zones) {
     if (z.kind !== "tunnel" || !z.vec) continue;
     const v = z.vec;
     const why = !lane(v) ? "outside the lane"
       : blocked(h, v, h.ballR, () => false).length ? "on a wall or a post"
-      : h.zones.some((q) => moves(q) && inZone(shapeOf(q), v[0], v[1])) ? "in a zone that moves the ball on" : "";
-    if (why) out.push(err("E6", `${cap(name(ref))} comes out at ${pt(v)}, ${why}`, ref, v));
+      : zones.some(({ item: q }) => moves(q) && inZone(shapeOf(q), v[0], v[1])) ? "in a zone that moves the ball on" : "";
+    if (why) { out.push(err("E6", `${cap(name(ref))} comes out at ${pt(v)}, ${why}`, ref, v)); continue; }
+    // (its own mouth only: by another's, the ball goes on through that one, a chain traps judges)
+    const pts = outline(z), d = wallDist(v[0], v[1], pts.map((a, k) => ({ a, b: pts[(k + 1) % pts.length] })));
+    if (d < MOUTH - 1e-9) out.push(err("E6", `${cap(name(ref))} comes out at ${pt(v)}, ${+d.toFixed(2)} from its own mouth: at least ${MOUTH}, or the ball runs straight back in`, ref, v));
   }
   return out;
 }
+
+/**
+ * E17, traps: no place a ball from the tee can come to rest that the cup is
+ * never reached from (lane.ts traps: through a tunnel, down a slope too long
+ * to climb back, off a hill's crest); and no piece that comes back (a
+ * pulse's post, a timed or pulsed wall, noPushes) on a ball resting beside
+ * water, which it would push the ball into (physics.UnstickIn pushes it out
+ * by the piece's radius and its own, minding only the hole's walls): from
+ * water every stroke goes back where it was struck, the water again.
+ */
+function noTraps(h: HoleIn, name: Namer): Issue[] {
+  return traps(h, LOOSE(h)).map((t) => {
+    const ref: PieceRef | undefined = t.zone >= 0 ? { set: "zone", i: t.zone } : undefined;
+    return err("E17", trapSaid(t, ref ? name(ref) : ""), ref, t.at);
+  });
+}
+
+/** E17's other half: no piece that comes back (lane.ts movers: a pulse's post, a timed or pulsed wall, a bar's four) by water, whatever else the hole has wrong. */
+function noPushes(h: HoleIn, lane: (p: V) => boolean, name: Namer): Issue[] {
+  const out: Issue[] = [];
+  for (const m of movers(h)) {
+    if (m.set === "zone") continue;
+    const ref: PieceRef = { set: m.set, i: m.i, ...(m.pulse !== undefined && { pulse: m.pulse }) };
+    let near: { ref: PieceRef } | null, at: V;
+    if (m.set === "post") {
+      const q = m.item as PostIn;
+      near = pushedInto(h, lane, (x, y) => Math.hypot(x - q.c[0], y - q.c[1]) - q.r, () => q.c, [q.c[0] - q.r, q.c[1] - q.r], [q.c[0] + q.r, q.c[1] + q.r]);
+      at = q.c;
+    } else {
+      // (a wall: pushed out from its nearest point, as UnstickIn pushes out of a bar's nearest side)
+      const w = m.item as WallIn;
+      near = pushedInto(h, lane, (x, y) => segDist(x, y, w.a, w.b), (x, y) => { const c = closest(x, y, w.a, w.b); return [c.x, c.z]; },
+        [Math.min(w.a[0], w.b[0]), Math.min(w.a[1], w.b[1])], [Math.max(w.a[0], w.b[0]), Math.max(w.a[1], w.b[1])]);
+      at = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
+    }
+    if (near) out.push(err("E17", pushSaid(h, name(ref), name(near.ref)), ref, at, [near.ref]));
+  }
+  return out;
+}
+
+/** E17's sentences, in one place: a trap (what led into it, named it), and a piece that comes back by water (it, and the water's name). */
+export const trapSaid = (t: Trap, it: string) =>
+  t.kind === "tunnel" ? `${cap(it)} lets the ball out at ${pt(t.at)}, where it can never get back to the cup`
+  : t.kind === "slope" ? `${cap(it)} sends the ball down at ${pt(t.at)}, where it can never get back to the cup`
+  : t.kind === "climb" ? `The cup cannot be reached from the tee: ${it} is too long for a ball to climb`
+  : t.kind === "cut" ? "The cup cannot be reached from the tee"
+  : `A jump off ${it} lands the ball at ${pt(t.at)}, where it can never get back to the cup`;
+export const pushSaid = (h: Pick<HoleIn, "ballR">, it: string, water: string) =>
+  `${cap(it)} comes back on a ball beside ${water} and would push it in: at least ${h.ballR + PUSH_GAP} between them`;
+
+/**
+ * The hazard a piece that comes back would push a ball resting by it into
+ * (of any clock), within the ball's radius and PUSH_GAP of it (where
+ * UnstickIn sets the ball's centre, which is what water takes), from a place
+ * a ball can rest (in the lane, a ball's radius off every fixed wall), with
+ * no fixed wall between (the push never crosses one: gap, a point's distance
+ * from the piece, negative inside; from, where the push comes from toward it;
+ * lo, hi the piece's box); null if none. Not a tunnel's mouth, which only
+ * sends the ball through the tunnel (the stroke goes on from its way out);
+ * not past the lane's edge either: a rail stops the push, and off the board
+ * the ball goes back where it was struck (golf's back).
+ */
+export function pushedInto(h: HoleIn, lane: (p: V) => boolean, gap: (x: number, y: number) => number, from: (x: number, y: number) => V, lo: V, hi: V): { ref: PieceRef } | null {
+  const room = h.ballR + PUSH_GAP, { zones, walls } = pushing(h);
+  if (!zones.length) return null;
+  for (let x = lo[0] - room; x <= hi[0] + room + 1e-9; x += CELL / 2) {
+    for (let y = lo[1] - room; y <= hi[1] + room + 1e-9; y += CELL / 2) {
+      if (gap(x, y) >= room) continue;
+      // (the water first; where the ball comes from and the walls, dearer, only for a point in it)
+      const z = zones.find((q) => inZone(q.sh, x, y));
+      if (!z) continue;
+      const f = from(x, y), lx = Math.min(f[0], x), hx = Math.max(f[0], x), ly = Math.min(f[1], y), hy = Math.max(f[1], y);
+      const rests = (b: V) => lane(b) && wallDist(b[0], b[1], walls) >= h.ballR - 1e-6;
+      if (!rests([f[0] + (x - f[0]) * 0.1, f[1] + (y - f[1]) * 0.1]) && !rests([(f[0] + x) / 2, (f[1] + y) / 2])) continue;
+      if (walls.some((w) => w.hi[0] >= lx && w.lo[0] <= hx && w.hi[1] >= ly && w.lo[1] <= hy && crosses(f, [x, y], w.a, w.b))) continue;
+      return { ref: z.ref };
+    }
+  }
+  return null;
+}
+/** What pushedInto reads of a hole, once: its hazards' shapes (every clock), its fixed walls and their boxes. */
+const pushing = (h: HoleIn) => {
+  let p = pushers.get(h);
+  if (!p) {
+    p = {
+      zones: each<ZoneIn>(h, "zone").filter(({ item }) => item.kind === "hazard").map(({ item, ref }) => ({ sh: shapeOf(item), ref })),
+      walls: h.walls.filter((w) => !w.every).map((w) => ({ a: w.a, b: w.b, lo: [Math.min(w.a[0], w.b[0]), Math.min(w.a[1], w.b[1])] as V, hi: [Math.max(w.a[0], w.b[0]), Math.max(w.a[1], w.b[1])] as V })),
+    };
+    pushers.set(h, p);
+  }
+  return p;
+};
+const pushers = new WeakMap<HoleIn, { zones: { sh: ReturnType<typeof shapeOf>; ref: PieceRef }[]; walls: { a: V; b: V; lo: V; hi: V }[] }>();
 
 /** E7: a timed piece is on for part of its cycle, never all or none of it; a pulse both comes and goes within a round's strokes. */
 function clocks(h: HoleIn, name: Namer): Issue[] {
@@ -411,19 +509,19 @@ function scenery(h: HoleIn, name: Namer): Issue[] {
 
 
 /**
- * The hole's checks (E1 to E8, E10, E13 to E15), errors first. name says a
+ * The hole's checks (E1 to E8, E10, E13 to E15, E17), errors first. name says a
  * piece; entryOf is the palette's view of each (by default every piece judged,
  * none allowed to meet another): a piece with no entry is not the builder's
  * to judge.
  */
-export function checkHole(h: HoleIn, { name = nameIn(h), entryOf = () => ({}) }: { name?: Namer; entryOf?: EntryOf } = {}): Issue[] {
+export function checkHole(h: HoleIn, { name = nameIn(h), entryOf = () => ({}), traps: search = true }: { name?: Namer; entryOf?: EntryOf; traps?: boolean } = {}): Issue[] {
   const lane = laneOf(h), judged: Judged = (r) => !!entryOf(r);
   const ends = [...tee(h, lane, name, judged), ...cup(h, lane, name, judged)].filter((i) => !i.ref || judged(i.ref));
   // the way follows from its ends: with the tee or the cup on a piece, E4 would only say so again. An end
   // only out of the lane (a rail of its own moved across it) may be the other end shut in: said first
   const asked = !ends.length || (!ends.some((i) => i.ref) && (lane(h.tee) || lane(h.pin)));
   const ways = asked ? way(h, name).filter((i) => !ends.length || !i.ref) : []; // (with an end out, only the way's absence: no gap's)
-  const out = [...board(h, name), ...ways, ...ends, ...mouths(h, name), ...exits(h, lane, name),
+  const out = [...board(h, name), ...ways, ...(search && asked && !ways.length && !ends.length ? noTraps(h, name) : []), ...noPushes(h, lane, name), ...ends, ...mouths(h, name), ...exits(h, lane, name),
     ...clocks(h, name), ...limits(h, name), ...(ends.length ? [] : inReach(h, reach(h, LOOSE(h)).reaches, name)), ...overlaps(h, name, entryOf), ...scenery(h, name)];
   return out.filter((i) => !i.ref || judged(i.ref)).sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
 }

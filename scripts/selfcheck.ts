@@ -16,7 +16,7 @@ const { RULES } = await import("../web/lib/chain.ts");
 const { SKIES, UNLOCKS } = await import("../web/lib/card.ts");
 const { GNOMES } = await import("../web/lib/scene/gnome.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
-const { KICKS, MAX_BOUNCE, MAX_MOVE, MAX_PAR, MIN_RAMP, MIN_SHOT_WORK, WEATHER } = await import("../web/lib/builder/rules.ts");
+const { KICK, KICKS, MAX_BOUNCE, MAX_MOVE, MAX_PAR, MIN_RAMP, MIN_SHOT_WORK, ROLL, SPEED_CAP, WEATHER } = await import("../web/lib/builder/rules.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -242,6 +242,9 @@ check("the physics the builder's palette is bound by", () => {
   assert.equal(MAX_BOUNCE, constOf(step, "MaxBounce"), "MaxBounce");
   assert.equal(MIN_RAMP, constOf(step, "MinRamp"), "MinRamp");
   assert.equal(MAX_MOVE, constOf(step, "MaxMove"), "MaxMove");
+  assert.equal(SPEED_CAP, constOf(step, "SpeedCap"), "SpeedCap");
+  assert.equal(KICK, constOf(course, "Kick"), "course.Kick");
+  for (const [k, name] of [["speed", "RollSpeed"], ["drag", "RollDrag"], ["bonus", "keepBonus"], ["keep", "maxKeep"]] as const) assert.equal(ROLL[k], constOf(step, name), name);
   for (const w of WEATHER) assert.ok(course.includes(`"${w}"`), `course: no weather skin "${w}"`);
   const data = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/data.gno", import.meta.url), "utf8");
   assert.ok(has(data, `if h.Strokes > ${MAX_PAR} {`), "course.Decode: the most par changed");

@@ -7,7 +7,7 @@
 // the next weather not holed; without it, a round in calm weather (a try,
 // under an id of its own: TRY_HOLE), the address asked once one is holed.
 import type { Chain } from "../chain";
-import type { HoleRow, Versions } from "../types";
+import type { HoleRow, Mode, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
 import { periodFor } from "./proof";
@@ -73,7 +73,9 @@ export function holeRow(id: string, d: Draft): HoleRow {
  *  none the takedown list names, nor any node's (its genesis too: the draft's verdict, kept by chain, asks the network nothing). */
 export function testChain(base: Chain, local: LocalChain, hex: string): Chain {
   const builder = () => Promise.resolve("builder");
-  return { ...base, ...local, holeData: () => Promise.resolve(hex), chainId: builder, genesis: builder };
+  // (its author holds a best on it, as the chain would once they save a round: the draft is being proved here)
+  const bests: Chain["bests"] = (hole, mode, players) => Promise.resolve({ version: 1, hole, mode: mode as Mode, par: 0, rows: players.map((player) => ({ player, name: "", strokes: 1 })) });
+  return { ...base, ...local, holeData: () => Promise.resolve(hex), chainId: builder, genesis: builder, bests };
 }
 
 /** The id a round is played under before the author's address is known: no author's, and no proof is ever kept for it. */

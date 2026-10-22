@@ -12,7 +12,7 @@ import { bakeLocal, look, weatherLooks } from "./bake";
 import { animate } from "./state";
 import { timeOf } from "./camera";
 import { gnomelet, brolly, bunting, mailbox } from "./props";
-import { seeded, lookSeed, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
+import { seeded, lookSeed, ISLAND, GRASS, placer, onGround, outlineOf, type Rand } from "./common";
 import { ud, type Hole } from "./data";
 import type { Bar, Skins } from "./worlds";
 import { boxOf, smoothstep, type Terrain } from "../terrain";
@@ -1211,14 +1211,6 @@ const marbleTex = () => paving("marble", 256, (x, rand, n) => {
   ring(c * 0.2, 5, "#8d9ca6");
 });
 
-// a zone's outline, as the chain has it: its polygon, ellipse or rectangle
-function outlineOf(z: Zone): readonly Vec2[] {
-  if (z.poly && z.poly.length > 2) return z.poly;
-  const [x0, z0] = z.min, [x1, z1] = z.max;
-  if (!z.round) return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
-  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hx = (x1 - x0) / 2, hz = (z1 - z0) / 2;
-  return Array.from({ length: 72 }, (_, i): Vec2 => [cx + Math.cos((i / 72) * Math.PI * 2) * hx, cz + Math.sin((i / 72) * Math.PI * 2) * hz]);
-}
 // a flat sheet over pts, lift above the ground; tile > 0 repeats the texture
 // every tile units of the board, 0 stretches it over the zone once. over
 // pulls it forward in depth, over what it lies on

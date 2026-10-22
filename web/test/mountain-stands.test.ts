@@ -108,8 +108,9 @@ void test("a serac whose tower would hide the ball from the player's camera: ref
   const errs = validate(hidden, { host, palette, census }).issues.filter((i) => i.severity === "error").map((i) => `${i.rule} ${i.text}`);
   assert.equal(errs.filter((e) => VIEW.test(e)).length, 1, errs.join("; "));
   assert.match(errs.find((e) => VIEW.test(e))!, /^E12 /);
-  // the same patch at the lane's top edge: nothing of the lane behind the tower, nothing hidden
-  const open = lane("mountain", [...box(12.5, 0, 17.5, 5.5), placePiece(entry("mountain/hazard/serac", palette)!, "x", [13, 6], { size: 4 })], 30, 30);
+  // the same patch at the lane's top edge: nothing of the lane behind the tower, nothing hidden (its top side the
+  // lane's own rail: one along it would be that kerb twice, E13)
+  const open = lane("mountain", [...box(12.5, 0, 17.5, 5.5).slice(1), placePiece(entry("mountain/hazard/serac", palette)!, "x", [13, 6], { size: 4 })], 30, 30);
   assert.deepEqual(validate(open, { host, palette, census }).issues.filter((i) => i.severity === "error").map((i) => i.text), []);
   // mountain/15's three seracs, as they are
   for (const l of fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n")) {

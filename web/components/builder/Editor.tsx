@@ -182,6 +182,7 @@ export default function Editor({ host, first, author, onSave, onBack, onPublish,
     return () => void (stale = true);
   }, [draft.world, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (palette: read, not a reason to load)
 
+  // (a ghost's checks and a clamp's probes leave the trap search out, edit.ts untrapped; what is kept is judged with it)
   const quick: ValidateOptions | null = useMemo(() => palette && { host, palette, slug: draft.slug || undefined }, [host, palette, draft.slug]);
   const full: ValidateOptions | null = useMemo(() => quick && { ...quick, census }, [quick]);
 

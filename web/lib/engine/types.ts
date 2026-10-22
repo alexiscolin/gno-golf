@@ -18,8 +18,8 @@ export type CamMode = "classic" | "far" | "third";
 /** The graphics setting, and the tier it gives on this device. */
 export type GfxMode = "auto" | "high" | "low";
 export type Tier = "high" | "low";
-/** What went wrong: the hole's load, its drawing, a shot, the round's stroke limit. */
-export type ErrorKind = "load" | "draw" | "shot" | "limit" | "unchecked";
+/** What went wrong: the hole's load, its drawing, a shot, the round's stroke limit, a community hole refused (the Builder's rules; its author's best not held yet). */
+export type ErrorKind = "load" | "draw" | "shot" | "limit" | "unchecked" | "unheld";
 /** A word on why the ball speeds up or drifts, and when it was said. */
 interface CauseNote {
   label: string;

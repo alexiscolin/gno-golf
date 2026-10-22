@@ -7,7 +7,7 @@
 // issues list would.
 import type { Issue } from "./checks";
 import { nextId, type ClockSpec, type Draft, type Geometry, type Piece, type V } from "./draft";
-import { entryParts, frame } from "./gg1";
+import { barCorners, entryParts, frame } from "./gg1";
 import { pieceName } from "./names";
 import { handlesOf, QUARTER, setHandle, snap, type HandleKey } from "./handles";
 import { CELL } from "./lane";
@@ -15,6 +15,7 @@ import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
 import { cap, pt, theWorld } from "./rules";
 import { refusalOf } from "./explain";
+import { segDist } from "../terrain";
 import { pastLimits } from "./limits";
 import { applySurface, narrowed, owned, surfaceIn, type Green } from "./surface";
 
@@ -182,7 +183,8 @@ export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: re
  * green once for each shape it takes (a stroke goes back over its own), the
  * hole as it was checked once a drag.
  */
-export function dragCheck(start: Draft, o: ValidateOptions) {
+export function dragCheck(start: Draft, given: ValidateOptions) {
+  const o = untrapped(given); // (as it moves: the trap search is the drop's)
   let base: readonly Issue[] | null = null, last = "", said: Issue[] = [], green: Green | null | undefined;
   const once = (key: string, run: () => Issue[]) => (key === last ? said : ((last = key), (said = run())));
   const was = () => (base ??= errorsOf(start, o));
@@ -203,6 +205,20 @@ export function dragCheck(start: Draft, o: ValidateOptions) {
   };
 }
 
+/**
+ * The checks without the trap search (E17's lane.ts traps, the dearest of them), for what is checked many times a
+ * gesture: the ghost and the handles as they move, a clamp's probes on its way. Whatever is kept is judged with
+ * the search all the same (dropMove, dropHandle, dropEnd, the editor's gate): a drop or a nudge that would make a
+ * trap is refused, with why, and the piece stays where it was. One object for each options (validate's cache).
+ */
+export function untrapped(o: ValidateOptions): ValidateOptions {
+  if (o.traps === false) return o;
+  let q = quicks.get(o);
+  if (!q) quicks.set(o, (q = { ...o, traps: false }));
+  return q;
+}
+const quicks = new WeakMap<ValidateOptions, ValidateOptions>();
+
 /** The draft's errors (validate's, warnings left out). */
 export const errorsOf = (d: Draft, o: ValidateOptions) => validate(d, o).issues.filter((i) => i.severity === "error");
 
@@ -217,34 +233,96 @@ export function movePiece(p: Piece, to: V): Piece {
 /** v on the quarter grid as the hole has it: from origin (the tee; the cup when the tee itself moves). */
 const onQuarter = (v: V, origin: V): V => snap(v, QUARTER, origin);
 
-/** How many strides a walk takes at most before its grid steps (each a whole check): a long drag stays quick. */
-const WALK_STRIDES = 32;
+/** A solid as the cheap check of a walk sees it: its segments (a rail; a bar's sides, its outline) and its discs (a post). */
+type Solid = { segs: [V, V][]; discs: [V, number][]; outline?: [V, V][] };
+const solidOf = (g: Geometry): Solid | null => {
+  if (g.t === "rail") return { segs: [[g.a, g.b]], discs: [] };
+  if (g.t === "post") return { segs: [], discs: [[g.c, g.r]] };
+  if (g.t !== "bar") return null;
+  const c = barCorners(g.a, g.b, g.thick), sides = c.map((q, k): [V, V] => [q, c[(k + 1) % 4]]);
+  return { segs: sides, discs: [], outline: sides };
+};
+/** Whether a point lies inside a convex outline (its sides, in order). */
+const inside = (q: V, sides: readonly [V, V][]) => {
+  const s = sides.map(([a, b]) => (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]));
+  return s.every((x) => x > 1e-9) || s.every((x) => x < -1e-9);
+};
+const segSegDist = (a: V, b: V, c: V, e: V) => {
+  const o = (p: V, q: V, r: V) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const d1 = o(c, e, a), d2 = o(c, e, b), d3 = o(a, b, c), d4 = o(a, b, e);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return 0;
+  return Math.min(segDist(a[0], a[1], c, e), segDist(b[0], b[1], c, e), segDist(c[0], c[1], a, b), segDist(e[0], e[1], a, b));
+};
+/** Whether two solids meet: their segments touch or cross, a disc touches a segment or a disc, one lies in the other's outline. */
+function meet(x: Solid, y: Solid): boolean {
+  for (const [a, b] of x.segs) for (const [c, e] of y.segs) if (segSegDist(a, b, c, e) < 1e-9) return true;
+  for (const [s, t] of [[x, y], [y, x]] as const) {
+    for (const [c, r] of s.discs) {
+      if (t.segs.some(([a, b]) => segDist(c[0], c[1], a, b) < r - 1e-9) || t.discs.some(([q, r2]) => Math.hypot(c[0] - q[0], c[1] - q[1]) < r + r2 - 1e-9)) return true;
+      if (t.outline && inside(c, t.outline)) return true;
+    }
+    if (t.outline && s.segs.some(([a]) => inside(a, t.outline!))) return true;
+  }
+  return false;
+}
+/**
+ * The cheap check of a walk for piece p in d: whether the piece, where `at` puts it, meets no rail, bar or post of
+ * the draft it did not meet where it was (a geometric test, no whole check): a zone moves through them freely.
+ */
+function clearOf(d: Draft, p: Piece, at: (v: V) => Piece): (v: V) => boolean {
+  const mine = solidOf(p.geometry);
+  if (!mine) return () => true;
+  const others = d.pieces.filter((q) => q.id !== p.id).map((q) => solidOf(q.geometry)).filter((q): q is Solid => !!q && !meet(mine, q));
+  return (v) => {
+    const s = solidOf(at(v).geometry);
+    return !s || !others.some((q) => meet(s, q));
+  };
+}
 
 /**
- * The last point from `from` toward `to` that ok takes: `to` itself if it
- * does; `from` if not even the first step does. At most WALK_STRIDES strides
- * along the way, then grid steps within the last stride ok took: a few dozen
- * checks however long the drag (a stride may step over a rail: where it lands
- * still holds).
+ * The last point from `from` toward `to` that ok takes. The way first, an eighth of a unit at a time (thinner
+ * than any rail's reach, any post or bar), with the cheap check (clear): as far as it goes, never past a rail, a
+ * post or a bar the piece would have to cross. Where it stops (to, if it goes all the way), the whole check (ok);
+ * if not even that, the quarters before it bisected for the last ok takes: a few whole checks however long the
+ * drag. `from` if not even the first does.
  */
-function walk(from: V, to: V, ok: (v: V) => boolean, origin: V): V {
-  const on = (v: V) => onQuarter(v, origin), at = (f: number) => on([from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f]);
+function walk(from: V, to: V, ok: (v: V) => boolean, origin: V, clear: (v: V) => boolean = () => true): V {
+  const on = (v: V) => onQuarter(v, origin), at = (f: number) => [from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f] as V;
   to = on(to);
-  if (ok(to)) return to;
-  const n = Math.ceil(Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1])) / CELL);
-  const strides = Math.min(n, WALK_STRIDES), steps = Math.ceil(n / strides);
-  let last = from, f0 = 0;
-  for (let k = 1; k < strides; k++) {
-    const v = at(k / strides);
-    if (!ok(v)) break;
-    (last = v), (f0 = k / strides);
+  const n = Math.ceil(Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1])) / QUARTER);
+  if (!n) return to;
+  // the quarters the cheap check takes, its halves between them looked at too
+  let far = 0;
+  for (let k = 1; k <= n && clear(at((k - 0.5) / n)) && clear(on(at(k / n))); k++) far = k;
+  const q = (k: number) => (k === n ? to : on(at(k / n)));
+  if (!far) return from;
+  if (ok(q(far))) return q(far);
+  let lo = 0, hi = far;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (ok(q(mid))) lo = mid;
+    else hi = mid;
   }
-  for (let j = 1; j < steps; j++) {
-    const v = at(f0 + j / (strides * steps));
-    if (!ok(v)) break;
-    last = v;
+  return lo ? q(lo) : from;
+}
+
+/**
+ * A clamp's last word: the place a walk with the quick checks found, judged with o's own (the trap search
+ * too, which the walk's probes leave out); if they refuse it, back toward where the piece was, a few whole
+ * checks of o's at most, to the last place they take: the piece lands where the full checks hold, as the
+ * ghost showed it might, or stays where it was.
+ */
+function settle(from: V, last: V, ok: (v: V) => boolean, origin: V): V {
+  if (last[0] === from[0] && last[1] === from[1]) return last;
+  if (ok(last)) return last;
+  let lo = from, hi = last;
+  for (let k = 0; k < 3; k++) {
+    const mid = onQuarter([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2], origin);
+    if ((mid[0] === lo[0] && mid[1] === lo[1]) || (mid[0] === hi[0] && mid[1] === hi[1])) break;
+    if (ok(mid)) lo = mid;
+    else hi = mid;
   }
-  return last;
+  return lo;
 }
 
 const without = (d: Draft, id: string) => ({ ...d, pieces: d.pieces.filter((q) => q.id !== id) });
@@ -258,23 +336,33 @@ const replace = (d: Draft, p: Piece) => frame({ ...d, pieces: d.pieces.map((q) =
 export function clampMove(d: Draft, id: string, to: V, o: ValidateOptions): V {
   const p = d.pieces.find((q) => q.id === id);
   if (!p) return to;
-  const before = errorsOf(d, o);
-  return walk(whereOf(p.geometry), to, (v) => canPlace(d, movePiece(p, v), o, before).length === 0, d.tee);
+  const q = untrapped(o), before = errorsOf(d, q), from = whereOf(p.geometry); // (its probes without the trap search)
+  const last = walk(from, to, (v) => canPlace(d, movePiece(p, v), q, before).length === 0, d.tee, clearOf(d, p, (v) => movePiece(p, v)));
+  if (q === o) return last;
+  const had = errorsOf(d, o);
+  return settle(from, last, (v) => canPlace(d, movePiece(p, v), o, had).length === 0, d.tee);
 }
 
 /** A drag of one of a piece's handles toward `to`: the piece within its entry's ranges (handles.ts), stopped at the last place the hole holds; the draft framed. */
 export function clampHandle(d: Draft, id: string, key: HandleKey, to: V, o: ValidateOptions): Draft {
   const p = d.pieces.find((q) => q.id === id), e = p && entryIn(p.entry, o.palette), h = p && handlesOf(p).find((x) => x.key === key);
   if (!p || !e || !h) return d;
-  const before = errorsOf(d, o);
-  const last = walk(h.at, to, (v) => canPlace(d, setHandle(p, key, v, e, d.tee), o, before).length === 0, d.tee);
+  const q = untrapped(o), before = errorsOf(d, q);
+  let last = walk(h.at, to, (v) => canPlace(d, setHandle(p, key, v, e, d.tee), q, before).length === 0, d.tee, clearOf(d, p, (v) => setHandle(p, key, v, e, d.tee)));
+  if (q !== o) {
+    const had = errorsOf(d, o);
+    last = settle(h.at, last, (v) => canPlace(d, setHandle(p, key, v, e, d.tee), o, had).length === 0, d.tee);
+  }
   return replace(d, setHandle(p, key, last, e, d.tee));
 }
 
 /** A drag of the tee or the cup toward `to`: stopped at the last place where the hole has no error it did not have. */
 export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptions): V {
-  const had = errorsOf(d, o);
-  return walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, o).length === 0, which === "tee" ? d.pin : d.tee);
+  const q = untrapped(o), had = errorsOf(d, q), origin = which === "tee" ? d.pin : d.tee;
+  const last = walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, q).length === 0, origin);
+  if (q === o) return last;
+  const full = errorsOf(d, o);
+  return settle(d[which], last, (v) => newErrors(full, { ...d, [which]: v }, o).length === 0, origin);
 }
 
 

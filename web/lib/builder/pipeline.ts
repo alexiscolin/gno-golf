@@ -15,12 +15,12 @@ import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { cap, FIELD, pt } from "./rules";
 import { builderLimits } from "./limits";
-import { onGrid, type Draft, type Piece, type V } from "./draft";
+import { onGrid, shapeOfPiece, type Draft, type Piece, type V } from "./draft";
 import type { BuilderHost, Cost } from "./wasm";
 import type { GHole } from "./types";
 import type { Drawn, PieceRef } from "../scene/census";
 import type { Hole } from "../scene/data";
-import { segDist } from "../terrain";
+import { inZone, segDist } from "../terrain";
 
 export interface ValidateOptions {
   host: BuilderHost;
@@ -33,6 +33,9 @@ export interface ValidateOptions {
   maxBytes?: number;
   /** the share of a work limit past which E11 warns */
   warnAt?: number;
+  /** false: no trap search (E17's lane.ts traps, the dearest check): the editor's quick checks, a ghost's and a drag's
+   *  clamp, made many times a gesture; whatever is kept is judged with it (the full checks: dropMove, gate) */
+  traps?: boolean;
 }
 /** The render census as an opened hole is always judged with (drawn.ts census). */
 export type Census = NonNullable<ValidateOptions["census"]>;
@@ -125,30 +128,89 @@ const within = (q: V, sides: readonly [V, V][]) => {
 };
 const segSeg = (a: V, b: V, c: V, e: V) => (crosses(a, b, c, e) ? 0 : Math.min(segDist(a[0], a[1], c, e), segDist(b[0], b[1], c, e), segDist(c[0], c[1], a, b), segDist(e[0], e[1], a, b)));
 
+/** A draft's bar, once: the piece, its corners (build.Bar's), its sides in order, its middle. */
+type Bar = { p: Piece & { geometry: { t: "bar"; a: V; b: V; thick: number } }; c: V[]; sides: [V, V][]; mid: V };
+const barsOf = (d: Draft): Bar[] =>
+  d.pieces.flatMap((p) => {
+    if (p.geometry.t !== "bar") return [];
+    const g = p.geometry, c = barCorners(g.a, g.b, g.thick);
+    return [{ p: p as Bar["p"], c, sides: c.map((q, k): [V, V] => [q, c[(k + 1) % 4]]), mid: [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2] as V }];
+  });
+/** A draft's fixed rails. */
+const railsOf = (d: Draft) => d.pieces.filter((p): p is Piece & { geometry: { t: "rail"; a: V; b: V } } => p.geometry.t === "rail" && p.clock.k === "fixed");
+/** Whether the palette lets p lie on or in q (as: q's kind as overlaps names it, "wall" a rail's or a bar's), or q on p. */
+const mayOverlap = (palette: readonly PaletteEntry[]) => (p: Piece, q: Piece, as: string) => {
+  const kp = entryIn(p.entry, palette)?.kind;
+  return !!entryIn(p.entry, palette)?.overlaps?.includes(as) || !!entryIn(q.entry, palette)?.overlaps?.includes(kp === "rail" || kp === "bar" ? "wall" : kp ?? "");
+};
+
 /** The draft's own rules on its bars: out of the lane (E10), crossing another bar (E13), against a rail (E15). */
-function bars(d: Draft, h: GHole, palette: readonly PaletteEntry[], refs: Map<string, PieceRef[]>): Issue[] {
-  const out: Issue[] = [], { reaches } = reach(h, LOOSE(h));
-  const barList = d.pieces.filter((p): p is Piece & { geometry: { t: "bar"; a: V; b: V; thick: number } } => p.geometry.t === "bar" && p.clock.k !== "stroke");
-  const rails = d.pieces.filter((p) => p.geometry.t === "rail" && p.clock.k === "fixed");
-  const edges = (p: (typeof barList)[number]) => { const c = barCorners(p.geometry.a, p.geometry.b, p.geometry.thick); return c.map((q, k): [V, V] => [q, c[(k + 1) % 4]]); };
-  barList.forEach((p, i) => {
-    const g = p.geometry, mid: V = [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2];
+function bars(d: Draft, h: GHole, palette: readonly PaletteEntry[], refs: Map<string, PieceRef[]>, all: readonly Bar[]): Issue[] {
+  const out: Issue[] = [], { reaches } = reach(h, LOOSE(h)), may = mayOverlap(palette);
+  const barList = all.filter(({ p }) => p.clock.k !== "stroke"), rails = railsOf(d);
+  barList.forEach(({ p, sides, mid }, i) => {
+    const g = p.geometry;
     if (!reaches(mid, Math.hypot(g.b[0] - g.a[0], g.b[1] - g.a[1]) / 2 + g.thick + h.ballR + CELL)) out.push(err("E10", `${cap(pieceName(p))} at ${pt(mid)} is outside the lane: no ball reaches it`, p, mid));
     for (const q of barList.slice(i + 1)) {
-      const may = entryIn(p.entry, palette)?.overlaps?.includes("wall") || entryIn(q.entry, palette)?.overlaps?.includes("wall");
-      if (!may && edges(p).some(([a, b]) => edges(q).some(([c, e]) => crosses(a, b, c, e)))) out.push({ ...err("E13", `${cap(pieceName(p))} crosses ${pieceName(q)} at ${pt(mid)}`, p, mid), also: refs.get(q.id) ?? [] });
+      if (!may(p, q.p, "wall") && sides.some(([a, b]) => q.sides.some(([c, e]) => crosses(a, b, c, e)))) out.push({ ...err("E13", `${cap(pieceName(p))} crosses ${pieceName(q.p)} at ${pt(mid)}`, p, mid), also: refs.get(q.p.id) ?? [] });
     }
     const onRails = entryIn(p.entry, palette)?.overlaps?.includes("wall");
     for (const r of rails) {
-      if (r.geometry.t !== "rail") continue;
       const ra = r.geometry.a, rb = r.geometry.b;
       // a rail run through the bar, or lying under it whole
-      if (!onRails && (edges(p).some(([a, b]) => crosses(a, b, ra, rb)) || within(ra, edges(p)) || within(rb, edges(p)))) {
+      if (!onRails && (sides.some(([a, b]) => crosses(a, b, ra, rb)) || within(ra, sides) || within(rb, sides))) {
         out.push({ ...err("E13", `${cap(pieceName(p))} crosses ${pieceName(r)} at ${pt(mid)}`, p, mid), also: refs.get(r.id) ?? [] });
         continue;
       }
-      const gap = Math.min(...edges(p).map(([a, b]) => segSeg(a, b, ra, rb)));
+      const gap = Math.min(...sides.map(([a, b]) => segSeg(a, b, ra, rb)));
       if (gap > 0 && gap < KERB_GAP - 1e-9) out.push(err("E15", `${cap(pieceName(p))} is ${+gap.toFixed(2)} from ${pieceName(r)}: at least ${KERB_GAP}, or the kerb swallows it`, p, mid));
+    }
+  });
+  return out;
+}
+
+/**
+ * The draft's own rules on what its bars, rails and tunnels meet, of any clock:
+ * E6, a tunnel let out inside a bar (the ball would rest in the solid); E13,
+ * two rails crossing or lying along one another (their kerbs drawn twice), a
+ * post standing inside a bar, a bar over a tunnel's mouth. A pairing the
+ * palette allows (overlaps) is fine. (A rail may stand in water or a mouth: a
+ * pier, a wall across a pond, a cave set in a wall; the ground comes up to
+ * meet it, terrain.ts pools' walls. A bar that comes back by water: E17,
+ * checks.ts, on its four walls.)
+ */
+function meets(d: Draft, palette: readonly PaletteEntry[], refs: Map<string, PieceRef[]>, all: readonly Bar[]): Issue[] {
+  const out: Issue[] = [], kindOf = (p: Piece) => entryIn(p.entry, palette)?.kind, may = mayOverlap(palette);
+  const meet = (p: Piece, what: string, q: Piece, at: V) => out.push({ ...err("E13", `${cap(pieceName(p))} ${what} ${pieceName(q)} at ${pt(at)}`, p, at), also: refs.get(q.id) ?? [] });
+  for (const t of d.pieces) {
+    const v = t.params.to;
+    if (!v || kindOf(t) !== "tunnel") continue;
+    const bar = all.find(({ sides }) => within(v, sides));
+    if (bar) out.push(err("E6", `${cap(pieceName(t))} comes out at ${pt(v)}, inside ${pieceName(bar.p)}`, t, v));
+  }
+  for (const { p, c, sides, mid } of all) {
+    for (const q of d.pieces) {
+      if (q.geometry.t === "post" && within(q.geometry.c, sides) && !may(q, p, "wall")) meet(q, "stands on", p, q.geometry.c);
+      const s = kindOf(q) === "tunnel" && shapeOfPiece(q.geometry);
+      if (s && !may(p, q, "tunnel")) {
+        const lo = [Math.max(s.min[0], Math.min(...c.map((r) => r[0]))), Math.max(s.min[1], Math.min(...c.map((r) => r[1])))], hi = [Math.min(s.max[0], Math.max(...c.map((r) => r[0]))), Math.min(s.max[1], Math.max(...c.map((r) => r[1])))];
+        let over = false; // (sampled where the bar's box and the mouth's meet)
+        for (let x = lo[0]; x <= hi[0] && !over; x += CELL / 2) for (let y = lo[1]; y <= hi[1] && !over; y += CELL / 2) over = within([x, y], sides) && inZone(s, x, y);
+        if (over) meet(p, "lies over", q, mid);
+      }
+    }
+  }
+  const rails = railsOf(d);
+  rails.forEach((r, i) => {
+    const { a, b } = r.geometry, l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    for (const q of rails.slice(i + 1)) {
+      const { a: c, b: e } = q.geometry;
+      if (crosses(a, b, c, e)) meet(r, "crosses", q, a);
+      else {
+        // along one another: on one line, sharing more than a point
+        const side = (p: V) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]), at = (p: V) => ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / (l * l);
+        if (Math.abs(side(c)) < 1e-9 && Math.abs(side(e)) < 1e-9 && Math.min(1, Math.max(at(c), at(e))) - Math.max(0, Math.min(at(c), at(e))) > 1e-6) meet(r, "lies over", q, c);
+      }
     }
   });
   return out;
@@ -211,7 +273,8 @@ function validated(draft: Draft, o: ValidateOptions): Validated {
   const name = (r: PieceRef) => (byRef.has(keyOf(r)) ? pieceName(byRef.get(keyOf(r))!) : `a piece`);
   const entryOf = (r: PieceRef) => { const p = byRef.get(keyOf(r)); return p ? entryIn(p.entry, palette) : undefined; };
   const seen = new Set<string>(), issues: Issue[] = [];
-  for (const i of [...checkHole(h, { name, entryOf }), ...bars(d, h, palette, refs)]) {
+  const all = barsOf(d);
+  for (const i of [...checkHole(h, { name, entryOf, traps: o.traps !== false }), ...bars(d, h, palette, refs, all), ...meets(d, palette, refs, all)]) {
     const p = i.ref ? byRef.get(keyOf(i.ref)) : undefined, piece = i.piece ?? p?.id;
     const k = `${i.rule} ${piece} ${i.text}`;
     if (!seen.has(k)) seen.add(k), issues.push({ ...i, ...(piece && { piece }) });
